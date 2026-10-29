@@ -21,14 +21,20 @@ const CAM = {width: {ideal: 960, max: 1280}, height: {ideal: 540, max: 720}, fra
 const MIC = {echoCancellation: true, noiseSuppression: true, autoGainControl: true};
 const rid = () => Math.random().toString(36).slice(2, 10);
 const sdp = d => (d && d.toJSON ? d.toJSON() : d);
-const errText = (e, what) => {
-  const n = e && e.name;
-  if (n === 'NotAllowedError' || n === 'SecurityError') return `Bạn đã chặn quyền ${what}. Cho phép trong thanh địa chỉ rồi thử lại.`;
-  if (n === 'NotFoundError' || n === 'OverconstrainedError') return `Không tìm thấy ${what}.`;
-  if (n === 'NotSupportedError') return `Không dùng được ${what} (bị chặn hoặc trình duyệt không hỗ trợ).`;
-  if (n === 'NotReadableError' || n === 'AbortError') return `${what[0].toUpperCase() + what.slice(1)} đang bị ứng dụng khác dùng hoặc bị lỗi.`;
-  return (e && e.message) || `Không mở được ${what}`;
+// Giải thích lỗi quyền bằng lời dễ hiểu + chỉ rõ bước tiếp theo. perm = trạng thái quyền của trình duyệt ('granted'|'denied'|'prompt'|'').
+const errText = (e, what, perm) => {
+  const n = e && e.name, msg = String((e && e.message) || ''), W = what[0].toUpperCase() + what.slice(1);
+  if (n === 'NotAllowedError' || n === 'SecurityError') {
+    if (/system/i.test(msg)) return `Windows/máy đang chặn ${what} cho trình duyệt. Vào Cài đặt → Quyền riêng tư → ${what === 'camera' ? 'Camera' : 'Micrô'}, bật "Cho phép ứng dụng truy cập" và "Cho phép ứng dụng trên máy tính truy cập", rồi bấm Bật lại.`;
+    if (perm === 'denied') return `Trình duyệt đang chặn ${what} cho trang này. Bấm biểu tượng 🔒 cạnh thanh địa chỉ → ${W} → Cho phép, rồi bấm Bật lại.`;
+    return `Chưa được cấp quyền ${what} (bạn chưa bấm "Cho phép" hoặc hộp hỏi bị tắt). Bấm Bật ${what} lần nữa và chọn Cho phép.`;
+  }
+  if (n === 'NotFoundError' || n === 'OverconstrainedError') return `Không thấy ${what}. Kiểm tra đã cắm/bật ${what} chưa, hoặc chọn thiết bị khác trong ⚙.`;
+  if (n === 'NotSupportedError') return `Không dùng được ${what} (trình duyệt không hỗ trợ hoặc trang không có HTTPS).`;
+  if (n === 'NotReadableError' || n === 'AbortError') return `${W} đang được ứng dụng hoặc cửa sổ khác dùng (vd. cửa sổ trình duyệt thứ 2, Zoom, Teams). Tắt chúng đi rồi bấm Bật lại.`;
+  return msg || `Không mở được ${what}`;
 };
+const permState = async n => { try { return (await navigator.permissions.query({name: n})).state; } catch (e) { return ''; } };
 
 export class Voice {
   constructor(sess) {
@@ -189,7 +195,7 @@ export class Voice {
       this.micStream = st; this.micTrack = st.getAudioTracks()[0]; this.micTrack.enabled = !this.muted; this.micId = (this.micTrack.getSettings() || {}).deviceId || id || '';
       this.micTrack.onended = () => this._micLost();
       this.micOn = true; this.micErr = ''; this._meter('me', st);
-    } catch (e) { this.micOn = false; this.micErr = errText(e, 'micro'); }
+    } catch (e) { this.micOn = false; this.micErr = errText(e, 'micro', await permState('microphone')); }
   }
   _stopMic() { if (this.micStream) { this.micStream.getTracks().forEach(t => { t.onended = null; t.stop(); }); } this.micStream = null; this.micTrack = null; this.micOn = false; this.speaking = false; if (this._an.me) { try { this._an.me.src.disconnect(); } catch (e) {} delete this._an.me; } }
   async _micLost() {     // rút micro / thiết bị bị ngắt: thử lại bằng micro mặc định 1 lần, không được thì báo lỗi (cuộc gọi vẫn còn)
@@ -208,7 +214,7 @@ export class Voice {
       try { this.camTrack.contentHint = 'motion'; } catch (e) {}
       this.camTrack.onended = () => { this._stopCam(); this.camErr = 'Camera bị ngắt. Cắm lại rồi bật lại.'; this._attachAll(); this._announce(); this._note(this.camErr); this._upd(); };
       this.camOn = true; this.camErr = '';
-    } catch (e) { this.camOn = false; this.camErr = errText(e, 'camera'); }
+    } catch (e) { this.camOn = false; this.camErr = errText(e, 'camera', await permState('camera')); }
   }
   _stopCam() { if (this.camStream) this.camStream.getTracks().forEach(t => { t.onended = null; t.stop(); }); this.camStream = null; this.camTrack = null; this.camOn = false; }
   async switchMic(id) { if (!this.active) { this.micId = id; return; } await this._startMic(id); this._attachAll(); this._announce(); this._upd(); if (this.micErr) this._note(this.micErr); }

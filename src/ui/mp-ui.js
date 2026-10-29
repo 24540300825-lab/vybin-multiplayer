@@ -150,7 +150,7 @@ export function mountMpUi({sess, chat, voice}) {
   $('cDg').onclick = () => { $('cDgP').classList.toggle('on'); dg(); };
   document.querySelectorAll('#cQ .chip').forEach(c => c.onclick = () => voice.setQuality(c.dataset.q));
   async function fillDevices() {
-    const d = await voice.devices(), fill = (el, list, cur) => { el.innerHTML = list.length ? list.map(x => `<option value="${esc(x.id)}"${x.id === cur ? ' selected' : ''}>${esc(x.label)}</option>`).join('') : '<option value="">(chưa có quyền / không có thiết bị)</option>'; };
+    const d = await voice.devices(), fill = (el, list, cur) => { el.innerHTML = list.length ? list.map(x => `<option value="${esc(x.id)}"${x.id === cur ? ' selected' : ''}>${esc(x.label)}</option>`).join('') : '<option value="">(chưa cấp quyền — bấm Bật mic / Bật camera)</option>'; };
     fill($('cSelM'), d.mics, voice.micId); fill($('cSelC'), d.cams, voice.camId);
   }
   voice.on('devices', () => { if ($('cSetP').classList.contains('on')) fillDevices(); });
