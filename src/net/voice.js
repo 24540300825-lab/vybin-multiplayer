@@ -24,6 +24,10 @@ const sdp = d => (d && d.toJSON ? d.toJSON() : d);
 // Giải thích lỗi quyền bằng lời dễ hiểu + chỉ rõ bước tiếp theo. perm = trạng thái quyền của trình duyệt ('granted'|'denied'|'prompt'|'').
 const errText = (e, what, perm) => {
   const n = e && e.name, msg = String((e && e.message) || ''), W = what[0].toUpperCase() + what.slice(1);
+  const why = ` [mã lỗi: ${n || '?'} — ${msg || '-'} — quyền: ${perm || '?'}]`;
+  const r = errText0(e, what, perm, n, msg, W); return r + (/^Không mở được/.test(r) ? '' : why);
+};
+const errText0 = (e, what, perm, n, msg, W) => {
   if (n === 'NotAllowedError' || n === 'SecurityError') {
     if (/system/i.test(msg)) return `Windows/máy đang chặn ${what} cho trình duyệt. Vào Cài đặt → Quyền riêng tư → ${what === 'camera' ? 'Camera' : 'Micrô'}, bật "Cho phép ứng dụng truy cập" và "Cho phép ứng dụng trên máy tính truy cập", rồi bấm Bật lại.`;
     if (perm === 'denied') return `Trình duyệt đang chặn ${what} cho trang này. Bấm biểu tượng 🔒 cạnh thanh địa chỉ → ${W} → Cho phép, rồi bấm Bật lại.`;
