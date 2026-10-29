@@ -20,6 +20,7 @@ async function boot() {
     const {Session} = await import('./net/session.js');
     sess = new Session();
     sess.on('status', ({state, text}) => {
+      if (state === 'full') { hide(); gate.show('🚪', 'Chỗ của bạn đã có người khác vào', 'Bạn rời đi khá lâu nên chỗ đã được nhường. Bấm Thử lại để vào lại nếu còn chỗ.', [['Thử lại', () => location.reload()]]); }
       if (state === 'dup') { hide(); gate.show('🪟', 'Đang mở ở tab khác', 'Tài khoản/slot này đang được dùng ở một tab khác. Dùng tab đó hoặc bấm nút bên dưới để chuyển sang tab này.', [['Dùng tab này', () => location.reload()]]); }
     });
     LB(5, 'Đang kết nối phòng "' + CONFIG.room + '"...');
@@ -82,7 +83,9 @@ async function boot() {
     window.VYNET = {sess, chat, voice, api};
     // tải nền byte của nhân vật kia (HTTP cache) để lúc họ vào không bị khựng
     setTimeout(() => { const f = FILES['char-' + other]; if (f) fetch(`assets/${f.file}?v=${f.v}`, {priority: 'low'}).then(r => r.arrayBuffer()).catch(() => {}); }, 4000);
-    addEventListener('pagehide', () => { try { voice.leave(); } catch (e) {} });
+    addEventListener('pagehide', () => { try { voice.leave('reload'); } catch (e) {} });
+    voice.resume().catch(e => console.warn('call resume', e));
+    addEventListener('pageshow', e => { if (e.persisted) voice.resume().catch(() => {}); });     // sau đổi map/F5: tự vào lại cuộc gọi nếu trước đó đang gọi
     $('mpLeave') && ($('mpLeave').onclick = async () => { await sess.leave(); location.reload(); });
   }
   LB(100, 'Xong!'); setTimeout(hide, 300);

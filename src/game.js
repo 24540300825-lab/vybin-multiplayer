@@ -171,6 +171,9 @@ export function init(ctx){
     for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;let ok=false;for(const b of fl)if(x>b.min.x+0.12&&x<b.max.x-0.12&&z>b.min.z+0.12&&z<b.max.z-0.12){ok=true;break}if(!ok)blocked[1][j*G.W+i]=1}}
   for(let lv=0;lv<2;lv++)for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;
     for(const S of stairs)if(x>S.x0-0.02&&x<S.x1+0.02&&z>S.z0-0.4&&z<S.z1+0.2)blocked[lv][j*G.W+i]=0;}
+  // thân cầu thang (giữa chân và đỉnh) là VẬT CẢN với đường đi A* / click-để-đi: chỉ miệng cầu thang (chân & đỉnh) được mở. Trước đây thân cầu thang để trống nên đường đi cắt ngang qua cầu thang ở tầng 0.
+  for(let lv=0;lv<2;lv++)for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;
+    for(const S of stairs)if(x>S.x0-0.02&&x<S.x1+0.02&&z>S.z0&&z<S.z1+0.02)blocked[lv][j*G.W+i]=1;}
   console.log('colliders',cols[0].length,cols[1].length);
   window.__G={G,blocked,A,cols,envMeshes,isUnder,CHAIR};
   const colGroup=new THREE.Group();colGroup.visible=false;scene.add(colGroup);
@@ -252,7 +255,7 @@ export function init(ctx){
   function makeChar(chrG,DEF){
   const K=DEF.K;
   let emitOff=0;const em=(t,a)=>{if(!DEF.remote&&!emitOff&&api.emit)api.emit(t,a)};
-  let net=null,netMis=0;
+  let net=null,netMis=0,lvMis=0;
   const char=chrG.scene;
   if(DEF.colors)char.traverse(o=>{if(!(o.isMesh))return;(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{
     const c=DEF.colors[m.name];if(c&&m.color){m.color.set(c);if('metalness' in m){m.metalness=0;m.roughness=1;}}})});
@@ -559,7 +562,11 @@ export function init(ctx){
     if(busy)return;
     if(P.mode==='free'){
       const k=1-Math.exp(-dt*(d>0.6?7:3.5));P.pos.x+=dx*k;P.pos.z+=dz*k;
-      if(!stairAt(P.pos.x,P.pos.z)&&!plan[0])P.level=s.l;
+      // tầng của bản sao tự suy ra từ lúc rời cầu thang; chỉ nhận tầng từ snapshot khi lệch KÉO DÀI (snapshot cũ 0.1–0.2s đã làm nhân vật tụt/nhảy tầng)
+      if(!stairAt(P.pos.x,P.pos.z)&&!plan[0]){
+        if(s.l===P.level)lvMis=0;
+        else if(!stairAt(s.x,s.z)&&Math.hypot(s.x-P.pos.x,s.z-P.pos.z)<0.8){lvMis+=dt;if(lvMis>0.7){P.level=s.l;lvMis=0}}
+        else lvMis=0;}
       if(P.sp<0.05&&!plan[0])P.yaw+=angDiff(s.w,P.yaw)*(1-Math.exp(-dt*6));}
     // đồng bộ chế độ (nằm/ngồi) nếu lệch kéo dài
     if(s.m!==P.mode&&!s.b&&!plan[0]){netMis+=dt;if(netMis>0.8){netMis=0;

@@ -24,7 +24,7 @@ export function mountMpUi({sess, chat, voice}) {
   const me = sess.slot, other = me === 'bin' ? 'vy' : 'bin';
   // ---- nút trên thanh trên cùng
   const top = $('hTop');
-  top.insertAdjacentHTML('afterbegin', '<button class="ib" id="iChat"><span>💬</span>Chat<b class="bdg" id="cBdg" style="display:none">0</b></button><button class="ib" id="iVoice"><span id="vIc">🎙️</span><i id="vTx">Voice</i></button><button class="ib" id="iVoiceX" style="display:none" title="Rời voice"><span>✕</span></button>');
+  top.insertAdjacentHTML('afterbegin', '<button class="ib" id="iChat"><span>💬</span>Chat<b class="bdg" id="cBdg" style="display:none">0</b></button><button class="ib" id="iVoice"><span id="vIc">🎙️</span><i id="vTx">Voice</i></button><button class="ib" id="iVid"><span>📹</span>Video</button><button class="ib" id="iVoiceX" style="display:none" title="Rời voice"><span>✕</span></button>');
   // ---- thẻ đối phương
   const pc = document.createElement('div'); pc.id = 'hPeer'; pc.className = 'hud glass';
   pc.innerHTML = `<div class="av" id="peAv">${NAME[other][0]}</div><div style="flex:1;min-width:0"><div class="nm" id="peNm">${NAME[other]}</div><div class="lv" id="peSt">Đang chờ...</div></div><div id="peMic" class="pm"></div>`;
@@ -77,21 +77,106 @@ export function mountMpUi({sess, chat, voice}) {
   tx.addEventListener('keyup', e => e.stopPropagation());
   $('chGo').onclick = go;
 
-  // ---------- voice ----------
-  function vui(s) {
-    const b = $('iVoice');
-    b.classList.toggle('live', s.active); b.classList.toggle('talk', s.speaking);
-    $('vIc').textContent = !s.active ? '🎙️' : s.muted ? '🔇' : '🎙️';
-    $('vTx').textContent = !s.active ? (s.listening ? 'Voice (nghe)' : 'Voice') : s.muted ? 'Đã tắt tiếng' : s.conn === 'connected' ? 'Đang nói chuyện' : s.conn === 'reconnecting' ? 'Kết nối lại…' : 'Đang kết nối…';
-    $('iVoiceX').style.display = s.active ? '' : 'none';
-    pc.classList.toggle('talk', !!s.peerSpeaking);
-    $('peMic').textContent = !sess.peer ? '' : s.peerVoice ? (s.peerMuted ? '🔇' : '🎙️') : '';
-    if (s.err) toast(s.err);
+  // ---------- cuộc gọi (voice + video) ----------
+  const PH = {idle: '', asking: 'Đang xin quyền…', waiting: `Chờ ${NAME[other]} vào cuộc gọi`, connecting: 'Đang kết nối…', connected: 'Đang gọi', weak: 'Mạng yếu', recovering: 'Đang nối lại…', lost: 'Mất kết nối — đang thử lại', ended: 'Cuộc gọi đã kết thúc'};
+  const call = document.createElement('div'); call.id = 'hCall'; call.className = 'hud glass';
+  call.innerHTML = `<div class="cH"><span class="cDot" id="cDot"></span><b id="cSt">—</b><i id="cTm"></i><span class="cSp"></span>
+      <button class="pl" id="cDg" title="Chẩn đoán">📊</button><button class="pl" id="cSet" title="Thiết bị & chất lượng">⚙</button><button class="pl" id="cMin" title="Thu nhỏ">–</button><button class="pl" id="cX" title="Đóng khung video (cuộc gọi vẫn tiếp tục)">✕</button></div>
+    <div class="cV"><video id="cRv" autoplay playsinline muted></video><div class="cNo" id="cNo"><div class="av">${NAME[other][0]}</div><span id="cNoT"></span></div><video id="cLv" autoplay playsinline muted></video></div>
+    <div id="cErr"></div>
+    <div class="cC"><button class="ib" id="cMic"><span>🎙️</span><i>Mic</i></button><button class="ib" id="cCam"><span>📹</span><i>Camera</i></button><button class="ib end" id="cEnd"><span>📞</span><i>Kết thúc</i></button></div>
+    <div class="cP" id="cSetP"><label>Micro <select id="cSelM"></select></label><label>Camera <select id="cSelC"></select></label>
+      <div class="chips" id="cQ">${['auto:Tự động', 'high:Cao', 'mid:Vừa', 'low:Thấp'].map(x => `<span class="chip" data-q="${x.split(':')[0]}">${x.split(':')[1]}</span>`).join('')}</div></div>
+    <div class="cP" id="cDgP"><pre id="cDgT"></pre><button class="pl" id="cDgCp">Sao chép</button></div>`;
+  document.body.appendChild(call);
+  const placeCall = () => { const pr = document.getElementById('hPeer'); if (pr) call.style.setProperty('--callTop', Math.round(pr.getBoundingClientRect().bottom + 8) + 'px'); };
+  placeCall(); addEventListener('resize', placeCall); setTimeout(placeCall, 900);
+  const rv = $('cRv'), lv = $('cLv'), play = v => { const p = v.play && v.play(); p && p.catch && p.catch(() => {}); };
+  let shown = false, collapsed = false, setOpenP = null, lastS = voice.state(), tmT = null, autoShown = false;
+  const mmss = t => { const n = Math.max(0, Math.floor(t / 1000)), h = Math.floor(n / 3600); return (h ? h + ':' : '') + String(Math.floor(n % 3600 / 60)).padStart(h ? 2 : 1, '0') + ':' + String(n % 60).padStart(2, '0'); };
+  const viewing = () => shown && !collapsed;
+  function bindVideo() {
+    const on = viewing() && !document.hidden;
+    const ms = on && voice.remoteVideo && lastS.peerCam ? voice.remoteVideo : null;
+    if (rv.srcObject !== ms) { rv.srcObject = ms; if (ms) play(rv); }
+    const ls = on && voice.camStream ? voice.camStream : null;
+    if (lv.srcObject !== ls) { lv.srcObject = ls; if (ls) play(lv); }
+    $('cNo').style.display = ms ? 'none' : '';
+    $('cNoT').textContent = !lastS.peerCam ? 'Camera của ' + NAME[other] + ' đang tắt' : !ms ? 'Đang tải hình…' : '';
+    lv.style.display = ls ? '' : 'none';
   }
-  voice.on('state', vui); vui(voice.state());
-  voice.on('needGesture', () => toast('Chạm vào trang để nghe voice'));
-  $('iVoice').onclick = async () => { const s = voice.state(); if (!s.active) await voice.join(); else voice.toggleMute(); };
-  $('iVoiceX').onclick = () => voice.leave();
-  addEventListener('keydown', e => { if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; if (e.code === 'KeyT' && !e.repeat) { e.preventDefault(); setOpen(true); } if (e.code === 'KeyM' && !e.repeat && voice.micOn) voice.toggleMute(); });
+  function showCall(v) { shown = v; call.classList.toggle('on', v); voice.setPanelOpen(viewing()); bindVideo(); tick(); }
+  function tick() { const s = lastS; $('cTm').textContent = (viewing() || collapsed) && s.connectedAt && s.active ? mmss(Date.now() - s.connectedAt) : ''; }
+  function cui(s) {
+    lastS = s; const ph = s.phase;
+    call.dataset.ph = ph; $('cSt').textContent = PH[ph] || '';
+    $('cMic').classList.toggle('off', !s.micOn || s.muted); $('cMic').firstChild.textContent = !s.micOn ? '🎙️' : s.muted ? '🔇' : '🎙️'; $('cMic').lastChild.textContent = !s.micOn ? 'Bật mic' : s.muted ? 'Bật tiếng' : 'Tắt tiếng';
+    $('cCam').classList.toggle('off', !s.camOn); $('cCam').lastChild.textContent = s.camOn ? 'Tắt camera' : 'Bật camera';
+    $('cCam').firstChild.textContent = s.camOn ? '📹' : '📷';
+    const errs = []; if (s.micErr) errs.push('🎙️ ' + s.micErr); if (s.camErr) errs.push('📹 ' + s.camErr);
+    if (!s.sigOk && s.active && s.phase !== 'lost') errs.push('📡 Tín hiệu tạm mất — cuộc gọi vẫn tiếp tục, đang nối lại tín hiệu…');
+    if (s.vPause) errs.push('⏸️ Mạng yếu — tạm dừng hình để giữ tiếng');
+    $('cErr').innerHTML = errs.map(e => `<div>${esc(e)}</div>`).join('');
+    document.querySelectorAll('#cQ .chip').forEach(c => c.classList.toggle('on', c.dataset.q === s.quality));
+    // nút trên thanh trên cùng
+    const b = $('iVoice'); b.classList.toggle('live', s.active); b.classList.toggle('talk', s.speaking);
+    $('vIc').textContent = !s.active ? '🎙️' : (!s.micOn || s.muted) ? '🔇' : '🎙️';
+    $('vTx').textContent = !s.active ? (s.listening ? 'Voice (nghe)' : 'Voice') : !s.micOn ? 'Bật mic' : s.muted ? 'Đã tắt tiếng' : s.phase === 'connected' ? 'Đang nói chuyện' : s.phase === 'weak' ? 'Mạng yếu' : s.phase === 'recovering' || s.phase === 'lost' ? 'Nối lại…' : s.phase === 'waiting' ? 'Chờ ' + NAME[other] : 'Đang kết nối…';
+    $('iVoiceX').style.display = s.active ? '' : 'none';
+    $('iVid').classList.toggle('live', s.camOn || (s.active && shown));
+    pc.classList.toggle('talk', !!s.peerSpeaking);
+    $('peMic').textContent = !sess.peer ? '' : s.peerVoice ? (s.peerMuted ? '🔇' : '🎙️') + (s.peerCam ? '📹' : '') : '';
+    // tự mở khung video khi mình bật camera hoặc đối phương bật camera (lần đầu của cuộc gọi); cuộc gọi chỉ có tiếng thì không hiện gì
+    if (!s.active && !s.listening) { autoShown = false; if (shown) showCall(false); }
+    else if (!autoShown && (s.camOn || s.peerCam)) { autoShown = true; collapsed = false; call.classList.remove('min'); showCall(true); }
+    if (!s.peerCam && !s.camOn && s.phase === 'ended') showCall(false);
+    bindVideo(); tick();
+  }
+  voice.on('state', cui);
+  voice.on('video', () => bindVideo());
+  voice.on('note', t => toast(t));
+  voice.on('needGesture', () => toast('Chạm vào trang để nghe cuộc gọi'));
+  voice.on('peerEnded', () => { autoShown = false; });
+  addEventListener('visibilitychange', () => { bindVideo(); tick(); });
+  tmT = setInterval(() => { if (!document.hidden) tick(); }, 1000);
+  $('iVoice').onclick = async () => { const s = voice.state(); if (!s.active) await voice.join({mic: true}); else voice.toggleMute(); };
+  $('iVid').onclick = async () => { const s = voice.state(); if (!s.active) { await voice.setCamera(true); return; } if (shown && !collapsed) showCall(false); else { collapsed = false; call.classList.remove('min'); showCall(true); } };
+  const endCall = () => { voice.leave(); autoShown = false; showCall(false); };
+  $('iVoiceX').onclick = endCall; $('cEnd').onclick = endCall;
+  $('cMic').onclick = () => voice.toggleMute(); $('cCam').onclick = () => voice.toggleCamera();
+  $('cX').onclick = () => showCall(false);
+  $('cMin').onclick = () => { collapsed = !collapsed; call.classList.toggle('min', collapsed); voice.setPanelOpen(viewing()); bindVideo(); tick(); };
+  $('cSet').onclick = async () => { const p = $('cSetP'); p.classList.toggle('on'); if (p.classList.contains('on')) fillDevices(); };
+  $('cDg').onclick = () => { $('cDgP').classList.toggle('on'); dg(); };
+  document.querySelectorAll('#cQ .chip').forEach(c => c.onclick = () => voice.setQuality(c.dataset.q));
+  async function fillDevices() {
+    const d = await voice.devices(), fill = (el, list, cur) => { el.innerHTML = list.length ? list.map(x => `<option value="${esc(x.id)}"${x.id === cur ? ' selected' : ''}>${esc(x.label)}</option>`).join('') : '<option value="">(chưa có quyền / không có thiết bị)</option>'; };
+    fill($('cSelM'), d.mics, voice.micId); fill($('cSelC'), d.cams, voice.camId);
+  }
+  voice.on('devices', () => { if ($('cSetP').classList.contains('on')) fillDevices(); });
+  $('cSelM').onchange = e => e.target.value && voice.switchMic(e.target.value);
+  $('cSelC').onchange = e => e.target.value && voice.switchCam(e.target.value);
+  const L = {high: 'Cao', mid: 'Vừa', low: 'Thấp'};
+  function dg() {
+    if (!$('cDgP').classList.contains('on')) return;
+    const d = voice.diagnostics(), n = (v, u = '') => v == null || v === '' ? '—' : v + u;
+    const relay = /relay/.test(d.route || '') ? ' ← qua TURN' : '';
+    $('cDgT').textContent = [
+      `Tín hiệu : ${d.sig}   Media: ${d.media}   ICE: ${n(d.ice)}`,
+      `Đường đi : ${n(d.route)}${relay}   TURN cấp: ${d.turn == null ? '—' : d.turn ? 'có' : 'không (chỉ STUN)'}`,
+      `RTT ${n(d.rtt, ' ms')} · mất gói ${n(d.lossIn, '%')} · jitter ${n(d.jitter, ' ms')}`,
+      `Âm thanh vào ${n(d.kbpsAudioIn, ' kbps')}`,
+      `Hình vào ${n(d.kbpsVideoIn, ' kbps')} ${n(d.fpsIn)} fps ${n(d.resIn)}`,
+      `Hình ra  ${n(d.kbpsVideoOut, ' kbps')} ${n(d.fpsOut)} fps ${n(d.resOut)}  (giới hạn: ${n(d.limit || 'none')})`,
+      `Mức hình : ${L[LEVELS_ID[d.level]] || '—'}${d.vPause ? ' (đã tạm dừng hình)' : ''}`,
+      `Thời gian kết nối ${n(d.connectMs, ' ms')} · nối lại ${d.reconnects} lần · gián đoạn ${mmss(d.interruptMs)} · đã gọi ${mmss(d.duration * 1000)}`].join('\n');
+  }
+  const LEVELS_ID = ['high', 'mid', 'low'];
+  voice.on('stats', dg); sess.on('status', dg);
+  $('cDgCp').onclick = () => { try { navigator.clipboard.writeText(JSON.stringify(voice.diagnostics(), null, 1)); toast('Đã sao chép số liệu chẩn đoán'); } catch (e) {} };
+  call.addEventListener('click', e => { const b = e.target.closest('button'); if (b) b.blur(); });     // tránh phím cách/Enter bấm nhầm nút đang focus
+  call.addEventListener('keydown', e => e.stopPropagation()); call.addEventListener('keyup', e => e.stopPropagation());
+  cui(voice.state());
+  addEventListener('keydown', e => { if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; if (e.code === 'KeyT' && !e.repeat) { e.preventDefault(); setOpen(true); } if (e.code === 'KeyM' && !e.repeat && voice.active) voice.toggleMute(); });
   return {setOpen};
 }

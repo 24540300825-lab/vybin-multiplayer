@@ -14,14 +14,25 @@ export class Chat {
   emit(ev, a) { (this.h[ev] || []).forEach(f => { try { f(a); } catch (e) { console.error(e); } }); }
 
   async start() {
-    const sb = this.s.sb, room = this.s.room;
     await this._history();
-    this._ch = sb.channel('chat:' + room)
+    this._listen();
+    // kênh realtime của phiên được dựng lại (tab ẩn lâu, mất mạng...) => dựng lại kênh chat + vá tin nhắn bị lỡ
+    this.s.on('revived', () => this.revive());
+  }
+  _listen() {
+    const sb = this.s.sb, room = this.s.room;
+    const ch = this._ch = sb.channel('chat:' + room + ':' + Math.random().toString(36).slice(2, 6))
       .on('postgres_changes', {event: 'INSERT', schema: 'public', table: 'messages', filter: 'room_code=eq.' + room}, p => this._add(p.new))
       .subscribe(st => {
+        if (ch !== this._ch) return;
         if (st === 'SUBSCRIBED') { this.ready = true; this.emit('state', 'ready'); this._history(true); }   // vá khoảng trống sau reconnect
         else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') { this.ready = false; this.emit('state', 'offline'); }
       });
+  }
+  async revive() {
+    const old = this._ch; this._ch = null; this.ready = false;
+    try { old && await this.s.sb.removeChannel(old); } catch (e) {}
+    this._listen();
   }
   async _history(gap) {
     const sb = this.s.sb;

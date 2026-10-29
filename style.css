@@ -78,3 +78,21 @@ canvas{display:block}
 .cm{max-width:86%;padding:6px 10px;border-radius:12px;background:#ffffff1c;font-size:13px;line-height:1.4;word-break:break-word}.cm.me{align-self:flex-end;background:#ffc46b33}.cm .cn{font-size:10px;opacity:.6;margin-bottom:2px}.cm.pend{opacity:.6}.cm.bad{outline:1px solid #ff6b6b}
 #chIn{display:flex;gap:6px;margin-top:8px;align-items:flex-end}#chTx{flex:1;resize:none;background:#ffffff1a;border:1px solid var(--gb);border-radius:10px;color:var(--tx);padding:7px 9px;font:inherit;font-size:13px;max-height:90px}
 #chErr{font-size:11px;color:#ff9a9a;min-height:14px;margin-top:3px}
+/* ===== cuộc gọi video ===== */
+#iVid{position:relative}#iVid.live{outline:2px solid #7cf08a88}
+#hCall{max-height:calc(100vh - var(--callTop,270px) - 10px);overflow:auto;position:fixed;left:14px;top:var(--callTop,270px);z-index:6;width:min(300px,calc(100vw - 28px));padding:8px;display:none;flex-direction:column;gap:6px}#hCall.on{display:flex}
+#hCall .cH{display:flex;align-items:center;gap:6px;font-size:12px}#hCall .cH b{font-weight:700}#hCall .cH i{font-style:normal;opacity:.75;font-variant-numeric:tabular-nums}#hCall .cSp{flex:1}
+#hCall .pl{padding:2px 7px;font-size:13px}
+.cDot{width:9px;height:9px;border-radius:50%;background:#888;flex:none}
+#hCall[data-ph=connected] .cDot{background:#7cf08a}#hCall[data-ph=weak] .cDot{background:#ffd27a}#hCall[data-ph=recovering] .cDot,#hCall[data-ph=connecting] .cDot,#hCall[data-ph=asking] .cDot{background:#ffd27a;animation:cblink 1s infinite}
+#hCall[data-ph=lost] .cDot{background:#ff5a5a}@keyframes cblink{50%{opacity:.3}}
+.cV{position:relative;aspect-ratio:16/9;background:#0008;border-radius:12px;overflow:hidden}
+#cRv{width:100%;height:100%;object-fit:cover;display:block;background:#000}
+#cLv{position:absolute;right:6px;bottom:6px;width:32%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;border:1px solid #fff6;transform:scaleX(-1);background:#000}
+.cNo{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:12px;opacity:.85}.cNo .av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#ffc46b,#ff8f6b);display:grid;place-items:center;font-weight:800;color:#3b2a1a;font-size:20px}
+#cErr{font-size:11px;color:#ffb3b3}#cErr:empty{display:none}#cErr div{margin:2px 0}
+.cC{display:flex;gap:6px;justify-content:center}.cC .ib{width:auto;flex:1;padding:5px 2px}.cC .ib span{font-size:20px}.cC .ib i{font-style:normal;font-size:10px}.cC .ib.off{opacity:.65}.cC .ib.end{background:#c0392b66}.cC .ib.end:hover{background:#c0392baa}
+.cP{display:none;font-size:12px}.cP.on{display:block}.cP label{display:flex;justify-content:space-between;gap:8px;align-items:center;margin:4px 0}.cP select{max-width:170px;background:#fff2;color:var(--tx);border:1px solid var(--gb);border-radius:8px;padding:3px}
+#cDgP pre{margin:0 0 6px;font:10px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;color:var(--tx2)}
+#hCall.min .cV,#hCall.min .cC,#hCall.min .cP,#hCall.min #cErr{display:none}#hCall.min{width:auto}
+@media(max-width:900px){#hCall{top:auto;bottom:150px;width:min(240px,calc(100vw - 28px))}}

@@ -9,7 +9,7 @@ export const CONFIG = {
   room: (q.get('room') || c.room || 'main').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || 'main',
   privateChannels: c.privateChannels !== false,
   snapshotHz: c.snapshotHz || 6,           // tần số gửi vị trí khi đang di chuyển
-  idleHz: c.idleHz || 1,                   // khi đứng yên
+  idleHz: c.idleHz || 0.4,                  // khi đứng yên
   ice: c.ice || [{urls: 'stun:stun.l.google.com:19302'}, {urls: 'stun:stun1.l.google.com:19302'}],
   turn: c.turn || null,                    // {urls:[...], username, credential}
   mock: q.get('mock') || c.mock || '',     // dev: đường dẫn module Supabase giả lập

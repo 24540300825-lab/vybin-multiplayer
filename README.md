@@ -19,13 +19,17 @@ Người vào đầu = **BIN**, người thứ hai = **VY**, người thứ ba b
 - `vercel.json` đã có cache header (assets immutable, hash theo `?v=`) và Permissions-Policy cho micro. Vercel cấp HTTPS (bắt buộc cho voice).
 
 ### TURN (nên có nếu chơi khác mạng / 4G)
-STUN Google có sẵn. Với NAT chặt cần TURN: tạo tài khoản Metered / Cloudflare Calls / tự dựng coturn, rồi bỏ comment dòng `turn:` trong `config.js`. (Credential TURN tĩnh trong frontend là công khai; dùng gói free/giới hạn băng thông.)
+STUN Google có sẵn (đủ cho đa số mạng nhà). Mạng chặt (4G, wifi công ty, NAT đối xứng) cần TURN. Game dùng **thông tin TURN ngắn hạn (1 giờ) do backend cấp**: trình duyệt gọi `/api/turn` (file `api/turn.js`), hàm này kiểm tra đăng nhập + đang ở trong phòng rồi mới trả thông tin. Khóa bí mật nằm trong biến môi trường Vercel, KHÔNG nằm trong trình duyệt/repo.
+- Cloudflare Realtime TURN: đặt `CF_TURN_KEY_ID`, `CF_TURN_API_TOKEN`.
+- Hoặc Metered Open Relay: đặt `METERED_APP`, `METERED_API_KEY`.
+- Chưa đặt biến nào => cuộc gọi vẫn chạy bằng STUN (bảng chẩn đoán 📊 ghi "TURN cấp: không").
+- Dòng `turn:` tĩnh trong `config.js` vẫn dùng được như phương án dự phòng (công khai, không khuyến khích).
 
 ### Kiểm tra sau deploy
 Mở URL ở 2 trình duyệt/thiết bị: máy 1 = BIN, máy 2 = VY; thử di chuyển, ngủ giường, chat, bấm nút Voice. Mở máy thứ 3 → phải thấy "Phòng đã đủ 2 người". `?perf` hoặc F3 hiện overlay FPS.
 
 ## 2. Điều khiển
-WASD + Shift (chạy) + E (tương tác) + click để đi; chuột phải/kéo xoay camera. Camera luôn bám nhân vật của mình. T mở chat, M tắt/mở mic.
+WASD + Shift (chạy) + E (tương tác) + click để đi; chuột phải/kéo xoay camera. Camera luôn bám nhân vật của mình. T mở chat, M tắt/mở tiếng. Nút 🎙️ Voice = vào cuộc gọi (chỉ tiếng); nút 📹 Video = mở khung video, bật camera trong khung đó.
 
 ## 3. Kiến trúc
 - `src/main.js` boot: cổng → Session → nạp asset (map + nhân vật của mình) → game.
@@ -57,7 +61,16 @@ Chạy với backend giả lập (2 tab Playwright, `dev/mock-supabase.js`) — 
 PASS: gán slot BIN/VY, nhìn thấy nhau, đồng bộ click-move/WASD/giường, chat 2 chiều không trùng + unread, voice kết nối + có byte audio (mic giả), mute, rời/vào lại voice, F5 giữ slot, người thứ 3 bị chặn, đổi map đồng bộ.
 **CHƯA kiểm chứng**: Supabase thật (RLS, policy `realtime.messages`, anonymous auth), Vercel thật, TURN/khác mạng, FPS trên GPU thật, ổn định phiên dài, thiết bị di động.
 
+## 7b. Cuộc gọi video (BR-004) — kiểm thử
+Chạy bằng Chromium thật (Playwright) với camera/mic **giả**, 2 cửa sổ cùng máy, mạng loopback (`host→host`), tín hiệu qua kênh giả lập (không phải Supabase thật):
+- ĐÃ CHẠY, đạt: nối cuộc gọi (kể cả bên kia chưa bấm vào), tiếng + hình 2 chiều có byte/FPS thật, tắt/bật camera, tắt tiếng, thu nhỏ khung => bên kia ngừng gửi hình (tiếng không đổi), mất tín hiệu 12 giây (media không đứt, cùng 1 kết nối, không tạo trùng), ICE restart thật, dựng lại kết nối, F5 một bên / cả hai bên, tự vào lại sau đổi map/F5, rút micro/camera (mô phỏng sự kiện ngắt), từ chối quyền (mô phỏng), kết thúc => camera/mic/kết nối/timer/listener đều giải phóng.
+- MÔ PHỎNG (số liệu mạng bịa để thử thuật toán, không phải mạng yếu thật): tự hạ chất lượng, tạm dừng hình, tự nâng lại.
+- CHƯA CHẠY: hai máy thật / khác mạng / 4G, TURN thật (chưa có tài khoản TURN), Safari/iOS/Firefox, camera & micro thật, CPU/RAM trên máy thật khi đang chơi 3D, Supabase Realtime thật dưới tải cuộc gọi.
+
 ## 8. Giới hạn đã biết
+- Đổi map = tải lại trang => cuộc gọi đứt vài giây rồi **tự nối lại** (nếu trình duyệt đã nhớ quyền mic/camera; Safari có thể phải bấm lại).
+- Cuộc gọi có hình tốn băng thông: ~0.2–1.1 Mbps mỗi chiều (tự hạ khi mạng yếu); đi thẳng giữa 2 máy, không tốn quota Supabase. Chỉ **tín hiệu** (vài chục tin lúc nối) đi qua Realtime.
+- Qua TURN: tốn băng thông của nhà cung cấp TURN (gói free có hạn mức, xem trang nhà cung cấp).
 - Đổi map = tải lại trang (có fade).
 - Remote có thể lệch nhẹ rồi tự hiệu chỉnh bằng snapshot.
 - Free tier Supabase giới hạn ~2M message Realtime/tháng.
