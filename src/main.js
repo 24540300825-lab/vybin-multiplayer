@@ -76,7 +76,8 @@ async function boot() {
     sess.on('msg', m => { if (m.k === 'map' && isMap(m.map) && m.map !== mapId) { toast('Đối phương chuyển sang: ' + MAP_LIST[m.map].name); prefetchMap(m.map); goToMap(m.map); } });
     sess.on('peer', ({present}) => { if (!present) return; });
     const chat = new Chat(sess), voice = new Voice(sess);
-    mountMpUi({sess, chat, voice});
+    const ui = mountMpUi({sess, chat, voice});
+    try { const {mountChatNotify} = await import('./ui/chat-notify.js'); mountChatNotify({chat, openChat: ui.setOpen}); } catch (e) { console.warn('chat-notify', e); }
     chat.start().catch(e => console.warn('chat', e));
     window.VYNET = {sess, chat, voice, api};
     // tải nền byte của nhân vật kia (HTTP cache) để lúc họ vào không bị khựng
