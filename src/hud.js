@@ -36,10 +36,23 @@ import {Lofi} from './lofi.js';
   $('sAuto').checked=!!window.TPX.auto;$('sAuto').onchange=e=>{window.TPX.auto=e.target.checked;syncOld();window.__applyToon();window.__envChanged&&window.__envChanged()};
   // --- đồng hồ
   const days=['CN','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
-  function clk(){const T=window.TPX;$('cT').textContent=fmt(T.time);const d=new Date();$('cD').textContent=days[d.getDay()]+', '+d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear()+' · '+WV[T.weather];
+  // Giờ thật theo múi giờ chọn (mặc định Hà Nội). Thời tiết vẫn đổi tự do. Tắt "Giờ thật" => quay về giờ chỉnh tay như cũ.
+  const TZS=[['Asia/Ho_Chi_Minh','Hà Nội / TP.HCM (UTC+7)'],['Asia/Bangkok','Bangkok (UTC+7)'],['Asia/Singapore','Singapore (UTC+8)'],['Asia/Tokyo','Tokyo (UTC+9)'],['Asia/Seoul','Seoul (UTC+9)'],['Australia/Sydney','Sydney'],['Asia/Kolkata','Ấn Độ (UTC+5:30)'],['Europe/Moscow','Moscow (UTC+3)'],['Europe/Paris','Paris / Berlin'],['Europe/London','London'],['UTC','UTC'],['America/New_York','New York'],['America/Chicago','Chicago'],['America/Los_Angeles','Los Angeles']];
+  let tz=load('vyTz','Asia/Ho_Chi_Minh');if(!TZS.some(x=>x[0]===tz))tz='Asia/Ho_Chi_Minh';
+  let real=load('vyReal',true)!==false;window.__realTime=real;
+  const sTz=$('sTz');sTz.innerHTML=TZS.map(([k,l])=>`<option value="${k}"${k===tz?' selected':''}>${l}</option>`).join('');
+  const dtf=z=>{try{return new Intl.DateTimeFormat('en-GB',{timeZone:z,hour:'numeric',minute:'numeric',second:'numeric',hourCycle:'h23',weekday:'short',day:'numeric',month:'numeric',year:'numeric'})}catch(e){return null}};
+  let F=dtf(tz);
+  function nowIn(){const o={};const d=new Date();if(F)F.formatToParts(d).forEach(p=>o[p.type]=p.value);else{o.hour=d.getHours();o.minute=d.getMinutes();o.second=d.getSeconds();o.weekday=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];o.day=d.getDate();o.month=d.getMonth()+1;o.year=d.getFullYear()}
+    return {h:(+o.hour%24)+(+o.minute)/60+(+o.second)/3600,wd:{Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[o.weekday]||0,day:o.day,mon:o.month,yr:o.year}}
+  function setReal(v){real=!!v;window.__realTime=real;save('vyReal',real);if(real){window.TPX.auto=false;syncOld();window.__applyToon&&window.__applyToon(false)}sT.disabled=real;$('sAuto').disabled=real;$('sReal').checked=real;clk()}
+  $('sReal').onchange=e=>setReal(e.target.checked);
+  sTz.onchange=e=>{tz=e.target.value;save('vyTz',tz);F=dtf(tz);clk()};
+  function clk(){const T=window.TPX,N=nowIn();if(real&&T.auto)T.auto=false;if(real&&Math.abs(T.time-N.h)>1e-4){T.time=N.h;window.__syncTime&&window.__syncTime()}
+    const shown=real?N.h:T.time;$('cT').textContent=fmt(shown);$('cD').textContent=days[N.wd]+', '+N.day+'/'+N.mon+'/'+N.yr+' · '+WV[T.weather];
     const night=T.time<5.5||T.time>19.3;$('cW').textContent=T.weather==='clear'?(night?'🌙':'☀️'):WI[T.weather]||'☀️';
-    if(document.activeElement!==sT){sT.value=T.time;$('sTimeV').textContent=fmt(T.time)}$('sAuto').checked=!!T.auto}
-  setInterval(clk,500);clk();
+    if(document.activeElement!==sT){sT.value=T.time;$('sTimeV').textContent=fmt(T.time)}if(!real)$('sAuto').checked=!!T.auto}
+  setInterval(clk,1000);setReal(real);
   // --- hồ sơ: bấm đổi nhân vật
   const LS=()=>window.LOCAL_SLOT||'vy';
   function prof(){const bin=LS()==='bin';$('pNm').textContent=bin?'Bin':'Vy';$('pAv').textContent=bin?'B':'V';$('pLv').textContent='Lv. 12 · đang điều khiển '+(bin?'Bin':'Vy')}

@@ -1219,7 +1219,7 @@ export function init(ctx){
     case 'int':rinp.interact=true;break;case 'door':{const d=doorList.find(x=>x.node.name===a);if(d)toggleDoor(d);break}}};
   api.envOut=null;
   window.__envChanged=()=>{if(api.envOut)api.envOut({time:TP.time,weather:TP.weather,auto:TP.auto?1:0})};
-  api.applyEnv=m=>{if(m.time!=null)TP.time=m.time;if(m.weather)TP.weather=m.weather;window.__tpSync&&window.__tpSync();applyToon(false)};
+  api.applyEnv=m=>{if(m.time!=null&&!window.__realTime)TP.time=m.time;if(m.weather)TP.weather=m.weather;window.__tpSync&&window.__tpSync();applyToon(false)};
   api.syncEnvOut=()=>window.__envChanged();
   api.warm=()=>renderer.compileAsync?renderer.compileAsync(scene,camera):Promise.resolve();
   api.dispose=()=>{try{remote&&remote.dispose();local.dispose()}catch(e){}renderer.dispose()};
