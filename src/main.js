@@ -51,7 +51,7 @@ async function boot() {
   eng.init({env: files[mapKey], tree: files['tree'] || null, localGlb: files['char-' + slot], localSlot: slot, mapId});
   const api = eng.api;
   LB(88, 'Biên dịch shader...');
-  try { await api.warm(); } catch (e) { console.warn('warm', e); }
+  try { await Promise.race([api.warm(), new Promise(r => setTimeout(r, 4000))]); } catch (e) { console.warn('warm', e); }
   if (CONFIG.perf) window.VY.Perf.toggle(true);
 
   // ---------- 3) chuyển map (có fade + loading, đồng bộ cả phòng) ----------
