@@ -31,7 +31,8 @@ export class Session {
       if (r.error) throw new Error('Đăng nhập ẩn danh thất bại: ' + r.error.message + ' (đã bật Anonymous sign-ins chưa?)');
       session = r.data.session;
     }
-    this.uid = session.user.id;
+    this.uid = session.user.id; this._token = session.access_token;
+    try { this.sb.auth.onAuthStateChange((ev, ss) => { if (ss && ss.access_token) { this._token = ss.access_token; try { this.sb.realtime.setAuth(ss.access_token); } catch (e) {} } }); } catch (e) {}
     // 2) giữ slot
     await this._claim();
     // 3) kênh realtime
@@ -61,7 +62,7 @@ export class Session {
 
   async _subscribe() {
     const sb = this.sb;
-    try { await sb.realtime.setAuth(); } catch (e) { /* bản cũ: tự xử lý */ }
+    try { await sb.realtime.setAuth(this._token); } catch (e) { /* bản cũ: tự xử lý */ }
     const ch = this.ch = sb.channel('room:' + this.room, {config: {private: CONFIG.privateChannels, broadcast: {self: false, ack: false}, presence: {key: this.tab}}});
     ch.on('broadcast', {event: 'g'}, ({payload}) => this._onMsg(payload));
     ch.on('presence', {event: 'sync'}, () => this._presence());
