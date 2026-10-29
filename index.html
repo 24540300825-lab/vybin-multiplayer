@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VY · BIN</title>
+<meta name="theme-color" content="#12151b">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23ffc46b'/%3E%3Ctext x='16' y='22' font-size='16' text-anchor='middle' font-family='sans-serif' font-weight='800' fill='%233b2a1a'%3EVB%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css?v=1">
+</head><body>
+<div id="load"><div id="lttl">VY · BIN</div><div id="lbar"><i id="lb"></i></div><div id="lmsg">Đang khởi động...</div>
+</div>
+<div id="toast"></div>
+<div id="fade"></div>
+<div class="hud glass" id="hProf"><div class="who" id="pWho"><div class="av" id="pAv">T</div><div style="flex:1"><div class="nm" id="pNm">Thịnh</div><div class="lv" id="pLv">Lv. 12 · đang điều khiển Bin</div><div class="bar"><i id="xpB" style="width:58%;background:#fff9"></i></div></div></div>
+ <div class="stat"><div class="r"><span>❤️ Sức khỏe</span><span id="vHp">98</span></div><div class="bar"><i id="bHp" style="background:#ff6b7a"></i></div></div>
+ <div class="stat"><div class="r"><span>⚡ Thể lực</span><span id="vSt">68</span></div><div class="bar"><i id="bSt" style="background:#ffb84d"></i></div></div>
+ <div class="stat"><div class="r"><span>🌿 Tập trung</span><span id="vFo">72</span></div><div class="bar"><i id="bFo" style="background:#6fa8ff"></i></div></div>
+ <div class="stat"><div class="r"><span>😊 Tâm trạng</span><span id="vMo">Vui</span></div><div class="bar"><i id="bMo" style="background:#8be28b"></i></div></div></div>
+<div class="hud glass" id="hClock"><div class="w" id="cW">☀️</div><div><div class="t" id="cT">15:42</div><div class="d" id="cD"></div></div></div>
+<div class="hud glass" id="hTop"><button class="ib" id="iTask"><span>📋</span>Việc</button><button class="ib" id="iCam"><span>📷</span>Chụp</button><button class="ib" id="iMap"><span>🗺️</span>Bản đồ</button><button class="ib" id="iSet"><span>⚙️</span>Cài đặt</button></div>
+<div class="hud glass" id="hTasks"><h3>Việc hôm nay <button class="pl" id="tkPlus">+</button></h3><div id="tkList"></div><div id="tkAdd" style="display:none"><input id="tkTx" placeholder="Việc mới…"><input id="tkTm" type="time" value="20:00"><button class="pl" id="tkOk">Thêm</button></div></div>
+<div class="hud glass" id="hMus"><div id="mList" class="glass"></div><div class="cv" id="mCv">♪</div><div class="mi"><div class="tt" id="mTt">Chill Beats</div><div class="st" id="mSt">Lofi Study</div><div class="mc"><button id="mPrev">⏮</button><button id="mPlay">▶</button><button id="mNext">⏭</button><button id="mLs">☰</button><input type="range" id="mVol" min="0" max="1" step="0.05" value="0.5" style="width:56px;accent-color:#ffd27a"></div></div></div>
+<div class="hud glass" id="hAct"><button class="ib" data-a="bWalk"><span>🚶</span>Đi</button><button class="ib" data-a="bRun"><span>🏃</span>Chạy</button><button class="ib" data-a="bSit"><span>🪑</span>Ngồi</button><button class="ib" data-a="bType"><span>💻</span>Làm việc</button><button class="ib" data-a="bOff"><span>🚪</span>Rời ghế</button><button class="ib" data-a="bSleep"><span>🛏️</span>Ngủ</button><button class="ib" data-a="bWake"><span>☀️</span>Dậy</button></div>
+<div id="hMap"><div id="mBox" class="glass"><h2>Chọn bản đồ <button class="pl" id="mX">✕</button></h2><div id="mpList"></div></div></div>
+<div id="hSet"><div id="sBox" class="glass"><h2>Cài đặt <button class="pl" id="sX">✕</button></h2>
+ <h4>Đồ họa</h4><div class="chips" id="sGfx"></div>
+ <h4>Ánh sáng & thời tiết</h4><label>Giờ <span style="display:flex;gap:6px;align-items:center"><input type="range" id="sTime" min="0" max="24" step="0.05"><b id="sTimeV"></b></span></label>
+ <label>Tự chạy ngày đêm <input type="checkbox" id="sAuto"></label><div class="chips" id="sWea"></div>
+ <h4>Phong cách (Look)</h4><div class="chips" id="sLook"></div>
+ <h4>Điều khiển</h4><div id="sCtl"></div>
+ <h4>Âm thanh</h4><label>Âm lượng nhạc <input type="range" id="sVolS" min="0" max="1" step="0.05"></label>
+ <h4>Nâng cao <button class="pl" id="sAdvB" style="margin-left:8px;text-transform:none">Hiện / ẩn</button></h4><div id="sAdv"></div>
+ <div style="margin-top:14px;font-size:11px;color:var(--tx2);line-height:1.5"><b style="width:auto;color:var(--tx)">Bin:</b> WASD đi, Shift chạy, E = ngồi/ngủ/dậy gần đồ vật. Click sàn = đi (nhấp đúp = chạy), click giường = ngủ, click ghế = ngồi. Kéo trái = xoay nhẹ, kéo phải = pan, lăn = zoom.</div></div></div>
+
+<div id="ui">
+ <div>State: <span id="st">-</span></div>
+ <div class="row"><button id="bWalk">Walk</button><button id="bRun">Run</button></div>
+ <div class="row"><button id="bSleep">Ngủ</button><button id="bWake">Dậy</button></div>
+ <div class="row"><button id="bSit">Ngồi</button><button id="bType">Gõ phím</button></div>
+ <div class="row"><button id="bOff">Off ghế</button><button id="bBlink">Blink</button></div>
+ <label>Walk m/s <input type="range" id="sW" data-k="walk" min="0.2" max="4" step="0.05" value="0.9"><b id="vwalk">0.9</b></label>
+ <label>Run m/s <input type="range" id="sR" data-k="run" min="0.3" max="8" step="0.05" value="2.3"><b id="vrun">2.3</b></label>
+ <label>Walk anim× <input type="range" id="sWA" data-k="walkAnim" min="0.3" max="3" step="0.05" value="1"><b id="vwalkAnim">1</b></label>
+ <label>Run anim× <input type="range" id="sRA" data-k="runAnim" min="0.3" max="3" step="0.05" value="1"><b id="vrunAnim">1</b></label>
+ <label>Colliders <input type="checkbox" id="cCol"></label>
+ <div class="row"><button id="bLofi">♪ Lofi: OFF</button><button id="bToon">🎨 Toon</button></div>
+ <label>Volume <input type="range" id="sVol" min="0" max="1" step="0.05" value="0.5"></label>
+ <div id="hint"><b>Bin:</b> WASD đi (theo camera), Shift chạy, E = ngồi/ngủ/dậy gần đồ vật.<br>Click sàn = đi (dbl-click = chạy). Click giường = ngủ. Click ghế = ngồi. Kéo trái = xoay nhẹ, kéo phải = pan, lăn = zoom.<br>Tinh chỉnh: gõ <b>CFG</b> trong console.</div>
+</div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script src="config.js"></script>
+<script type="module" src="src/main.js"></script>
+</body></html>
