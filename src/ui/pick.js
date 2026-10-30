@@ -35,6 +35,5 @@ export function pickChar({taken = [], note = ''} = {}) {
       setTimeout(() => { load.classList.remove('pick'); root.classList.add('out'); setTimeout(() => root.remove(), 400); resolve(k); }, 480);
     };
     root.addEventListener('click', e => { const b = e.target.closest('.pk'); if (b) choose(b.dataset.k); });
-    const first = root.querySelector('.pk:not([disabled])'); if (first) setTimeout(() => { try { first.focus({preventScroll: true}); } catch (e) {} }, 60);
   });
 }
