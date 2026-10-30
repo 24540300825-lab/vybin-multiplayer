@@ -79,7 +79,7 @@ import {mountYtUi} from './ui/music-ui.js';
     const s=document.createElement('span');s.textContent=k.t;const e=document.createElement('em');e.textContent=k.h;const u=document.createElement('u');u.textContent='✕';u.onclick=()=>{SFX.play('del');tasks.splice(i,1);save('vyTasks',tasks);rt()};r.append(c,s,e,u);L.appendChild(r)})}
   rt();$('iTask').onclick=()=>{$('hTasks').classList.toggle('on');$('iTask').classList.toggle('on')};$('hTasks').classList.add('on');$('iTask').classList.add('on');
   $('tkPlus').onclick=()=>{const a=$('tkAdd');a.style.display=a.style.display==='none'?'flex':'none';$('tkTx').focus()};
-  const addT=()=>{const t=$('tkTx').value.trim();if(!t)return;tasks.push({t,h:$('tkTm').value||'--:--',d:0});SFX.play('taskAdd');$('tkTx').value='';save('vyTasks',tasks);rt()};
+  const addT=()=>{const t=$('tkTx').value.trim();if(!t)return;tasks.push({t,h:$('tkTm').value||'--:--',d:0});$('tkTx').value='';save('vyTasks',tasks);rt()};
   $('tkOk').dataset.nosfx='1';$('tkOk').onclick=addT;$('tkTx').onkeydown=e=>{if(e.key==='Enter')addT()};
   // --- chụp ảnh
   $('iCam').onclick=()=>{window.__shot=()=>{const a=document.createElement('a');a.download='vy-bin-'+Date.now()+'.png';a.href=V().renderer.domElement.toDataURL('image/png');a.click();SFX.play('shutter');toast('Đã lưu ảnh')}};
@@ -96,8 +96,8 @@ import {mountYtUi} from './ui/music-ui.js';
   async function play(){if(src==='yt'){const on=await YTM.toggle();SFX.play(on?'musicPlay':'musicPause');showT();return}playing=await Lofi.toggle();SFX.play(playing?'musicPlay':'musicPause');showT()}
   ['mPlay','mNext','mPrev'].forEach(i=>$(i).dataset.nosfx='1');
   $('mPlay').onclick=play;
-  $('mNext').onclick=()=>{SFX.play('musicSkip');if(src==='yt')YTM.next();else{Lofi.setTrack(Lofi.idx+1);showT()}};
-  $('mPrev').onclick=()=>{SFX.play('musicSkip');if(src==='yt')YTM.prev();else{Lofi.setTrack(Lofi.idx-1);showT()}};
+  $('mNext').onclick=()=>{if(src==='yt')YTM.next();else{Lofi.setTrack(Lofi.idx+1);showT()}};
+  $('mPrev').onclick=()=>{if(src==='yt')YTM.prev();else{Lofi.setTrack(Lofi.idx-1);showT()}};
   $('mLs').onclick=()=>{$('mList').classList.toggle('on')};
   ytUi=mountYtUi(YTM,{onPick:async i=>{await useSrc('yt');await YTM.playAt(i)}});
   const yb=document.createElement('button');yb.id='mYtB';yb.textContent='📺';yb.title='Nhạc YouTube & playlist';yb.onclick=()=>{ytUi.open();if(ytUi.isOpen&&src!=='yt'&&YTM.lib.pls[YTM.lib.pl].items.length)useSrc('yt')};$('mLs').after(yb);

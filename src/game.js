@@ -137,13 +137,15 @@ export function init(ctx){
       const n=Math.max(8,Math.ceil((S.z1-S.z0)/0.05)),ys=[];
       for(let k=0;k<=n;k++){const z=S.z1-k*(S.z1-S.z0)/n;rc.set(new THREE.Vector3(S.cx,30,z),new THREE.Vector3(0,-1,0));const h=rc.intersectObjects(meshes,false)[0];ys.push(h?h.point.y:null)}
       for(let k=0;k<=n;k++)if(ys[k]==null){let a=k-1,b=k+1;while(a>=0&&ys[a]==null)a--;while(b<=n&&ys[b]==null)b++;ys[k]=a<0?(b<=n?ys[b]:0):b>n?ys[a]:ys[a]+(ys[b]-ys[a])*(k-a)/(b-a)}
-      const sm=ys.map((_,k)=>{let t=0,c=0;for(let d=-3;d<=3;d++){const q=k+d;if(q>=0&&q<=n){t+=ys[q];c++}}return t/c});
-      S.n=n;const W=Math.max(3,Math.round(0.34/((S.z1-S.z0)/n)));S.ys=sm.map((v,k)=>{let m=v;for(let d=-W;d<=W;d++){const q=k+d;if(q>=0&&q<=n)m=Math.max(m,ys[q])}return m});S.raw=ys;stairs.push(S)})}
-  const stairAt=(x,z)=>{for(const S of stairs)if(x>S.x0-0.05&&x<S.x1+0.05&&z>S.z0&&z<S.z1+0.05)return S;return null};
+      // đường dốc THẲNG (bình phương tối thiểu qua mặt các bậc), không còn "bậc nhô lên" nên không giật; nâng nhẹ để chân không lún
+      {const dz=(S.z1-S.z0)/n;let sx=0,sy=0,sxx=0,sxy=0;for(let k=0;k<=n;k++){const d=k*dz;sx+=d;sy+=ys[k];sxx+=d*d;sxy+=d*ys[k]}
+        const m=n+1,b=(m*sxy-sx*sy)/(m*sxx-sx*sx),a=(sy-b*sx)/m;S.a=a+0.03;S.b=b;S.top=A.L1}
+      S.n=n;S.raw=ys;stairs.push(S)})}
+  const stairAt=(x,z)=>{for(const S of stairs)if(x>S.x0-0.05&&x<S.x1+0.05&&z>S.z0&&z<S.z1)return S;return null};
   const inStair=(x,z)=>!!stairAt(x,z);
-  const stairY=(S,z)=>{if(z>=S.z1+0.05)return 0;const f=(S.z1-z)/(S.z1-S.z0)*S.n;if(f<=0)return S.ys[0]*(1-Math.max(0,(z-S.z1)/0.05));if(f>=S.n)return S.ys[S.n];const i=Math.floor(f);return S.ys[i]+(S.ys[i+1]-S.ys[i])*(f-i)};
+  const stairY=(S,z)=>Math.min(S.top,Math.max(0,S.a+S.b*(S.z1-z)));
   const heightAt=(x,z,lv)=>{const S=stairAt(x,z);if(S)return stairY(S,z);
-    if(!lv)for(const T of stairs)if(x>T.x0-0.05&&x<T.x1+0.05&&z>T.z1+0.05&&z<T.z1+0.39)return T.ys[0]*(1-(z-T.z1-0.05)/0.34);   // chân trước chạm bậc đầu trước khi thân vào cầu thang
+    if(!lv)for(const T of stairs)if(x>T.x0&&x<T.x1&&z>=T.z1&&z<T.z1+0.34)return stairY(T,T.z1)*(1-(z-T.z1)/0.34);   // chân chạm bậc đầu êm trước khi vào cầu thang
     return lv?A.L1:A.L0};
   A.stairs=stairs;
   const pickStair=(x0,z0,x1,z1,up)=>{let best=stairs[0],bd=1e9;for(const S of stairs){const a=up?S.botZ:S.topZ,b=up?S.topZ:S.botZ,d=Math.hypot(x0-S.cx,z0-a)+Math.hypot(S.cx-x1,b-z1);if(d<bd){bd=d;best=S}}return best};
@@ -160,6 +162,7 @@ export function init(ctx){
   const blocked=[new Uint8Array(G.W*G.H),new Uint8Array(G.W*G.H)],cols=[[],[]];
   for(const m of envMeshes){
     if(/^Stair/.test(m.name)||isUnder(m,CHAIR.name))continue;
+    if(m.isInstancedMesh)continue;      // cây/cỏ instancing: Box3 chỉ tính bản mẫu ở gốc toạ độ (0,0,0) → vật cản "ma" chặn nhầm miệng cầu thang trái (các bản thật nằm ngoài nhà)
     const b=new THREE.Box3().setFromObject(m);if(b.isEmpty())continue;
     if((b.max.x-b.min.x)*(b.max.z-b.min.z)>14)continue;
     [A.L0,A.L1].forEach((fy,lv)=>{if(b.max.y>fy+0.12&&b.min.y<fy+0.9)cols[lv].push(b)});
@@ -173,9 +176,13 @@ export function init(ctx){
     for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;let ok=false;for(const b of fl)if(x>b.min.x+0.12&&x<b.max.x-0.12&&z>b.min.z+0.12&&z<b.max.z-0.12){ok=true;break}if(!ok)blocked[1][j*G.W+i]=1}}
   for(let lv=0;lv<2;lv++)for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;
     for(const S of stairs)if(x>S.x0-0.02&&x<S.x1+0.02&&z>S.z0-0.4&&z<S.z1+0.2)blocked[lv][j*G.W+i]=0;}
+  // lối vào chân cầu thang từ phía giữa nhà (dải trước chân thang): vật trang trí (bụi cây ở gốc toạ độ) từng chặn kín lối này nên A*/WASD không vào được cầu thang trái
+  for(const S of stairs){const dir=S.cx<(MC.walk0[0]+MC.walk0[1])/2?1:-1,e=dir>0?S.x1:S.x0;
+    for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;if((x-e)*dir>-0.02&&(x-e)*dir<0.7&&z>S.z1-0.02&&z<S.z1+0.3&&z<MC.walk0[3])blocked[0][j*G.W+i]=0}}
   // thân cầu thang (giữa chân và đỉnh) là VẬT CẢN với đường đi A* / click-để-đi: chỉ miệng cầu thang (chân & đỉnh) được mở. Trước đây thân cầu thang để trống nên đường đi cắt ngang qua cầu thang ở tầng 0.
   for(let lv=0;lv<2;lv++)for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;
-    for(const S of stairs)if(x>S.x0-0.02&&x<S.x1+0.02&&z>S.z0&&z<S.z1+0.02)blocked[lv][j*G.W+i]=1;}
+    for(const S of stairs){if(x>S.x0-0.02&&x<S.x1+0.02&&z>S.z0&&z<S.z1+0.02)blocked[lv][j*G.W+i]=1;
+      else if(x>S.x0-0.16&&x<S.x1+0.16&&z>S.z0&&z<S.z1-0.03)blocked[lv][j*G.W+i]=1;}}      // vành đệm bán kính nhân vật dọc hông cầu thang: đường đi không sượt/cắt góc hông
   console.log('colliders',cols[0].length,cols[1].length);
   window.__G={G,blocked,A,cols,envMeshes,isUnder,CHAIR};
   const colGroup=new THREE.Group();colGroup.visible=false;scene.add(colGroup);
@@ -287,6 +294,25 @@ export function init(ctx){
     return trimClip(clip,tEnd,t0);}
   if(DEF.trim)chrG.animations=chrG.animations.map(c=>DEF.trim.test(c.name.trim())?autoTrim(c):c);
 
+  // Khử "khung rác" trong dữ liệu clip: vài khoá xoay (1–2 khung ở 30fps) văng ra rồi quay lại đúng như cũ (vd. cẳng tay giật 60° trong 2 khung ở clip off giường / idle / ngồi dậy) → thay bằng nội suy giữa khung trước & sau
+  const deglitch=c=>{if(c._dg)return;c._dg=1;let fixed=0;const qa=(v,i,j)=>2*Math.acos(Math.min(1,Math.abs(v[4*i]*v[4*j]+v[4*i+1]*v[4*j+1]+v[4*i+2]*v[4*j+2]+v[4*i+3]*v[4*j+3])));
+    const q0=new THREE.Quaternion(),q1=new THREE.Quaternion(),qo=new THREE.Quaternion();
+    for(const t of c.tracks){if(!t.name.endsWith('.quaternion'))continue;const v=t.values,n=t.times.length;
+      for(let i=1;i<n-1;i++)for(const w of [1,2]){if(i+w>=n)continue;
+        if(Math.min(qa(v,i-1,i),qa(v,i+w-1,i+w))-qa(v,i-1,i+w)>0.3){q0.fromArray(v,4*(i-1));q1.fromArray(v,4*(i+w));
+          for(let k=0;k<w;k++){qo.copy(q0).slerp(q1,(k+1)/(w+1)).toArray(v,4*(i+k))}fixed++;break}}}
+    return fixed};
+  chrG.animations.forEach(c=>{if(!/EYE|BLINK/.test(c.name)){const f=deglitch(c);if(f)console.log('deglitch',c.name,f)}});
+  // clip lặp mà khung cuối ≠ khung đầu (vd. Vy ngồi: tay xoay ~60° mỗi lần vòng lặp 9 giây) → kéo dần 0.4s cuối về đúng khung đầu để vòng lặp liền mạch
+  const seamLoop=c=>{if(c._sl||!/SITTING|TYPING|STANDING|WALK|RUN|LOOP/.test(c.name)||/EYE|BLINK/.test(c.name))return;c._sl=1;const TAIL=0.4,D=c.duration,sm=x=>x*x*(3-2*x);let n=0;
+    const q0=new THREE.Quaternion(),q1=new THREE.Quaternion();
+    for(const t of c.tracks){const v=t.values,m=t.times.length;if(m<4)continue;
+      if(t.name.endsWith('.quaternion')){q0.fromArray(v,0);
+        for(let i=m-1;i>0&&t.times[i]>D-TAIL;i--){const f=sm(Math.min(1,(t.times[i]-(D-TAIL))/TAIL));q1.fromArray(v,4*i);q1.slerp(q0,f).toArray(v,4*i);n++}}
+      else if(t.name.endsWith('.position')){for(let i=m-1;i>0&&t.times[i]>D-TAIL;i--){const f=sm(Math.min(1,(t.times[i]-(D-TAIL))/TAIL));for(let k=0;k<3;k++)v[3*i+k]+=(v[k]-v[3*i+k])*f;n++}}}
+    return n};
+  chrG.animations.forEach(c=>{const wasWrap=(()=>{let mx=0;for(const t of c.tracks)if(t.name.endsWith('.quaternion')&&t.times.length>3){const v=t.values,e=4*(t.times.length-1);mx=Math.max(mx,2*Math.acos(Math.min(1,Math.abs(v[0]*v[e]+v[1]*v[e+1]+v[2]*v[e+2]+v[3]*v[e+3]))))}return mx})();
+    if(wasWrap>0.12){const n=seamLoop(c);if(n)console.log('seamLoop',c.name,n)}});
   chrG.animations.forEach(c=>{const n=c.name.trim();
     if(n.startsWith(DEF.eye.close))eye.CLOSE.push(mixer.clipAction(c));
     else if(n.startsWith(DEF.eye.open))eye.OPEN.push(mixer.clipAction(c));
@@ -338,7 +364,9 @@ export function init(ctx){
     a.setLoop(o.once ? THREE.LoopOnce : THREE.LoopRepeat, o.once ? 1 : Infinity);
     a.clampWhenFinished=!!o.once;
     a.timeScale=o.ts||1;
-    a.reset();a.play();
+    // clip lặp đang còn chạy dở (đang mờ dần) mà chọn lại thì GIỮ NGUYÊN thời gian — trước đây reset() về khung 0 làm pose giật/chớp 1–2 khung (đặc biệt khi WALK↔REST đổi liên tục)
+    if(o.once||o.restart||!layers.includes(a)||!a.isRunning())a.reset();
+    a.play();
     if(cur!==a){
       let sum=0;layers.forEach(l=>sum+=l.w);if(sum>0)layers.forEach(l=>l.w/=sum);
       if(!layers.includes(a)){a.w=0;layers.push(a);}
@@ -359,7 +387,7 @@ export function init(ctx){
       if(l!==c&&l.w<0.002){l.stop();l.w=0;layers.splice(i,1);}else l.setEffectiveWeight(l.w);}
   }
   const runMode={v:false};
-  let restT=0,idleHeld=false;
+  let restT=0,idleHeld=false,stopT=1;
   const toRest=(instant)=>{play('REST',{fade:instant?0:0.25});restT=0;idleHeld=false};
   // idle: Vy lặp liên tục sau 5s; Bin (idleBurst) đứng RESTPOSE rồi cứ 5–10s diễn trọn clip IDLE 1 lần (đủ 106 khung) rồi về RESTPOSE
   // ----- âm thanh nhân vật: tiếng bước theo pha chạm đất của clip đi/chạy; remote nhỏ dần theo khoảng cách tới người chơi -----
@@ -383,7 +411,7 @@ export function init(ctx){
     else if(cur===acts[K.REST]){restT+=dt;if(restT>(DEF.idleBurst?nextIdleAt:5)){idleDone=false;play('IDLE',DEF.idleBurst?{fade:0.12,once:true}:{fade:0.1});idleHeld=true}}
     else toRest();
   }
-  const wp=(x,z,setLevel,run)=>({t:'wp',x,z,setLevel,run:run||runMode.v});
+  const wp=(x,z,setLevel,run,strict)=>({t:'wp',x,z,setLevel,run:run||runMode.v,strict});
 
   // vị trí root cho từng phía (L/R): hông cuối clip leo phải trùng tâm ghế / giường
   function chairPose(side){const an=HIP['CLIMBCHAIR_'+side].e,y=A.chairYaw,c=Math.cos(y),s=Math.sin(y);
@@ -404,10 +432,12 @@ export function init(ctx){
 
   function startPos(){return (P.mode==='bed'||P.mode==='sit'||P.mode==='type')&&P.stand?P.stand.clone():P.pos.clone()}
   function pickSide(fn){const p=startPos();return ['L','R'].map(s=>{const v=fn(s);return{s,d:Math.hypot(v.x-p.x,v.z-p.z)}}).sort((a,b)=>a.d-b.d)[0].s}
+  // điểm "chờ" thẳng trục trước miệng cầu thang (xa nhất còn trống, tối đa 0.5 m); nếu chật hơn 0.3 m thì dùng luôn điểm miệng
+  const approachZ=(cx,z0,dir,lv)=>{let best=z0;for(let d=0.1;d<=0.5;d+=0.1){const zz=z0+dir*d,c=cell(cx,zz);if(free(lv,c[0],c[1])&&zz<(lv?MC.l1[3]:MC.walk0[3])-0.05&&zz>MC.walk0[2])best=zz;else break}return Math.abs(best-z0)>=0.3?best:z0};
   function route(x,z,lv,run,exact){const it=[],s=startPos();let L=P.level,x0=s.x,z0=s.z;
     const add=pts=>pts.forEach(p=>it.push(wp(p.x,p.z,null,run)));
-    if(L===0&&lv===1){const S=pickStair(x0,z0,x,z,true),cx=S.cx;add(findPath(x0,z0,cx,S.botZ,0,true));it.push(wp(cx,S.midZ,1,run),wp(cx,S.topZ,null,run));x0=cx;z0=S.topZ}
-    else if(L===1&&lv===0){const S=pickStair(x0,z0,x,z,false),cx=S.cx;add(findPath(x0,z0,cx,S.topZ,1,true));it.push(wp(cx,S.midZ,0,run),wp(cx,S.botZ,null,run));x0=cx;z0=S.botZ}
+    if(L===0&&lv===1){const S=pickStair(x0,z0,x,z,true),cx=S.cx,ap=approachZ(cx,S.botZ,1,0);add(findPath(x0,z0,cx,ap,0,true));it.slice(-2).forEach(w=>w.strict=1);it.push(wp(cx,S.botZ,null,run,1),wp(cx,S.midZ,1,run),wp(cx,S.topZ,null,run));x0=cx;z0=S.topZ}      // tới thẳng trục chân cầu thang rồi mới leo (không cắt góc từ bên hông)
+    else if(L===1&&lv===0){const S=pickStair(x0,z0,x,z,false),cx=S.cx,ok=approachZ(cx,S.topZ,-1,1);add(findPath(x0,z0,cx,ok,1,true));it.slice(-2).forEach(w=>w.strict=1);it.push(wp(cx,S.topZ,null,run,1),wp(cx,S.midZ,0,run),wp(cx,S.botZ,null,run),wp(cx,approachZ(cx,S.botZ,1,0),null,run,1));x0=cx;z0=approachZ(cx,S.botZ,1,0)}
     add(findPath(x0,z0,x,z,lv,exact));return it;}
   const leave=()=>{const k=busy&&busy.kind;return (P.mode==='bed'||k==='climbBed')?[{t:'offBed'}]:(P.mode==='sit'||P.mode==='type'||k==='climbChair')?[{t:'offChair'}]:[]};
   function cmdMove(x,z,lv,run){
@@ -459,13 +489,13 @@ export function init(ctx){
       case 'wp':{
         const dx=it.x-P.pos.x,dz=it.z-P.pos.z,d=Math.hypot(dx,dz);
         const last=!(plan[1]&&plan[1].t==='wp');
-        const arrive=last?0.02:Math.max(0.1,P.sp*0.12);
+        const arrive=last?0.02:it.strict?0.04:Math.max(0.1,P.sp*0.12);
         if(d<=arrive){if(last){P.pos.x=it.x;P.pos.z=it.z;}if(it.setLevel!=null)P.level=it.setLevel;plan.shift();break}
         const diff=angDiff(Math.atan2(dx,dz),P.yaw);
         P.yaw+=clamp(diff*(1-Math.exp(-dt*30)),-22*dt,22*dt);
         P.sp=(it.run?CFG.run:CFG.walk)*(stairAt(P.pos.x,P.pos.z)?0.85:1);
         const mx=(last&&d<0.5)?dx/d:Math.sin(P.yaw),mz=(last&&d<0.5)?dz/d:Math.cos(P.yaw);
-        const st=Math.min(P.sp*dt,d);P.pos.x+=mx*st;P.pos.z+=mz*st;
+        const st=Math.min(P.sp*dt,d)*(it.strict?Math.max(0.05,1-Math.abs(diff)/0.5):1);P.pos.x+=mx*st;P.pos.z+=mz*st;      // điểm vào cầu thang: quay mặt về hướng đi rồi mới bước (không vòng ra ngoài trục)
         play(it.run?'RUN':'WALK',{fade:0.2});
         break;}
       case 'face':{const diff=angDiff(it.yaw,P.yaw);
@@ -529,7 +559,7 @@ export function init(ctx){
       if(was&&W!==S)return false;
       if(!was){const fromBottom=P.level===0&&oz>=S.z1-0.03&&z<oz,fromTop=P.level===1&&oz<=S.z0+0.08&&z>oz;if(!fromBottom&&!fromTop)return false;}
       return true;}
-    if(was&&!ins){const atBot=z>=W.z1+0.05&&oz<W.z1+0.05,atTop=z<=W.z0&&oz>W.z0;if((!atBot&&!atTop)||x<W.x0+0.02||x>W.x1-0.02)return false}   // đang ở trên cầu thang: chỉ được ra ở chân/đỉnh, đúng bề ngang bậc
+    if(was&&!ins){const atBot=z>=W.z1&&oz<W.z1,atTop=z<=W.z0&&oz>W.z0;if((!atBot&&!atTop)||x<W.x0+0.02||x>W.x1-0.02)return false}   // đang ở trên cầu thang: chỉ được ra ở chân/đỉnh, đúng bề ngang bậc
     if(lv===0){const w=MC.walk0;if(x<w[0]||x>w[1]||z<w[2]||z>w[3])return false}
     else{const w=MC.l1;if(x<w[0]||x>w[1]||z<w[2]||z>(w[3]==null?stairs[0].z0+0.02:w[3]))return false}
     if(lv===A.chairL&&CHB&&x>CHB[0]&&x<CHB[2]&&z>CHB[1]&&z<CHB[3]&&!(ox>CHB[0]&&ox<CHB[2]&&oz>CHB[1]&&oz<CHB[3]))return false;
@@ -537,10 +567,17 @@ export function init(ctx){
   function stepMove(dx,dz){
     const ox=P.pos.x,oz=P.pos.z,nx=ox+dx,nz=oz+dz,W=stairAt(ox,oz),M=0.2;
     // phễu cầu thang: vào/ở trong cầu thang thì tự căn giữa (cách mép/tay vịn M), không bị kẹt
-    const fx=(x,z)=>{let S=W;if(!S){const T=stairAt(x,z);if(T&&x>T.x0-0.14&&x<T.x1+0.14)S=T}return S?Math.min(S.x1-M,Math.max(S.x0+M,x)):x};
+    // chỉ được vào cầu thang qua ĐẦU dưới (đang ở tầng 0, đi lên) hoặc ĐỈNH (đang ở tầng 1, đi xuống). Hông cầu thang đặc hoàn toàn.
+    // Bên trong / sát cửa vào thì kéo nhẹ vào giữa (từ từ, không dịch chuyển đột ngột).
+    const fx=(x,z)=>{let S=W;if(!S){const T=stairAt(x,z);if(T&&((P.level===0&&oz>=T.z1-0.03)||(P.level===1&&oz<=T.z0+0.08)))S=T;
+        if(!S){for(const T of stairs){const nearBot=P.level===0&&oz>T.z1&&oz<T.z1+0.5&&nz<oz,nearTop=P.level===1&&oz<T.z0&&oz>T.z0-0.5&&nz>oz;if((nearBot||nearTop)&&x>T.x0-0.02&&x<T.x1+0.02){S=T;break}}}}
+      if(!S)return x;const t=Math.min(S.x1-M,Math.max(S.x0+M,x)),lim=Math.max(0.02,Math.abs(nz-oz)*0.7);return x+Math.max(-lim,Math.min(lim,t-x))};
     let x1=fx(nx,nz);if(walkable(ox,oz,x1,nz)){P.pos.x=x1;P.pos.z=nz;return}
     x1=fx(nx,oz);if(walkable(ox,oz,x1,oz)){P.pos.x=x1;return}
     x1=fx(ox,nz);if(walkable(ox,oz,x1,nz)){P.pos.x=x1;P.pos.z=nz;return}
+    // cửa vào cầu thang lệch trục: trượt ngang về giữa (không đi tới) để lọt vào miệng thay vì kẹt ở mép
+    for(const T of stairs){const nb=P.level===0&&oz>=T.z1-0.03&&oz<T.z1+0.5&&dz<0,nt=P.level===1&&oz<=T.z0+0.08&&oz>T.z0-0.5&&dz>0;
+      if((nb||nt)&&ox>T.x0-0.2&&ox<T.x1+0.2){const t=Math.min(T.x1-0.3,Math.max(T.x0+0.3,ox)),sx=ox+Math.sign(t-ox)*Math.min(Math.abs(t-ox),Math.hypot(dx,dz)*0.7);if(Math.abs(sx-ox)>1e-5&&walkable(ox,oz,sx,oz)){P.pos.x=sx;return}}}
     P.sp*=0.5;}
     function pushOut(){
     if(inStair(P.pos.x,P.pos.z))return;
@@ -572,9 +609,11 @@ export function init(ctx){
       P.sp=(inp.run?CFG.run:CFG.walk)*(stairAt(P.pos.x,P.pos.z)?0.85:1);
       stepMove(Math.sin(P.yaw)*P.sp*dt,Math.cos(P.yaw)*P.sp*dt);
       play(inp.run?'RUN':'WALK',{fade:0.15});idleHeld=false;
+      stopT=0;
     }else{
-      P.sp=0;
-      idleTick(dt);
+      P.sp=0;stopT+=dt;
+      // vừa thả phím (≤0.14s) vẫn giữ dáng đi → phím/cần gạt chớp tắt vài khung không làm nhân vật nháy sang REST rồi quay lại
+      if(stopT>0.14||(cur!==acts[K.WALK]&&cur!==acts[K.RUN]))idleTick(dt);
     }
   }
 
@@ -585,7 +624,7 @@ export function init(ctx){
     for(const x of ['L','R'])if(occ['bed'+x]===DEF.id&&P.mode!=='bed'&&!(busy&&busy.kind==='climbBed')&&!plan.some(i=>i.t==='climbBed'))occ['bed'+x]=null;
     if(!busy&&!plan[0]&&P.mode==='free')pushOut();
     if(DEF.ctrl==='wasd'){const S=stairAt(P.pos.x,P.pos.z);if(P._S&&!S&&!plan[0])P.level=P.pos.z<P._S.midZ?1:0;P._S=S;}
-    if(!busy&&P.mode==='free'){const h=heightAt(P.pos.x,P.pos.z,P.level);P.pos.y+=(h-P.pos.y)*(1-Math.exp(-dt*(stairAt(P.pos.x,P.pos.z)?70:16)));}
+    if(!busy&&P.mode==='free'){const h=heightAt(P.pos.x,P.pos.z,P.level);P.pos.y+=(h-P.pos.y)*(1-Math.exp(-dt*(stairAt(P.pos.x,P.pos.z)?40:16)));}
     if(DEF.remote&&net)correct(dt);
   }
   // ----- nhân vật remote: nắn dần về snapshot của chủ nhân vật (chủ là authority) -----

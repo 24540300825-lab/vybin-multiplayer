@@ -159,7 +159,7 @@ export function createEngine(ctx, opts = {}) {
     chime: (t, o) => { const m = pick([[12, 14, 17], [14, 17, 19], [11, 14, 16], [17, 14, 12]]), pan = rnd(-0.6, 0.6); m.forEach((d, i) => tone(t + i * rnd(0.35, 0.7), 2.6, hz(sc(d)), {peak: 0.022 * o.v, a: 0.01, b: 'amb', send: 0.95, lp: 3000, pan})); },
   };
   // hệ số cân bằng âm lượng (đo bằng render offline, đưa mọi âm về đỉnh mục tiêu)
-  const TRIM = {click: 3.34, hover: 3.35, toggleOn: 1.35, toggleOff: 1.45, tab: 3.49, tick: 3.34, open: 2.21, close: 3.75, error: 1.12, success: 0.83, toast: 2.16, pop: 3.17, popupIn: 1.17, dismiss: 5.1, msgIn: 0.91, msgOut: 2.96, key: 2.41, copy: 1.42, taskDone: 0.86, taskAdd: 1.15, del: 3.73, shutter: 2.11, whoosh: 2.13, ready: 0.94, musicPlay: 1.36, musicPause: 1.38, musicSkip: 1.84, accept: 0.89, decline: 1.42, hangup: 1.57, connected: 1.31, peerJoin: 1.02, peerLeave: 1.13, mute: 2.48, unmute: 2.4, camOn: 1.06, camOff: 1.09, lost: 1.26, recovered: 1, missed: 1.05, noAnswer: 1.28, step: 2.7, sit: 2.62, standUp: 1.22, bedClimb: 1.31, bedOff: 1.5, sleep: 1.03, wake: 0.98, doorOpen: 1.85, doorClose: 1.33, lamp: 1.75, weather: 1.13, thunder: 5.16, bird: 2.13, cricket: 2.34, chime: 1.16};
+  const TRIM = {click: 1.7, hover: 3.35, toggleOn: 1.35, toggleOff: 1.45, tab: 3.49, tick: 3.34, open: 2.21, close: 3.75, error: 1.12, success: 0.83, toast: 2.16, pop: 3.17, popupIn: 1.17, dismiss: 5.1, msgIn: 0.91, msgOut: 2.96, key: 2.41, copy: 1.42, taskDone: 0.86, taskAdd: 1.15, del: 3.73, shutter: 2.11, whoosh: 2.13, ready: 0.94, musicPlay: 1.36, musicPause: 1.38, musicSkip: 1.84, accept: 0.89, decline: 1.42, hangup: 1.57, connected: 1.31, peerJoin: 1.02, peerLeave: 1.13, mute: 2.48, unmute: 2.4, camOn: 1.06, camOff: 1.09, lost: 1.26, recovered: 1, missed: 1.05, noAnswer: 1.28, step: 4.2, sit: 3.9, standUp: 1.9, bedClimb: 2.0, bedOff: 2.2, sleep: 1.5, wake: 1.4, doorOpen: 2.8, doorClose: 2.0, lamp: 2.4, weather: 1.13, thunder: 5.16, bird: 2.13, cricket: 2.34, chime: 1.16};
   const GAP = {hover: 0.12, chime: 2, click: 0.04, tick: 0.035, step: 0.08, key: 0.025, msgIn: 0.25, toast: 0.3, bird: 0.5, cricket: 0.2};
   const last = {};
   function play(name, o = {}) {
@@ -296,55 +296,27 @@ function bindSettings() {
   if (amb) { amb.checked = cfg.amb; amb.addEventListener('change', () => { SFX.setAmb(amb.checked); }); }
 }
 
-// ---- âm thanh giao diện tự động: hover/click/bật tắt/kéo thanh/mở-đóng bảng/toast ----
-const CLICKABLE = 'button,.ib,.chip,.pl,.mc,[role=button],summary,.cpop,select,a[href]';
+// ---- âm thanh giao diện tự động (ĐÃ TINH GỌN): chỉ còn tiếng bấm nút rất nhẹ, tick xong việc, và cảnh báo lỗi.
+// Đã bỏ: hover, kéo thanh, gõ phím trong ô nhập, mở/đóng bảng, toast thường, bật/tắt công tắc, đổi tab/select. Ưu tiên cho âm nhân vật & gameplay.
+const CLICKABLE = 'button,.ib';
 function bindUi() {
   const skip = el => el.closest('[data-nosfx]');
-  let lastHover = null;
-  document.addEventListener('pointerover', e => {
-    if (e.pointerType === 'touch') return;
-    const el = e.target.closest && e.target.closest(CLICKABLE); if (!el || el === lastHover || skip(el)) return;
-    lastHover = el; SFX.play('hover');
-  }, true);
-  document.addEventListener('pointerout', e => { if (lastHover && !lastHover.contains(e.relatedTarget)) lastHover = null; }, true);
   document.addEventListener('click', e => {
     const t = e.target; if (!t.closest) return;
-    const el = t.closest(CLICKABLE); if (!el || skip(el)) return;
-    if (el.classList.contains('chip')) SFX.play('tab'); else SFX.play('click');
+    const el = t.closest(CLICKABLE); if (!el || skip(el) || el.classList.contains('chip')) return;
+    SFX.play('click');
   }, true);
   document.addEventListener('change', e => {
     const t = e.target; if (!t || skip(t)) return;
-    if (t.type === 'checkbox') { if (t.closest('.tk')) SFX.play(t.checked ? 'taskDone' : 'toggleOff'); else SFX.play(t.checked ? 'toggleOn' : 'toggleOff'); }
-    else if (t.tagName === 'SELECT') SFX.play('tab');
+    if (t.type === 'checkbox' && t.closest('.tk') && t.checked) SFX.play('taskDone');
   }, true);
-  const lastV = new WeakMap();
-  document.addEventListener('input', e => {
-    const t = e.target; if (!t || skip(t)) return;
-    if (t.type === 'range') {
-      const mn = +t.min || 0, mx = +t.max || 1, f = (+t.value - mn) / Math.max(1e-6, mx - mn), q = Math.round(f * 20);
-      if (lastV.get(t) !== q) { lastV.set(t, q); SFX.play('tick', {f}); }
-    } else if ((t.tagName === 'INPUT' && /text|search|url|^$/.test(t.type || '')) || t.tagName === 'TEXTAREA') {
-      if (e.inputType && e.inputType.startsWith('insert')) SFX.play('key', {v: 0.8});
-    }
-  }, true);
-  // mở / đóng bảng: bất kỳ phần tử .hud/#hSet/#hMap… được thêm/bớt class "on"
-  const mo = new MutationObserver(list => {
-    for (const m of list) {
-      const el = m.target; if (el.nodeType !== 1 || el.closest('[data-nosfx]')) continue;
-      const was = (m.oldValue || '').split(/\s+/).includes('on'), now = el.classList.contains('on');
-      if (was === now) continue;
-      if (el.id === 'hCall' || el.id === 'chPops' || el.classList.contains('chip') || el.classList.contains('ib') || el.classList.contains('pl') || el.classList.contains('mc') || /^(mList)$/.test(el.id)) continue;
-      SFX.play(now ? 'open' : 'close');
-    }
-  });
-  mo.observe(document.body, {subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true});
-  // toast mới → tiếng báo nhẹ
+  // toast: chỉ báo tiếng khi là lỗi/cảnh báo
   const toast = document.getElementById('toast');
   if (toast) {
     let lastTxt = '';
     new MutationObserver(() => {
       const tx = toast.textContent.trim(); if (!tx || tx === lastTxt) { lastTxt = tx; return; } lastTxt = tx;
-      SFX.play(/(không|lỗi|chưa|mất|bị chặn|⚠)/i.test(tx) ? 'error' : 'toast');
+      if (/(không|lỗi|chưa|mất|bị chặn|⚠)/i.test(tx) && !/nghe máy|từ chối|nhỡ/i.test(tx)) SFX.play('error');
     }).observe(toast, {childList: true, characterData: true, subtree: true});
   }
 }

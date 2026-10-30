@@ -56,7 +56,7 @@ Toàn bộ hiệu ứng âm thanh nằm trong `src/sfx.js`, tổng hợp bằng 
 - Thêm một âm mới: thêm một hàm vào bảng `LIB` (ví dụ `myPing: (t, o) => bell(t, 84, {peak: 0.1 * o.v})`), rồi gọi `SFX.play('myPing')` ở nơi cần. Nếu âm to/nhỏ lệch so với âm khác, chỉnh hệ số trong bảng `TRIM` (đo bằng cách render offline rồi đưa về đỉnh ~0.1–0.3).
 - Âm theo khoảng cách (nhân vật kia, cửa ở xa): `SFX.playAt('step', khoảng_cách_m, {range: 13})`.
 - Âm lặp (chuông gọi): thêm vào `LOOPS` rồi bật/tắt bằng `SFX.loop('tên', true/false)`.
-- Giao diện (hover, click, bật/tắt, kéo thanh, mở/đóng bảng, toast) tự có âm. Nút nào muốn tự quản âm riêng thì gắn `data-nosfx="1"`.
+- Giao diện đã được tinh gọn: chỉ còn tiếng bấm nút rất nhẹ (`button`, `.ib`), tick xong việc và cảnh báo lỗi. Hover, kéo thanh, gõ phím, mở/đóng bảng, toast thường, bật/tắt công tắc **không** có âm (ưu tiên âm nhân vật & gameplay: bước chân, ngồi/đứng, giường, cửa…). Nút nào muốn tự quản âm riêng thì gắn `data-nosfx`.
 - Người chơi chỉnh trong Cài đặt → Âm thanh (bật/tắt, âm lượng, âm môi trường); lưu trong trình duyệt (khóa `vySfx`).
 - Trình duyệt chỉ cho phát âm sau lần bấm đầu tiên — trước đó mọi lệnh `SFX.play` im lặng, không báo lỗi.
 
