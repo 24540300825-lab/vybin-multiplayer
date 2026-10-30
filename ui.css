@@ -40,7 +40,7 @@ button{font-family:inherit}
 .col>*{pointer-events:auto}
 #hLeft{left:3.25rem;top:3.25rem;gap:1.5rem;align-items:flex-start}
 #hRight{right:6rem;top:3.5rem;gap:1.5rem;align-items:flex-end}
-#hMusic{left:3.25rem;bottom:4rem;gap:1rem;align-items:flex-start;max-width:calc(100vw - 2rem);max-height:calc(100vh - 6rem)}
+#hMusic{left:3.75rem;bottom:4rem;gap:1rem;align-items:flex-start;max-width:calc(100vw - 2rem);max-height:calc(100vh - 6rem)}
 #hMusic.ytopen #mDrawer{display:none!important}
 #hBR{right:6rem;bottom:4rem;gap:1rem;align-items:flex-end}
 
@@ -82,8 +82,9 @@ button{font-family:inherit}
 #hProf.min .tg{top:-.75rem}
 #hProf.min .tg svg{transform:rotate(180deg)}
 /* thẻ đối phương (Figma: Vy card 419×82, avatar 64) */
-#hPeer{margin-left:0;display:flex;align-items:center;gap:1.5rem;box-sizing:border-box;min-width:26rem;padding:.5rem 1.5rem .5rem .5rem;border-radius:2.5rem;transition:opacity .3s}
+#hPeer{margin-left:1.5rem;display:flex;align-items:center;gap:1.5rem;box-sizing:border-box;min-width:26rem;padding:.5rem 1.5rem .5rem .5rem;border-radius:2.5rem;transition:opacity .3s}
 #hPeer .av{width:4rem;height:4rem}
+#hLeft:has(#hProf.min) #hPeer{margin-left:-.5rem}   /* avatar Bin thu nhỏ 64 → thẻ Vy lùi theo để tâm avatar vẫn thẳng trục */
 #hPeer.talk .av{box-shadow:0 0 0 .25rem #7cf08a,0 0 1rem #7cf08a}
 #hPeer.off[data-s=bin] .av img{filter:grayscale(1) brightness(.92)}
 #hPeer .tx{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -94,9 +95,9 @@ button{font-family:inherit}
 #hPeer .pm:empty{display:none}
 
 /* ---------- thanh biểu tượng trên cùng (Figma: Frame 12, icon 40, cách nhau 64) ---------- */
-#hTop{display:flex;gap:3.25rem;align-items:center;margin:-.25rem -.39rem 0 0}   /* ô icon 40 cách nhau 60 (Figma); lề âm = để MÉP icon (không phải mép nút) thẳng hàng với mép capsule bên dưới và đỉnh avatar bên trái */
+#hTop{display:flex;gap:2.25rem;align-items:center;margin:-.5rem -.46rem 0 0}   /* ô icon 36, tâm cách đều 84 (Figma sau khi thu nhỏ); lề âm = để MÉP icon (không phải mép nút) thẳng hàng với mép capsule bên dưới, đỉnh icon cao nhất = đỉnh avatar bên trái */
 #hTop .ib{font-size:0;position:relative;width:3rem;height:3rem;border-radius:1rem;border:0;background:none;color:#fff;cursor:pointer;display:grid;place-items:center;padding:0;transition:transform .15s}
-#hTop .ib .ic,#hTop .ib>span{font-size:2.5rem;filter:drop-shadow(var(--sh))}
+#hTop .ib .ic,#hTop .ib>span{font-size:2.25rem;filter:drop-shadow(var(--sh))}
 #hTop .ib>span{font-size:2rem;line-height:1}
 #hTop .ib:hover{transform:translateY(-.125rem) scale(1.08)}
 #hTop .ib:active{transform:scale(.94)}
@@ -152,23 +153,23 @@ button{font-family:inherit}
 .nempty{padding:1.5rem 1rem;text-align:center;color:var(--ink2)}
 
 /* ---------- nhạc (Figma: pill 555×90, album 64, prev/pause/next) ---------- */
-.pill{display:flex;align-items:center;gap:2.25rem;box-sizing:border-box;padding:.75rem 1rem .75rem 1.5rem;border-radius:999px;min-height:5.5rem}
+.pill{display:flex;align-items:center;gap:2.25rem;box-sizing:border-box;padding:.75rem 1.5rem;border-radius:999px;min-height:5.5rem}
 .pill .cv{position:relative;flex:none;width:4rem;height:4rem;border:0;padding:0;background:none;border-radius:50%;cursor:pointer}
 .pill .cv img{display:block;width:100%;height:100%;border-radius:50%}
 .pill .ytb{display:none;position:absolute;right:-.25rem;bottom:-.25rem;width:1.5rem;height:1.5rem;border-radius:50%;background:var(--bad);font-size:.875rem}
 .pill .cv.yt .ytb{display:grid}
-.pill .mi{width:13.5rem;min-width:0}
+.pill .mi{width:14rem;min-width:0}
 .pill .tt{font:400 1.5rem/1.2 var(--f-d);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pill .st{font:700 var(--t1)/1.4 var(--f-b);color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pill .mc{display:flex;gap:1.25rem;align-items:center}
-.pill .mc button{width:2.5rem;height:2.5rem;padding:0;border:0;border-radius:50%;background:none;color:#fff;font-size:2rem;display:grid;place-items:center;cursor:pointer;transition:transform .12s,background .15s}
+.pill .mc{display:flex;gap:.875rem;align-items:center;margin:0 -.625rem}   /* Figma: icon 20/16/20 cách nhau 54; lề âm = bù khoảng trống trong nút 40 để MÉP icon thẳng với lề capsule */
+.pill .mc button{width:2.5rem;height:2.5rem;padding:0;border:0;border-radius:50%;background:none;color:#fff;font-size:1.5rem;display:grid;place-items:center;cursor:pointer}
 .pill .mc button:hover{background:var(--fill)}.pill .mc button:active{transform:scale(.9)}
 .pill .mc svg{display:block}
 .pill .tg{margin-left:-1rem}
 /* màn lớn: nút mở danh sách nhạc là "tay nắm" tròn nằm giữa mép trên capsule (capsule giữ đúng 552 như Figma, không đụng thanh hành động) */
 @media(min-width:1181px) and (min-height:641px){
   #hMusic{gap:1.25rem}
-  .pill{position:relative;padding-right:1rem}
+  .pill{position:relative}
   .pill .tg{position:absolute;left:50%;top:-1rem;margin:0 0 0 -1rem;width:2rem;height:2rem;font-size:1rem;background:rgba(0,0,0,.26)}
   .pill .tg:hover{background:rgba(0,0,0,.4)}
 }
@@ -211,21 +212,8 @@ button{font-family:inherit}
 #hClock .wx .ic{font-size:1.25rem}
 #hClock .wx #cW[data-w=w_overcast]{font-size:2rem;margin:-.25rem 0}
 
-/* ---------- thanh hành động giữa dưới ---------- */
-#hAct{position:fixed;z-index:6;left:50%;bottom:4rem;transform:translateX(-50%);display:flex;align-items:center;gap:.25rem;padding:.75rem;border-radius:2.5rem;max-width:calc(100vw - 1rem)}
-#hAct .ib{flex:none;min-width:4.5rem;width:auto;white-space:nowrap;height:4.5rem;border-radius:1.5rem;border:0;background:none;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.25rem;cursor:pointer;font:700 var(--t1)/1.2 var(--f-b);padding:0 .25rem;transition:background .15s,transform .12s}
-#hAct .ib .ic{font-size:2rem;filter:drop-shadow(var(--sh))}
-#hAct .ib:hover{background:var(--fill)}
-#hAct .ib:active{transform:scale(.94)}
-#hAct .ib.on{background:var(--fill2);color:var(--ac)}
-#hAct .tg{margin-left:.5rem}
-#hAct.min{padding:.5rem}
-#hAct.min .ib{display:none}
-#hAct.min .tg{margin:0}
-#hAct.min .tg svg{transform:rotate(180deg)}
-
 /* ---------- toast ---------- */
-#toast{position:fixed;left:50%;bottom:11rem;transform:translateX(-50%);z-index:12;max-width:min(36rem,calc(100vw - 2rem));box-sizing:border-box;padding:.75rem 1.5rem;border-radius:2rem;background:var(--panel);border:1px solid var(--line);-webkit-backdrop-filter:blur(.75rem);backdrop-filter:blur(.75rem);text-align:center;opacity:0;transition:opacity .25s;pointer-events:none}
+#toast{position:fixed;left:50%;bottom:4rem;transform:translateX(-50%);z-index:12;max-width:min(36rem,calc(100vw - 2rem));box-sizing:border-box;padding:.75rem 1.5rem;border-radius:2rem;background:var(--panel);border:1px solid var(--line);-webkit-backdrop-filter:blur(.75rem);backdrop-filter:blur(.75rem);text-align:center;opacity:0;transition:opacity .25s;pointer-events:none}
 
 /* ---------- hộp thoại (bản đồ, cài đặt) ---------- */
 .modal{position:fixed;inset:0;z-index:8;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;padding:1rem;box-sizing:border-box}
@@ -354,6 +342,80 @@ input[type=range]:disabled{opacity:.45}
 @keyframes ringShake{0%,100%{transform:rotate(0)}15%{transform:rotate(-14deg)}30%{transform:rotate(12deg)}45%{transform:rotate(-9deg)}60%{transform:rotate(7deg)}75%{transform:rotate(0)}}
 @media(prefers-reduced-motion:reduce){#ringPop{transition:opacity .2s}#ringPop .av::before,#ringPop .av::after,#ringPop .ph{animation:none}.cpop{animation:none}.cpop.out{transform:none}}
 
+/* ---------- phím tắt (Cài đặt) ---------- */
+#sKeys .kh{margin:.25rem 0 .5rem;font-size:.875rem;line-height:1.4;color:var(--ink2);font-weight:600}
+#sKeys .kh.k2{margin-top:1rem;font:700 .75rem/1 var(--f-b);letter-spacing:.0625rem;text-transform:uppercase}
+#sKeys .kl{display:flex;flex-direction:column;gap:.25rem}
+#sKeys .kr{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:2.5rem;padding:0 .25rem 0 .75rem;border-radius:1rem;background:var(--fill);font-size:1rem}
+#sKeys .kr.fx{background:none;border:1px solid var(--line);color:var(--ink2);min-height:2rem;font-size:.875rem}
+#sKeys .kb,#sKeys kbd{flex:none;min-width:3rem;height:2rem;padding:0 .75rem;box-sizing:border-box;border-radius:.75rem;border:1px solid rgba(255,255,255,.4);background:var(--chipbg);color:#fff;font:800 .875rem/1 var(--f-b);display:inline-grid;place-items:center;white-space:nowrap}
+#sKeys kbd{border-color:var(--line);background:none;color:var(--ink3);font-weight:700}
+#sKeys .kb{cursor:pointer}
+#sKeys .kb:hover{background:rgba(255,255,255,.18);box-shadow:0 0 .75rem rgba(255,255,255,.25)}
+#sKeys .kb.none{color:var(--ink2)}
+#sKeys .kb.cap{background:var(--ac);border-color:var(--ac);color:var(--ac-ink);box-shadow:0 0 1rem rgba(255,213,129,.55);animation:kcap 1s ease-in-out infinite}
+@keyframes kcap{50%{box-shadow:0 0 .375rem rgba(255,213,129,.3)}}
+#sKeys .kreset{margin-top:1rem}
+
+/* =====================================================================
+   CHUYỂN ĐỘNG — nhanh (≤ .22s), mềm: chủ yếu opacity + glow + scale nhẹ, không kéo dài
+   ===================================================================== */
+:root{--ease:cubic-bezier(.22,.9,.3,1);--ease-out:cubic-bezier(.4,0,.8,.6)}
+.rb,.tg,.pb,.pl,.chip,#hTop .ib,.pill .mc button,.pill .cv,.tk u,.cpop .x,.yI .x,#chGo,#sKeys .kb,.mapc,.ni,#mList div,.yI,.tk{
+  transition:transform .14s var(--ease),opacity .14s ease,background-color .14s ease,border-color .14s ease,filter .18s var(--ease),box-shadow .18s var(--ease)}
+.rb:active,.tg:active{transform:scale(.88)}
+.rb:hover,.tg:hover{box-shadow:0 0 .75rem rgba(255,255,255,.22)}
+.pb:hover{filter:brightness(1.08);box-shadow:0 0 1rem rgba(255,213,129,.5)}
+.pb:active{transform:scale(.96);filter:brightness(.97)}
+.pl:hover,.chip:hover{box-shadow:0 0 .75rem rgba(255,255,255,.2)}
+.pl:active,.chip:active{transform:scale(.95)}
+.pl.on,.chip.on{box-shadow:0 0 .75rem rgba(255,213,129,.45)}
+/* icon thanh trên cùng: mờ nhẹ → sáng + toả sáng khi rê, co lại khi bấm */
+#hTop .ib{opacity:.9}
+#hTop .ib:hover{opacity:1;transform:none}
+#hTop .ib:active{transform:none}
+#hTop .ib .ic{filter:drop-shadow(var(--sh)) drop-shadow(0 0 0 rgba(255,255,255,0));transition:transform .14s var(--ease),filter .2s var(--ease)}
+#hTop .ib:hover .ic{transform:translateY(-.125rem) scale(1.1);filter:drop-shadow(var(--sh)) drop-shadow(0 0 .625rem rgba(255,255,255,.6))}
+#hTop .ib:active .ic{transform:scale(.9);filter:drop-shadow(var(--sh)) drop-shadow(0 0 .375rem rgba(255,255,255,.9));transition-duration:.06s}
+#hTop .ib:focus-visible{outline-offset:-.125rem}
+/* nhạc */
+.pill .mc button{opacity:.88}
+.pill .mc button:hover{opacity:1;background:none}
+.pill .mc button:active{transform:scale(.82)}
+.pill .mc svg{transition:filter .18s var(--ease)}
+.pill .mc button:hover svg{filter:drop-shadow(0 0 .5rem rgba(255,255,255,.75))}
+.pill .cv:hover{transform:scale(1.06);filter:drop-shadow(0 0 .75rem rgba(255,255,255,.4))}
+.pill .cv:active{transform:scale(.95)}
+.pill .tg{opacity:.85}.pill .tg:hover{opacity:1}
+/* chấm đỏ: bật ra */
+.dot,.bdg{animation:dotPop .28s var(--ease)}
+@keyframes dotPop{from{transform:scale(0);opacity:0}60%{transform:scale(1.25)}to{transform:scale(1);opacity:1}}
+/* danh sách: nền sáng dần, không nhảy */
+.ni:hover{background:rgba(255,255,255,.2)}.ni.unread:hover{background:rgba(255,213,129,.28)}
+.mapc:active,.ni[data-go]:active,#mList div:active,.yI:active{transform:scale(.985)}
+/* panel mở / đóng: mờ + trượt nhẹ (đóng cũng mượt nhờ display discrete; trình duyệt cũ thì tự bật/tắt ngay) */
+#hNote,#hTasks,#hChat,#hYt,#mDrawer,#hCall{
+  opacity:0;transition:opacity .16s ease,transform .2s var(--ease),display .2s allow-discrete}
+#hNote,#hTasks,#hChat,#hYt,#mDrawer{transform:translateY(.5rem) scale(.98)}
+#hNote,#hTasks{transform-origin:100% 0}
+#hChat,#hYt,#mDrawer{transform-origin:0 100%}
+#hNote.on,#hTasks.on,#hChat.on,#hYt.on,#hMusic.open #mDrawer,#hCall.on{opacity:1}
+#hNote.on,#hTasks.on,#hChat.on,#hYt.on,#hMusic.open #mDrawer{transform:none}
+.modal{opacity:0;transition:opacity .16s ease,display .2s allow-discrete,overlay .2s allow-discrete}
+.modal.on{opacity:1}
+.modal .mbox{transform:translateY(.75rem) scale(.97);transition:transform .22s var(--ease)}
+.modal.on .mbox{transform:none}
+#toast{transition:opacity .18s ease}
+@starting-style{
+  #hNote.on,#hTasks.on,#hChat.on,#hYt.on,#hMusic.open #mDrawer{opacity:0;transform:translateY(.5rem) scale(.98)}
+  #hCall.on{opacity:0}
+  .modal.on{opacity:0}
+  .modal.on .mbox{transform:translateY(.75rem) scale(.97)}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01s!important;animation-duration:.01s!important;animation-iteration-count:1!important}
+}
+
 /* =====================================================================
    RESPONSIVE — chế độ GỌN (màn nhỏ / điện thoại): co giãn lớn hơn, thu gọn thẻ & thanh
    ===================================================================== */
@@ -361,20 +423,16 @@ input[type=range]:disabled{opacity:.45}
   :root{--u:clamp(.75px,min(calc(100vw/1400),calc(100vh/800)),1px)}
   #hLeft{left:1rem;top:1rem;gap:.75rem}
   #hRight{right:1rem;top:1rem}
-  #hMusic{left:1rem;bottom:1rem}
+  #hMusic{left:.5rem;bottom:1rem}   /* tâm album = tâm avatar Bin thu nhỏ (16 + 32) */
   #hBR{right:1rem;bottom:1rem}
   #hTop{gap:1rem;margin:0}
   #hTop .ib{width:3rem;height:3rem}#hTop .ib .ic{font-size:2rem}
-  #hAct{bottom:1rem;gap:0;padding:.5rem}
-  #hAct .ib{width:3.5rem;height:3.5rem;border-radius:1.25rem}#hAct .ib>span{display:none}#hAct .ib .ic{font-size:1.75rem}
-  #hAct .tg{margin-left:.25rem}
   /* nhạc: chỉ còn album + mũi tên; mở ra mới thấy bài + nút */
   #hMus{padding:.5rem;gap:.5rem}
   #hMus .mi,#hMus .mc{display:none}
   #hMusic.open #hMus{gap:1rem;padding:.5rem 1rem .5rem .5rem}
   #hMusic.open #hMus .mi{display:block;width:9rem}#hMusic.open #hMus .mc{display:flex;gap:.25rem}
   #hMus .tg{margin-left:0}
-  body:has(#hMusic.open) #hAct,body:has(#hMusic.ytopen) #hAct{display:none}
   #hMusic.open #hMus{flex-wrap:nowrap}
   /* đồng hồ: chỉ giờ + icon thời tiết */
   #hClock{padding:.75rem 1.25rem;gap:.75rem}
@@ -382,7 +440,7 @@ input[type=range]:disabled{opacity:.45}
   #hClock .vr,#hClock #cDw,#hClock #cDd,#hClock #cWt{display:none}
   #hClock .wx{height:auto;padding:.25rem .5rem}
   #hClock .dt{gap:0}
-  #toast{bottom:6.5rem}
+  #toast{bottom:5rem}
   #hChat{height:min(24rem,calc(100vh - 14rem))}
 }
 /* điện thoại dọc: cột icon bên phải, panel phủ gần hết ngang */
@@ -391,9 +449,7 @@ input[type=range]:disabled{opacity:.45}
   #hRight{align-items:flex-end}
   #hNote,#hTasks{position:fixed;left:1rem;right:4.5rem;top:1rem;width:auto;max-width:none;max-height:calc(100vh - 9rem)}
   #hProf:not(.min){transform-origin:top left}
-  #hBR{bottom:5.5rem}
-  #hMusic{bottom:5.5rem;max-width:calc(100vw - 2rem)}
-  #hAct{bottom:1rem}
+  #hMusic{max-width:calc(100vw - 2rem)}
   #hChat{width:calc(100vw - 2rem)}
   #hCall:not(.full){top:auto;bottom:9rem;left:1rem;width:min(var(--callW,240px),calc(100vw - 2rem))}
 }

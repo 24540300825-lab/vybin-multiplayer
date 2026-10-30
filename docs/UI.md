@@ -20,13 +20,13 @@ Màn hình thật co giãn theo `--u` (1 px thiết kế): màn 1920×1080 → 1
 - **Pill thời tiết / chip / ô nhập**: nền `rgba(0,0,0,.46)`, viền trắng 1px, bo tròn.
 - **Thanh chỉ số**: rãnh `#242424`, cao 12, đầu trái thon; đỏ `#d25353` (Sức khỏe), cam `#ffb84d` (Thể lực), xanh lá `#8be28b` (Tâm trạng), **xanh dương `#6fa8ff` (Tập trung — màu thêm)**.
 - **Chữ**: tên / giờ / tiêu đề = **Audex** (24 / 64 / 24); nội dung = **Nunito Sans Bold** (12–20); chữ phụ `#c3c1c1`. Màu nhấn (nút chính, mục đang chọn) `#ffd581`.
-- Thanh icon trên cùng: mỗi icon nằm giữa **ô 40×40**, các ô cách nhau 60 (tâm cách đều 100); nút bấm 48. Icon giữ đúng kích thước thật của Figma (bell 36×40, chat 40×37, mic 25×40, video 40×25, camera 40×30, ghim 30×40, cài đặt 35×34) và được căn tâm cả hai chiều.
+- Thanh icon trên cùng: mỗi icon nằm giữa **ô 36×36** (font-size 2.25rem), tâm cách đều 84; nút bấm 48. Icon giữ đúng kích thước thật trong Figma (đã thu nhỏ): bell 29×32, chat 34×32, mic 20×32, video 30×19, camera 33×25, ghim 24×32, cài đặt 33×32; căn tâm cả hai chiều. Nhạc: prev/next 20×16, pause 16×16 (font-size 1.5rem).
 
 ## Font Audex
 Chưa có file font nên đang dùng **Nunito** thay tạm. Khi có `audex.woff2` (hoặc `.ttf`): đặt vào `assets/fonts/`, bỏ ghi chú khối `@font-face` ở đầu `ui.css`. Không cần sửa gì khác (biến `--f-d` đã ưu tiên Audex).
 
 ## Căn lề (quy tắc "thẳng hàng")
-- Lề trái chung **52**: mép trái avatar Bin = thẻ Vy = capsule nhạc. Lề dưới chung **64**: capsule nhạc = đồng hồ = thanh hành động. Lề phải chung **96**: mép capsule đồng hồ = mép phải icon cài đặt (đã bù khoảng trống 2 bên của icon, `#hTop` margin âm). Đỉnh chung **56**: đỉnh avatar Bin = đỉnh các icon.
+- **Tâm avatar thẳng trục x = 116**: avatar Bin (128) = avatar Vy (64) = album nhạc (64); capsule Vy/nhạc lùi vào cho đúng (hồ sơ thu gọn thì thẻ Vy lùi theo). Lề dưới chung **64**: capsule nhạc = đồng hồ = thông báo nhanh (toast). Lề phải chung **96**: mép capsule đồng hồ = mép phải icon cài đặt (đã bù khoảng trống 2 bên của icon, `#hTop` margin âm). Đỉnh chung **56**: đỉnh avatar Bin = đỉnh các icon.
 - Chữ số lớn (giờ, số chỉ số) dùng `text-box: trim-both cap alphabetic` để **tâm chữ số** trùng tâm ô/thanh, không phụ thuộc font (trình duyệt cũ chưa hỗ trợ thì tự căn giữa theo dòng).
 - Nút mở danh sách nhạc là "tay nắm" tròn giữa mép trên capsule nhạc (màn lớn) để capsule giữ đúng 552 như Figma.
 
@@ -42,3 +42,9 @@ Hồ sơ (mũi tên trên thẻ Bin), thanh hành động (mũi tên bên phải
 
 ## Thêm nút vào thanh icon (tính năng cắm thêm)
 `ctx.ui.addButton({icon, label, title, onClick})` vẫn dùng được: nút nhận `icon` (emoji hoặc chuỗi SVG) hiển thị đơn giản; `label`/`title` hiện khi rê chuột.
+
+## Phím tắt (thay cho thanh hành động cũ)
+`src/ui/shortcuts.js`: mặc định Q đi · R chạy · C ngồi · F làm việc (gõ phím) · X rời ghế · Z ngủ · V dậy. Đổi / bỏ gán / khôi phục trong **Cài đặt → Phím tắt** (lưu `localStorage.vyKeys`). Phím cố định (không đổi): WASD, Shift, E, T, M, Esc, F3. Phím tắt tạm tắt khi đang gõ chữ hoặc mở hộp thoại. Cách chạy: shortcuts.js phát sự kiện `window` `vy:act` (`detail` = `walk|run|sit|type|off|sleep|wake`), `src/game.js` nghe và bấm đúng các nút ẩn trong `#ui` (cùng lệnh cũ).
+
+## Chuyển động
+Cuối `ui.css`, mục "CHUYỂN ĐỘNG": mọi chuyển ≤ .22s, đường cong `--ease`. Nút: sáng/mờ + toả sáng (glow) khi rê, co nhẹ khi bấm. Panel / hộp thoại: mờ + trượt nhẹ khi mở và khi đóng (`@starting-style` + `display allow-discrete`; trình duyệt cũ thì bật/tắt ngay). Tôn trọng `prefers-reduced-motion`.

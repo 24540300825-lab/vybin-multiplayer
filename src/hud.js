@@ -5,6 +5,7 @@ import {createYTMusic} from './music-yt.js';
 import {mountYtUi} from './ui/music-ui.js';
 import {ic, paintIcons} from './ui/icons.js';
 import {Notify} from './ui/notify.js';
+import {mountShortcuts} from './ui/shortcuts.js';
 // ===== HUD / UI mới (kiểu game) =====
 (function buildHUD(){
   const $=id=>document.getElementById(id),V=()=>window.VY;
@@ -70,9 +71,6 @@ import {Notify} from './ui/notify.js';
   const setProf=min=>{$('hProf').classList.toggle('min',min);$('pTog').setAttribute('aria-expanded',String(!min));$('pTog').setAttribute('aria-label',min?'Mở rộng hồ sơ':'Thu gọn hồ sơ');setTimeout(()=>window.dispatchEvent(new Event('resize')),300)};
   setProf(ui.profMin!=null?!!ui.profMin:compact());
   $('pTog').onclick=()=>{const m=!$('hProf').classList.contains('min');ui.profMin=m;saveUi();setProf(m)};
-  const setAct=min=>{$('hAct').classList.toggle('min',min);const t=$('aTog');t.setAttribute('aria-expanded',String(!min));t.setAttribute('aria-label',min?'Mở thanh hành động':'Thu gọn thanh hành động')};
-  setAct(ui.actMin!=null?!!ui.actMin:false);
-  $('aTog').onclick=()=>{const m=!$('hAct').classList.contains('min');ui.actMin=m;saveUi();setAct(m)};
   // --- chỉ số
   const S={hp:98,st:68,fo:72,mo:78};
   function setB(k,id,txt){$('b'+id).style.width=Math.max(2,S[k])+'%';$('v'+id).textContent=txt!=null?txt:Math.round(S[k])}
@@ -84,9 +82,8 @@ import {Notify} from './ui/notify.js';
     S.hp=Math.min(100,S.hp+(slp?.3:0)*dt);
     setB('hp','Hp');setB('st','St');setB('fo','Fo');setB('mo','Mo');
     $('rHp').title='Sức khỏe: '+Math.round(S.hp);$('rSt').title='Thể lực: '+Math.round(S.st);$('rFo').title='Tập trung: '+Math.round(S.fo);$('rMo').title='Tâm trạng: '+(S.mo>70?'Vui':S.mo>40?'Ổn':'Buồn')+' ('+Math.round(S.mo)+')';
-    document.querySelectorAll('#hAct .ib').forEach(b=>{const id=b.dataset.a;b.classList.toggle('on',(id==='bRun'&&run)||(id==='bWalk'&&walk)||(id==='bType'&&typ)||(id==='bSit'&&/SITTING_IDLE/.test(clip))||(id==='bSleep'&&slp))});
   },500);
-  document.querySelectorAll('#hAct .ib').forEach(b=>b.onclick=()=>{const t=$(b.dataset.a);if(t)t.click()});
+  mountShortcuts({toast});
   // --- task
   let tasks=load('vyTasks',[{t:'Hoàn thiện storyboard',h:'16:00',d:0},{t:'Render test animation',h:'18:00',d:0},{t:'Chỉnh thiết kế poster',h:'20:00',d:0},{t:'Đọc tài liệu',h:'22:00',d:0},{t:'Uống nước (2L)',h:'15:00',d:1}]);
   function rt(){const L=$('tkList');L.innerHTML='';if(!tasks.length){L.innerHTML='<div class="tk-empty">Chưa có việc nào — bấm + để thêm.</div>';return}tasks.forEach((k,i)=>{const r=document.createElement('div');r.className='tk'+(k.d?' done':'');const c=document.createElement('input');c.type='checkbox';c.checked=!!k.d;c.onchange=()=>{k.d=c.checked?1:0;save('vyTasks',tasks);rt()};

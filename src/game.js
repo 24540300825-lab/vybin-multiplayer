@@ -712,6 +712,8 @@ export function init(ctx){
   $('bSleep').onclick=cmdSleep;$('bWake').onclick=cmdWake;
   $('bSit').onclick=()=>cmdSit();$('bType').onclick=()=>{if(P.mode==='type')cmdSit('sit');else cmdSit('type')};
   $('bOff').onclick=cmdOffChair;$('bBlink').onclick=()=>local.blink();
+  // phím tắt (src/ui/shortcuts.js) → cùng các lệnh với nút ẩn ở trên
+  {const ACT={walk:'bWalk',run:'bRun',sit:'bSit',type:'bType',off:'bOff',sleep:'bSleep',wake:'bWake'};addEventListener('vy:act',e=>{const b=ACT[e.detail];if(b)$(b).click()})}
   document.querySelectorAll('input[data-k]').forEach(el=>{const k=el.dataset.k;el.max=Math.max(+el.max,k==='run'?10:k==='walk'?6:3);el.value=CFG[k];$('v'+k).textContent=el.value;el.oninput=()=>{CFG[k]=+el.value;$('v'+k).textContent=el.value;try{localStorage.setItem('vyCfg',JSON.stringify({v:3,walk:CFG.walk,run:CFG.run,walkAnim:CFG.walkAnim,runAnim:CFG.runAnim}))}catch(e){}}});
   try{const sv=JSON.parse(localStorage.getItem('vyCfg')||'null');if(sv&&sv.v===3){['walk','run','walkAnim','runAnim'].forEach(k=>{if(sv[k]!=null){CFG[k]=sv[k];const el=document.querySelector('input[data-k='+k+']');if(el){el.value=sv[k];$('v'+k).textContent=sv[k]}}})}}catch(e){}
 

@@ -62,17 +62,6 @@
  <div class="hud cap" id="hClock" title="Giờ trong game"><span class="t" id="cT">12:34</span><span class="vr"></span><div class="dt"><span id="cDw">Thứ sáu</span><span id="cDd">30/10/2026</span><span class="wx"><i class="ic" id="cW"></i><span id="cWt">Trời quang</span></span></div></div>
 </div>
 
-<div class="hud cap" id="hAct" role="toolbar" aria-label="Hành động">
- <button class="ib" data-a="bWalk"><i class="ic" data-ic="walk"></i><span>Đi</span></button>
- <button class="ib" data-a="bRun"><i class="ic" data-ic="run"></i><span>Chạy</span></button>
- <button class="ib" data-a="bSit"><i class="ic" data-ic="sit"></i><span>Ngồi</span></button>
- <button class="ib" data-a="bType"><i class="ic" data-ic="type"></i><span>Làm việc</span></button>
- <button class="ib" data-a="bOff"><i class="ic" data-ic="out"></i><span>Rời ghế</span></button>
- <button class="ib" data-a="bSleep"><i class="ic" data-ic="sleep"></i><span>Ngủ</span></button>
- <button class="ib" data-a="bWake"><i class="ic" data-ic="wake"></i><span>Dậy</span></button>
- <button class="tg" id="aTog" title="Thu gọn / mở rộng thanh hành động" aria-label="Thu gọn thanh hành động" aria-expanded="true" data-ic="down"></button>
-</div>
-
 <div class="modal" id="hMap" role="dialog" aria-modal="true" aria-label="Chọn bản đồ"><div class="mbox" id="mBox"><div class="ph"><h2>Chọn bản đồ</h2><span class="sp"></span><button class="rb" id="mX" title="Đóng" aria-label="Đóng" data-ic="x"></button></div><div id="mpList"></div></div></div>
 
 <div class="modal" id="hSet" role="dialog" aria-modal="true" aria-label="Cài đặt"><div class="mbox" id="sBox">
@@ -83,6 +72,7 @@
   <label>Tự chạy ngày đêm <input type="checkbox" id="sAuto"></label><div class="chips" id="sWea"></div></details>
  <details class="sec"><summary>Phong cách (Look)</summary><div class="chips" id="sLook"></div></details>
  <details class="sec"><summary>Điều khiển</summary><div id="sCtl"></div></details>
+ <details class="sec"><summary>Phím tắt</summary><div id="sKeys"></div></details>
  <details class="sec" open><summary>Âm thanh</summary>
   <label>Âm lượng nhạc <input type="range" id="sVolS" min="0" max="1" step="0.05"></label>
   <label>Âm hiệu ứng (bước chân, cuộc gọi…) <input type="checkbox" id="sSfxOn" checked></label><label>Âm lượng hiệu ứng <input type="range" id="sSfx" min="0" max="1" step="0.05" value="0.8"></label><label>Âm môi trường (gió, chim, dế) <input type="checkbox" id="sAmb" checked></label></details>
