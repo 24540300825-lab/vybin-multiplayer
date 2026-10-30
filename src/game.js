@@ -847,17 +847,17 @@ export function init(ctx){
     +'vec3 V=normalize(uCam-vW);'
     +'float frame=1.0-smoothstep(0.075,0.095,ed);'                         // khung viền ngoài đục
     +'float hl=(smoothstep(0.075,0.09,ed)*(1.0-smoothstep(0.095,0.12,ed)))*0.55;'   // vạch sáng ngay mép trong khung
-    +'float glow=(1.0-smoothstep(0.1,0.55,ed))*0.07;'                       // kính hơi đục dần về phía viền
+    +'float glow=(1.0-smoothstep(0.1,0.55,ed))*0.035;'                       // kính hơi đục dần về phía viền
     +'float sill=0.0,sillHl=0.0,beam=0.0,beamHl=0.0,frost=0.0,fr,sheen;'
     +'if(uMode<0.5){float y=vW.y;'
     +'  sill=1.0-smoothstep(0.37,0.4,y);sillHl=smoothstep(0.4,0.415,y)*(1.0-smoothstep(0.43,0.45,y))*0.5;'   // chân tường đặc tầng trệt
-    +'  frost=(1.0-smoothstep(0.4,1.6,y))*0.12;'
+    +'  frost=(1.0-smoothstep(0.4,1.4,y))*0.05;'
     +'  fr=pow(1.0-clamp(abs(V.z),0.0,1.0),2.0);'
-    +'  sheen=band(vUv.x*uSz.x*0.55+vUv.y*uSz.y*0.35,3.4,0.9)*0.05+band(vUv.x*uSz.x*0.55+vUv.y*uSz.y*0.35,7.2,0.35)*0.035;'
+    +'  sheen=band(vUv.x*uSz.x*0.55+vUv.y*uSz.y*0.35,3.4,0.9)*0.03+band(vUv.x*uSz.x*0.55+vUv.y*uSz.y*0.35,7.2,0.35)*0.02;'
     +'}else{fr=pow(1.0-clamp(abs(V.y),0.0,1.0),2.0);'
-    +'  sheen=band(m.x*0.7+m.y*0.5,4.0,1.1)*0.04+band(m.x*0.7+m.y*0.5,8.3,0.4)*0.03;}'
+    +'  sheen=band(m.x*0.7+m.y*0.5,4.0,1.1)*0.022+band(m.x*0.7+m.y*0.5,8.3,0.4)*0.016;}'
     +'float sa=max(max(frame,max(sill,beam)),0.0);'                         // phần đục (khung, chân tường, dầm)
-    +'float ag=0.045+0.06*fr+glow+frost+sheen+max(hl,max(sillHl,beamHl));' // phần kính
+    +'float ag=0.012+0.03*fr+glow+frost+sheen+max(hl,max(sillHl,beamHl));' // phần kính
     +'float a=sa*0.94+ag*(1.0-sa*0.94);'
     +'vec3 col=mix(uGlass,uFrame,sa);col=mix(col,vec3(1.0),clamp(max(hl,max(sillHl,beamHl))*0.8+sheen*2.0,0.0,0.6)*(1.0-sa));'
     +'gl_FragColor=vec4(col,clamp(a,0.0,0.96)*uA);}';
@@ -875,7 +875,7 @@ export function init(ctx){
   function glassStep(){
     const cam=camera.position,l=TU.uAmbS.value,lum=Math.min(1,Math.max(0.3,(l.x*0.3+l.y*0.59+l.z*0.11)*0.95));
     for(const G of [GLASS.front,GLASS.top]){if(!G)continue;const u=G.mat.uniforms;
-      u.uGlass.value.set(0.93*lum,0.97*lum,1*lum);u.uFrame.value.set(1*lum,0.95*lum,0.86*lum);u.uCam.value.copy(cam)}
+      u.uGlass.value.set(0.52*lum,0.56*lum,0.6*lum);u.uFrame.value.set(1*lum,0.95*lum,0.86*lum);u.uCam.value.copy(cam)}
     if(GLASS.front){const d=cam.z-GLASS.front.F.z;GLASS.front.mat.uniforms.uA.value=d>0?Math.min(1,Math.max(0,(d-3)/6)):0}   // camera sát/vào trong tường thì tường biến mất hẳn
     if(GLASS.top){const d=cam.y-GLASS.top.T.y;GLASS.top.mat.uniforms.uA.value=Math.min(1,Math.max(0,(d-1)/4))}               // camera thấp hơn nóc thì nóc biến mất
   }
@@ -1232,20 +1232,26 @@ export function init(ctx){
   const HOUSE='bool inHouse(vec3 p){return p.x>-0.2&&p.x<10.2&&p.z>-8.2&&p.z<0.8&&p.y<6.3;}';
   const rainU={uT:beamU.uT,uWind:{value:0},uInt:{value:1},uPx:{value:1},uRes:{value:new THREE.Vector2(1,1)},uC:{value:new THREE.Vector3()},uAmt:{value:0},uCol:{value:new THREE.Color('#d6e4f5')}};
   const rainM=new THREE.ShaderMaterial({uniforms:rainU,transparent:true,depthWrite:false,fog:false,side:THREE.DoubleSide,
-    vertexShader:PRE+HOUSE+`uniform float uInt,uPx;uniform vec2 uRes;attribute vec3 seed;attribute vec2 corner;varying float vA;varying float vX;void main(){
+    vertexShader:PRE+HOUSE+`uniform float uInt,uPx;uniform vec2 uRes;attribute vec3 seed;attribute vec2 corner;varying float vA;varying float vX;varying float vT;varying float vN;void main(){
       float H=22.0;float spd=(19.0+seed.y*8.0)*(0.85+0.3*uInt);float y=mod(seed.y*H*7.3-uT*spd,H);
       vec3 p=vec3(uC.x-19.0+mod(seed.x*38.0-(uC.x-19.0),38.0),y-1.2,uC.z-19.0+mod(seed.z*38.0-(uC.z-19.0),38.0));
       float len=(0.5+seed.x*0.45)*(0.65+0.45*uInt);
+      float nr0=1.0-smoothstep(5.0,42.0,length(p-cameraPosition));len*=1.0+0.9*nr0;   // gần camera: vệt dài hơn (nhoè chuyển động)
       vec3 vel=normalize(vec3(uWind*0.22,1.0,0.03))*len;
       float keep=step(fract(seed.x*91.7+seed.z*13.3),uAmt);if(inHouse(p))keep=0.0;
       vec4 ca=projectionMatrix*viewMatrix*vec4(p,1.0),cb=projectionMatrix*viewMatrix*vec4(p+vel,1.0);
       float asp=uRes.x/uRes.y;vec2 sa=ca.xy/ca.w,sb=cb.xy/cb.w;vec2 dir=(sb-sa)*vec2(asp,1.0);float dl=length(dir);dir=dl>1e-5?dir/dl:vec2(0.0,1.0);
-      vec2 nr=vec2(-dir.y,dir.x)/vec2(asp,1.0);float wpx=(0.9+uInt*0.45)*uPx*(0.8+seed.z*0.5);
+      vec2 nr=vec2(-dir.y,dir.x)/vec2(asp,1.0);float wpx=(0.8+uInt*0.4)*uPx*(0.75+seed.z*0.5)*(0.7+1.5*nr0);   // gần: hạt to hơn; xa: mảnh
       vec4 c=mix(ca,cb,corner.y);c.xy+=nr*corner.x*wpx*2.0/uRes.y*c.w;
       float df=(1.0-smoothstep(26.0,70.0,ca.w))*smoothstep(9.0,22.0,ca.w);
-      vA=mix(0.5,0.0,corner.y)*keep*df*(0.55+0.45*seed.y);vX=corner.x;
+      vA=keep*df*(0.5+0.5*seed.y)*(0.45+0.75*nr0);vX=corner.x;vT=corner.y;vN=nr0;
       gl_Position=keep>0.5?c:vec4(2.0,2.0,2.0,1.0);}`,
-    fragmentShader:'uniform vec3 uCol;varying float vA;varying float vX;void main(){float e=1.0-smoothstep(0.35,1.0,abs(vX));gl_FragColor=vec4(uCol,vA*e);}'});
+    fragmentShader:'uniform vec3 uCol;varying float vA;varying float vX;varying float vT;varying float vN;void main(){'
+      // giọt mưa điện ảnh: đầu sáng, đuôi tan dần (ease), lõi trắng mảnh + viền mềm; xa thì xanh lạnh mờ, gần thì sáng trắng ấm hơn
+      +'float ax=abs(vX);float body=pow(1.0-smoothstep(0.0,1.0,ax),1.6);float core=1.0-smoothstep(0.0,0.38,ax);'
+      +'float tail=pow(1.0-vT,1.7)*smoothstep(0.0,0.08,1.0-vT);float head=smoothstep(0.55,0.0,vT)*0.5;'
+      +'vec3 far=vec3(0.58,0.7,0.88),near=mix(uCol,vec3(1.0),0.45);vec3 c=mix(far,near,vN);c=mix(c,vec3(1.0),core*0.5);'
+      +'gl_FragColor=vec4(c,vA*body*(tail*0.8+head)*(0.75+0.5*core));}'});
   const rain=new THREE.Mesh(rainG,rainM);rain.frustumCulled=false;rain.raycast=()=>{};rain.visible=false;rain.renderOrder=7;scene.add(rain);
   // gợn nước trên mặt đất (ripples)
   const RP=520;const pseed=new Float32Array(RP*4*3),pcor=new Float32Array(RP*4*2),pidx=[];
@@ -1258,7 +1264,7 @@ export function init(ctx){
       bool slab=p.x>-0.5&&p.x<16.2&&p.z>-8.6&&p.z<1.4;if(slab)keep=0.0;
       p+=vec3(corner.x,0.0,corner.y)*(0.05+ph*0.3);vC=corner;vA=(1.0-ph)*(1.0-ph)*keep*0.4;
       gl_Position=keep>0.5?projectionMatrix*viewMatrix*vec4(p,1.0):vec4(2.0,2.0,2.0,1.0);}`,
-    fragmentShader:'uniform vec3 uCol;varying vec2 vC;varying float vA;void main(){float r=length(vC);float ring=smoothstep(0.55,0.8,r)*(1.0-smoothstep(0.85,1.0,r));gl_FragColor=vec4(uCol,ring*vA);}'});
+    fragmentShader:'uniform vec3 uCol;varying vec2 vC;varying float vA;void main(){float r=length(vC);float ring=smoothstep(0.62,0.82,r)*(1.0-smoothstep(0.86,1.0,r));float ring2=smoothstep(0.3,0.4,r)*(1.0-smoothstep(0.44,0.54,r))*0.55;gl_FragColor=vec4(mix(uCol,vec3(1.0),0.35),(ring+ring2)*vA);}'});
   const ripples=new THREE.Mesh(ripG,ripM);ripples.frustumCulled=false;ripples.raycast=()=>{};ripples.visible=false;ripples.renderOrder=3;scene.add(ripples);
   const SN=2200;const sseed=new Float32Array(SN*3);for(let i=0;i<SN*3;i++)sseed[i]=Math.random();
   const snowG=new THREE.BufferGeometry();snowG.setAttribute('position',new THREE.BufferAttribute(new Float32Array(SN*3),3));snowG.setAttribute('seed',new THREE.BufferAttribute(sseed,3));
