@@ -1131,7 +1131,7 @@ export function init(ctx){
   const RA={ctx:null,g:null};
   function initRainAudio(){if(RA.ctx)return;try{const ctx=new (window.AudioContext||window.webkitAudioContext)();const len=ctx.sampleRate*2,buf=ctx.createBuffer(1,len,ctx.sampleRate),d=buf.getChannelData(0);
       let b=0;for(let i=0;i<len;i++){const w=Math.random()*2-1;b=(b+0.04*w)/1.04;d[i]=w*0.5+b*3}
-      const src=ctx.createBufferSource();src.buffer=buf;src.loop=true;const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=500;const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=6500;
+      const src=ctx.createBufferSource();src.buffer=buf;src.loop=true;const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=650;const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=3800;
       const g=ctx.createGain();g.gain.value=0;src.connect(hp);hp.connect(lp);lp.connect(g);g.connect(ctx.destination);src.start();RA.ctx=ctx;RA.g=g;RA.buf=buf}catch(e){}}
   addEventListener('pointerdown',initRainAudio,{once:true});addEventListener('keydown',initRainAudio,{once:true});
   function thunder(){if(!RA.ctx)return;const ctx=RA.ctx,s=ctx.createBufferSource();s.buffer=RA.buf;const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=180;const g=ctx.createGain();
