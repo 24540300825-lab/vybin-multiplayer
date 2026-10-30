@@ -104,7 +104,7 @@ button{font-family:inherit}
 #hTop .ib.live{color:#7cf08a}
 #hTop .ib.talk{filter:drop-shadow(0 0 .75rem #7cf08a)}
 #hTop #iVoiceX{color:#ff8a8a}
-.dot,.bdg{position:absolute;top:.25rem;right:.125rem;background:var(--bad);color:#fff;border:.125rem solid #fff;border-radius:999px;font:800 .75rem/1 var(--f-b);font-style:normal;box-sizing:border-box}
+.dot,.bdg{z-index:2;position:absolute;top:.25rem;right:.125rem;background:var(--bad);color:#fff;border:.125rem solid #fff;border-radius:999px;font:800 .75rem/1 var(--f-b);font-style:normal;box-sizing:border-box}
 .dot{width:1rem;height:1rem;top:.5rem;right:.5rem}
 .bdg{min-width:1.25rem;height:1.25rem;padding:0 .25rem;display:grid;place-items:center}
 
