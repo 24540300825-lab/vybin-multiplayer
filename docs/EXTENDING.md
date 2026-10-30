@@ -33,6 +33,17 @@ Lỗi trong 1 tính năng chỉ làm **tính năng đó** tắt, game vẫn ch�
 6. Thử `?solo&as=bin#map=xxx`, rồi chơi thử 2 người.
 Mẹo cầu thang: đặt các bậc có tên đúng mẫu, mỗi cầu thang 1 nhóm mesh; game tự đo độ cao bậc bằng tia ray nên không cần số liệu tay.
 
+### 2b. Khi cập nhật / thay map đang có (checklist "giữ nguyên tính năng")
+Các tính năng hiện có bám vào **tên node** và **số liệu trong `MC`** (`src/map-configs.js`). Khi nhận GLB map mới, giữ đúng các tên này (hoặc sửa `MC` cho khớp) thì mọi thứ tự chạy lại:
+- **Điểm tương tác (pin)**: node `Bed`, `Desk_Chair` (hoặc `MC.seat/chair`), `Sofa`, `TV_Panel`/`TV_Screen`, cửa `Doormat`/`Landing_Doormat`/`Door_Entrance_Leaf`/`GD_Door_Entrance_Leaf`. Đổi tên → pin lệch hoặc mất.
+- **Ghế**: `MC.chair`, `MC.chairFlip` (true nếu ghế trong file quay ngược hướng).
+- **Đèn + vệt sáng**: node khớp regex `Pendant_*Bulb*`. Vùng nhà dùng cho đèn/mưa đang cố định x -0.2..10.2, z -8.2..0.8, y<6.3 trong `game.js` → map mới khác kích thước phải sửa hộp này.
+- **Tường kính (mặt trước + đỉnh)**: `MC.glass = {front:{x0,x1,z,y0,y1}, top:{x0,x1,z0,z1,y}}` — đo lại theo khung nhà mới. Bệ kính chỉ vẽ ở y<0.4 (sàn trệt).
+- **Tầng gác / cầu thang**: `MC.mezz`, `MC.treadNames`/`MC.tread`, `MC.walk0`, `MC.l1`, `MC.cl1`.
+- **Ẩn / tô màu / nâng**: `MC.hide`, `MC.hideFlat`, `MC.tint`, `MC.lift`, `MC.out`, `MC.gtex`, `MC.garden`.
+- **Không phụ thuộc map** (giữ nguyên khi đổi map): màn chọn nhân vật + nhớ máy (`localStorage.vyChar`), cuộc gọi, HUD, nhân vật.
+Sau khi đổi map: chạy `?solo&as=bin#map=xxx`, kiểm: pin hiện đúng chỗ, ngồi ghế/ngủ/xem TV, đèn đêm, tường kính mờ khi camera sát, mưa không lọt vào trong nhà.
+
 ## 3. Thêm / đổi nhân vật hoặc animation
 - File `assets/char-<slot>.glb` (slot = `bin` hoặc `vy`).
 - Game nhận clip theo **tên** trong file GLB: các clip dạng `ACT_…` (không chứa `__`) được tự đăng ký làm hành động, ví dụ `ACT_WALK`, `ACT_RUN`, `ACT_STANDING_IDLE`, `ACT_SITTING_IDLE`, `ACT_TYPING_IDLE`, `ACT_SLEEP-LOOP BREATHE`; clip mắt bắt đầu bằng tiền tố mắt đóng/mở/chớp (khai báo trong `DEF.eye`). **Giữ nguyên tên clip cũ khi đổi file**; clip mới đặt tên `ACT_TENMOI` thì tự có trong bảng `acts`, rồi gọi từ code/tính năng.
