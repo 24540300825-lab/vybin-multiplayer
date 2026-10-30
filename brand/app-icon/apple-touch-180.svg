@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="180" height="180">
+  <title>Apple touch icon (nền vuông, iOS tự bo)</title><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffc46b"/><stop offset="1" stop-color="#ff8f6b"/></linearGradient></defs><rect width="256" height="256" fill="url(#g)"/><g transform="translate(12.8 12.8) scale(.9)"><path id="roof" d="M56 120 L128 62 L200 120" fill="none" stroke="#f8f1e1" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle id="bin" cx="104" cy="160" r="36" fill="#3b2a1a"/>
+  <circle id="vy" cx="152" cy="160" r="36" fill="#f8f1e1"/>
+  <clipPath id="lensClip"><circle cx="104" cy="160" r="36"/></clipPath>
+  <circle id="lens" cx="152" cy="160" r="36" fill="#ff8f6b" clip-path="url(#lensClip)"/></g>
+</svg>

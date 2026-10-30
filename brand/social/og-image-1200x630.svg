@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <title>Ảnh chia sẻ link (Open Graph) 1200×630</title>
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffc46b"/><stop offset="1" stop-color="#ff8f6b"/></linearGradient><linearGradient id="bgG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#12151b"/><stop offset="1" stop-color="#3a3524"/></linearGradient>
+  <radialGradient id="glow" cx=".5" cy=".42" r=".5"><stop offset="0" stop-color="#ffc46b" stop-opacity=".28"/><stop offset="1" stop-color="#ffc46b" stop-opacity="0"/></radialGradient></defs>
+  <rect id="bg" width="1200" height="630" fill="url(#bgG)"/><rect id="glow" width="1200" height="630" fill="url(#glow)"/>
+  <g transform="translate(505.0 126.0) scale(0.7421875)"><rect width="256" height="256" rx="58" fill="url(#g)"/><path id="roof" d="M56 120 L128 62 L200 120" fill="none" stroke="#f8f1e1" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle id="bin" cx="104" cy="160" r="36" fill="#3b2a1a"/>
+  <circle id="vy" cx="152" cy="160" r="36" fill="#f8f1e1"/>
+  <clipPath id="lensClip"><circle cx="104" cy="160" r="36"/></clipPath>
+  <circle id="lens" cx="152" cy="160" r="36" fill="#ff8f6b" clip-path="url(#lensClip)"/></g>
+  <text id="name" x="600.0" y="395.8" text-anchor="middle" font-family="Nunito, 'Segoe UI', system-ui, sans-serif" font-weight="800" font-size="79.8" letter-spacing="3" fill="#f8f1e1">VY<tspan fill="#ffc46b"> · </tspan>BIN</text>
+  <text id="tagline" x="600.0" y="437.6" text-anchor="middle" font-family="Nunito, 'Segoe UI', system-ui, sans-serif" font-weight="600" font-size="28.5" fill="#d9cfb8">Căn phòng nhỏ của hai người</text>
+</svg>

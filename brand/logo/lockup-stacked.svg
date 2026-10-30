@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 360" width="360" height="360">
+  <title>VY·BIN — lockup dọc</title><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffc46b"/><stop offset="1" stop-color="#ff8f6b"/></linearGradient></defs>
+  <g transform="translate(88 12)"><rect width="184" height="184" rx="42" fill="url(#g)"/><g transform="scale(.71875)"><path id="roof" d="M56 120 L128 62 L200 120" fill="none" stroke="#f8f1e1" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle id="bin" cx="104" cy="160" r="36" fill="#3b2a1a"/>
+  <circle id="vy" cx="152" cy="160" r="36" fill="#f8f1e1"/>
+  <clipPath id="lensClip"><circle cx="104" cy="160" r="36"/></clipPath>
+  <circle id="lens" cx="152" cy="160" r="36" fill="#ff8f6b" clip-path="url(#lensClip)"/></g></g>
+  <text x="180" y="262" text-anchor="middle" font-family="Nunito, 'Segoe UI', system-ui, sans-serif" font-weight="800" font-size="64" letter-spacing="2" fill="#f8f1e1">VY<tspan fill="#ffc46b"> · </tspan>BIN</text>
+  <text x="180" y="300" text-anchor="middle" font-family="Nunito, 'Segoe UI', system-ui, sans-serif" font-weight="600" font-size="22" fill="#d9cfb8">Căn phòng nhỏ của hai người</text>
+</svg>

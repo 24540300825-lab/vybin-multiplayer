@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 144" width="640" height="144">
+  <title>VY·BIN — lockup ngang</title><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffc46b"/><stop offset="1" stop-color="#ff8f6b"/></linearGradient></defs>
+  <g transform="translate(0 0) scale(.5625)"><rect width="256" height="256" rx="58" fill="url(#g)"/><path id="roof" d="M56 120 L128 62 L200 120" fill="none" stroke="#f8f1e1" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle id="bin" cx="104" cy="160" r="36" fill="#3b2a1a"/>
+  <circle id="vy" cx="152" cy="160" r="36" fill="#f8f1e1"/>
+  <clipPath id="lensClip"><circle cx="104" cy="160" r="36"/></clipPath>
+  <circle id="lens" cx="152" cy="160" r="36" fill="#ff8f6b" clip-path="url(#lensClip)"/></g>
+  <text x="176" y="94" font-family="Nunito, 'Segoe UI', system-ui, sans-serif" font-weight="800" font-size="72" letter-spacing="2" fill="#f8f1e1">VY<tspan fill="#ffc46b"> · </tspan>BIN</text>
+</svg>

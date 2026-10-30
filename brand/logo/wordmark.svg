@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 120" width="520" height="120">
+  <title>VY·BIN — wordmark</title>
+  <!-- LƯU Ý: chữ đang là <text> (font Nunito 800). Khi chốt font trong Figma, hãy "Outline stroke/Create outlines" rồi trả lại. -->
+  <text id="wordmark" x="0" y="92" font-family="Nunito, 'Segoe UI', system-ui, sans-serif" font-weight="800" font-size="96" letter-spacing="2" fill="#f8f1e1">VY<tspan fill="#ffc46b"> · </tspan>BIN</text>
+</svg>

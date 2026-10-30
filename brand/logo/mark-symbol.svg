@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>VY·BIN — symbol (không nền)</title>
+  <path id="roof" d="M56 120 L128 62 L200 120" fill="none" stroke="#ffc46b" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle id="bin" cx="104" cy="160" r="36" fill="#3b2a1a"/>
+  <circle id="vy" cx="152" cy="160" r="36" fill="#f8f1e1"/>
+  <clipPath id="lensClip"><circle cx="104" cy="160" r="36"/></clipPath>
+  <circle id="lens" cx="152" cy="160" r="36" fill="#ff8f6b" clip-path="url(#lensClip)"/>
+</svg>
