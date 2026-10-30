@@ -570,21 +570,21 @@ html[data-fx=high] #load.black #lui{transform:translateY(.75rem) scale(.97)}
 #pins{position:fixed;inset:0;z-index:5;pointer-events:none}
 .pin{position:absolute;left:0;top:0;width:3.9375rem;height:4.75rem;margin:-4.625rem 0 0 -1.96875rem;padding:0;border:0;background:none;cursor:pointer;pointer-events:auto;font:700 var(--t1)/1.2 var(--f-b);color:#fff;opacity:1;transition:opacity .18s ease;-webkit-tap-highlight-color:transparent}
 .pin.off{opacity:0;pointer-events:none}
-.pin .pw,.pin .pb{position:absolute;inset:0;display:block}
-.pin .pb{transform-origin:50% 94%;transition:transform .16s cubic-bezier(.2,.9,.3,1.2)}
+.pin .pw,.pin .pq{position:absolute;inset:0;display:block}
+.pin .pq{transform-origin:50% 94%;transition:transform .16s cubic-bezier(.2,.9,.3,1.2)}
 .pin .pt,.pin .pg,.pin .pi{position:absolute;display:block;pointer-events:none;-webkit-user-drag:none}
-/* Figma: vòng ngoài 63px = fill trắng 2% + viền trắng 45% + BACKGROUND BLUR 5px (làm mờ đuôi pin & cảnh phía sau → vệt sáng ở đáy vòng) */
-.pin .pf{position:absolute;left:0;top:0;width:3.9375rem;height:3.9375rem;box-sizing:border-box;border-radius:50%;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.45);-webkit-backdrop-filter:blur(.3125rem);backdrop-filter:blur(.3125rem);pointer-events:none;transition:box-shadow .16s ease}
+/* Figma: vòng ngoài 63px = fill trắng 2% + viền trắng 45%; vệt sáng ở đáy vòng (do blur đuôi pin) vẽ bằng gradient — chỉ 1 hình tròn, không backdrop-filter */
+.pin .pf{position:absolute;left:0;top:0;width:3.9375rem;height:3.9375rem;box-sizing:border-box;border-radius:50%;border:1px solid rgba(255,255,255,.45);background:radial-gradient(ellipse 26% 12% at 50% 93%,rgba(255,255,255,.95),rgba(255,255,255,.35) 60%,rgba(255,255,255,0) 100%),rgba(255,255,255,.02);pointer-events:none}
 .pin .pt,.pin .pg{left:0;top:0;width:100%;height:100%}
 .pin .pd{position:absolute;left:.5rem;top:.5rem;width:2.9375rem;height:2.9375rem;border-radius:50%;opacity:0;background:radial-gradient(circle,#c98241 0,#a85f20 55%,#914a14 100%);transition:opacity .16s ease;pointer-events:none}
 .pin .pr{position:absolute;left:0;top:0;width:3.9375rem;height:3.9375rem;border-radius:50%;box-shadow:0 0 0 .125rem #fff;opacity:0;pointer-events:none}
 .pin .pl{position:absolute;left:calc(100% + .5rem);top:.875rem;white-space:nowrap;padding:.375rem .875rem;border-radius:999px;background:rgba(40,24,10,.72);text-shadow:0 .0625rem .125rem rgba(0,0,0,.4);opacity:0;transform:translateX(-.375rem);transition:opacity .14s ease,transform .18s ease;pointer-events:none}
 /* hover: phồng lên + vòng sáng cam + hiện nhãn */
-.pin:hover .pb,.pin:focus-visible .pb{transform:scale(1.16)}
-.pin:hover .pf,.pin:focus-visible .pf{box-shadow:0 0 .75rem .125rem rgba(255,170,50,.9)}
+.pin:hover .pq,.pin:focus-visible .pq{transform:scale(1.16)}
+.pin:hover .pq,.pin:focus-visible .pq{filter:drop-shadow(0 0 .5rem rgba(255,170,50,.95))}
 .pin:hover .pl,.pin:focus-visible .pl{opacity:1;transform:none}
 /* bấm xuống: lún nhẹ */
-.pin:active .pb{transform:scale(.9);transition-duration:.06s}
+.pin:active .pq{transform:scale(.9);transition-duration:.06s}
 /* đang làm (đang ngồi/ngủ): đĩa nâu, icon trắng — bấm lần nữa để đứng dậy / thức dậy */
 .pin.on .pd{opacity:1}
 .pin.on .pi{filter:brightness(0) invert(1)}
@@ -594,12 +594,11 @@ html[data-fx=high] #load.black #lui{transform:translateY(.75rem) scale(.97)}
 @keyframes pinBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-.3125rem)}}
 @keyframes pinIn{0%{transform:scale(.4) translateY(.75rem)}60%{transform:scale(1.12)}100%{transform:none}}
 /* Nhẹ: tĩnh */
-html[data-fx=lite] .pin .pf{-webkit-backdrop-filter:none;backdrop-filter:none}
-html[data-fx=lite] .pin,html[data-fx=lite] .pin .pb,html[data-fx=lite] .pin .pl,html[data-fx=lite] .pin .pd{transition:none!important}
+html[data-fx=lite] .pin,html[data-fx=lite] .pin .pq,html[data-fx=lite] .pin .pl,html[data-fx=lite] .pin .pd{transition:none!important}
 html[data-fx=lite] .pin.pop .pr{animation:none}
 /* Đồ họa cao: lơ lửng nhẹ + bật ra khi hiện */
 html[data-fx=high] .pin:not(.off) .pw{animation:pinBob 2.6s ease-in-out var(--pd,0s) infinite}
-html[data-fx=high] .pin:not(.off) .pb{animation:pinIn .45s cubic-bezier(.3,1.4,.5,1) both}
+html[data-fx=high] .pin:not(.off) .pq{animation:pinIn .45s cubic-bezier(.3,1.4,.5,1) both}
 html[data-fx=high] .pin:hover .pw,html[data-fx=high] .pin:focus-visible .pw{animation-play-state:paused}
 @media(hover:none){.pin .pl{display:none}}
 

@@ -22,7 +22,7 @@ export function initPins({camera, items}) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'pin off'; b.dataset.k = it.key;
     b.style.setProperty('--pd', (i * -0.6) + 's');
-    b.innerHTML = '<span class="pw"><span class="pb"><img class="pt" alt="" draggable="false" src="assets/ui/pins/pin-tail.svg"><i class="pf"></i><img class="pg" alt="" draggable="false" src="assets/ui/pins/pin-body.svg"><i class="pd"></i>' + icon(it.icon) + '<i class="pr"></i></span><span class="pl"></span></span>';
+    b.innerHTML = '<span class="pw"><span class="pq"><img class="pt" alt="" draggable="false" src="assets/ui/pins/pin-tail.svg"><i class="pf"></i><img class="pg" alt="" draggable="false" src="assets/ui/pins/pin-body.svg"><i class="pd"></i>' + icon(it.icon) + '<i class="pr"></i></span><span class="pl"></span></span>';
     const lab = b.querySelector('.pl');
     b.onclick = e => {
       e.stopPropagation();

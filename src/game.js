@@ -850,13 +850,19 @@ export function init(ctx){
     const GC=MC.glass;if(!GC)return;
     if(GC.front){const F=GC.front,w=F.x1-F.x0,h=F.y1-F.y0;
       const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,
-        uniforms:{uA:{value:0.08},uCol:{value:new THREE.Vector3(1,0.96,0.9)},uCam:{value:new THREE.Vector3()}},
+        uniforms:{uA:{value:1},uCol:{value:new THREE.Vector3(1,0.96,0.9)},uCam:{value:new THREE.Vector3()}},
         vertexShader:'varying vec2 vUv;varying vec3 vW;void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.0);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}',
         fragmentShader:'uniform float uA;uniform vec3 uCol,uCam;varying vec2 vUv;varying vec3 vW;void main(){'
+          // kiểu "tường cắt" trong game: chân tường đặc (mỗi tầng) + dải kính mờ đục dần về phía chân + khung viền/trụ góc + giữa cực mờ để nhìn rõ nội thất
+          +'float y=vW.y,lh=y<3.05?y:max(y-3.1,0.0);'
+          +'float sk=y<3.05?0.4:0.2;float skirt=1.0-smoothstep(sk-0.04,sk,lh);'
+          +'float frost=(1.0-smoothstep(0.44,1.0,lh))*0.09;'
+          +'float beamB=smoothstep(2.96,3.0,y)*(1.0-smoothstep(3.08,3.12,y))*0.8;'
+          +'float rim=smoothstep(5.72,5.8,y)*0.85;'
+          +'float ed=min(vUv.x,1.0-vUv.x)*'+w.toFixed(2)+';float post=(1.0-smoothstep(0.06,0.14,ed))*0.8;'
           +'vec3 V=normalize(uCam-vW);float fr=pow(1.0-clamp(abs(V.z),0.0,1.0),2.0);'
-          +'float ed=min(min(vUv.x,1.0-vUv.x)*'+w.toFixed(2)+',min(vUv.y,1.0-vUv.y)*'+h.toFixed(2)+');float edge=1.0-smoothstep(0.0,0.09,ed);'
-          +'float band=smoothstep(0.0,1.0,sin((vUv.x*0.9+vUv.y*1.3)*6.2832*0.6)*0.5+0.5);'
-          +'float a=uA*(0.5+1.5*fr)+edge*uA*0.8+band*uA*0.25;gl_FragColor=vec4(uCol,min(a,0.3));}'});
+          +'float a=max(max(skirt*0.92,frost),max(max(beamB,rim),post));a=max(a,0.07+0.05*fr);'
+          +'gl_FragColor=vec4(uCol*(0.86+0.14*(1.0-skirt)),a*uA);}'});
       const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);m.position.set((F.x0+F.x1)/2,F.y0+h/2,F.z);m.renderOrder=4;m.castShadow=false;m.receiveShadow=false;m.frustumCulled=false;m.name='GLASS_FRONT';
       scene.add(m);GLASS.front={m,mat,F}}
     if(GC.east){const E=GC.east,meshes=[];
@@ -874,8 +880,8 @@ export function init(ctx){
     if(GLASS.front){const {mat,F}=GLASS.front,d=cam.z-F.z;
       const l=TU.uAmbS.value,lum=Math.min(1,Math.max(0.3,(l.x*0.3+l.y*0.59+l.z*0.11)*0.95));
       mat.uniforms.uCol.value.set(1*lum,0.96*lum,0.9*lum);mat.uniforms.uCam.value.copy(cam);
-      mat.uniforms.uA.value=d>0?0.07*Math.min(1,Math.max(0,(d-3)/6)):0}   // camera sát/vào trong tường thì tường biến mất hẳn
-    if(GLASS.east.length){const E=GLASS.E,t=Math.min(1,Math.max(0,(cam.x-E.x0)/(E.x1-E.x0))),k=t*t*(3-2*t),op=1-0.88*k;
+      mat.uniforms.uA.value=d>0?Math.min(1,Math.max(0,(d-3)/6)):0}   // camera sát/vào trong tường thì tường biến mất hẳn
+    if(GLASS.east.length){const E=GLASS.E,t=Math.min(1,Math.max(0,(cam.x-E.x0)/(E.x1-E.x0))),k=t*t*(3-2*t),op=1-0.66*k;
       for(const c of GLASS.east){c.opacity=op;c.depthWrite=op>0.97}}
   }
   buildGlass();
