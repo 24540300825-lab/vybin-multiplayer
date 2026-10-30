@@ -9,7 +9,7 @@ import {OTHER} from './session.js';
 const r3 = v => Math.round(v * 1000) / 1000;
 
 export function bindSync(sess, api, loadChar) {
-  let remoteLoading = false, queue = [], snapT = 0, lastIn = '', lastInT = 0, seq = 0;
+  let remoteLoading = false, queue = [], snapT = 0, lastInT = 0, seq = 0;
 
   async function ensureRemote(slot) {
     if (api.remote && api.remote.id === slot) return;
@@ -26,22 +26,27 @@ export function bindSync(sess, api, loadChar) {
 
   // ----- local -> net -----
   api.emit = (t, a) => sess.send({k: 'c', t, a});
+  // Ngân sách tin nhắn: Supabase Realtime giới hạn số tin/giây mỗi kết nối. Trước đây mỗi lần đổi hướng phím gửi ~20 tin/s + snapshot 6/s => vượt trần,
+  // tin bị rơi/trễ => nhân vật kia "đứng im rồi giật". Giờ: chỉ gửi 'i' khi đổi trạng thái đi/dừng/chạy hoặc đổi hướng đáng kể (<=6/s);
+  // hướng phím hiện tại luôn kèm theo trong snapshot (8/s) nên mất 1 tin cũng không làm nhân vật bị kẹt. Tổng khi di chuyển <= ~14 tin/s.
+  let curIn = {x: 0, z: 0, r: 0, m: 0}, lastMv = 0, lastRun = 0, lastAng = 0;
+  const angD = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
   api.sendInput = inp => {
-    // chỉ gửi khi đổi (lượng tử hoá) hoặc nhắc lại 1Hz khi đang giữ phím
-    const s = (inp.mag > 0.1 ? [r3(inp.x), r3(inp.z), inp.run ? 1 : 0].join() : '0');
-    const now = performance.now();
-    if (s !== lastIn || (s !== '0' && now - lastInT > 1000)) {
-      if (s !== lastIn && now - lastInT < 45 && s !== '0') return;          // giới hạn ~20Hz
-      lastIn = s; lastInT = now;
-      sess.send({k: 'i', x: r3(inp.x), z: r3(inp.z), r: inp.run ? 1 : 0, m: inp.mag > 0.1 ? 1 : 0});
-      if (s !== '0') snapT = Math.min(snapT, 0.1);
-    }
+    const mv = inp.mag > 0.1 ? 1 : 0, run = inp.run ? 1 : 0, now = performance.now(), ang = mv ? Math.atan2(inp.x, inp.z) : 0;
+    curIn = {x: r3(inp.x), z: r3(inp.z), r: run, m: mv};
+    const edge = mv !== lastMv || run !== lastRun;
+    const turned = mv && Math.abs(angD(ang, lastAng)) > 0.35 && now - lastInT > 170;
+    const keep = mv && now - lastInT > 1000;
+    if (!(edge || turned || keep)) return;
+    lastMv = mv; lastRun = run; lastAng = ang; lastInT = now;
+    sess.send({k: 'i', x: curIn.x, z: curIn.z, r: run, m: mv});
+    if (mv) snapT = Math.min(snapT, 0.1);
   };
   api.onTick = dt => {
     snapT -= dt;
     if (snapT > 0) return;
     const st = api.snapshot(); if (!st) return;
-    sess.send({k: 's', n: ++seq, ...st});
+    sess.send({k: 's', n: ++seq, ...st, ix: curIn.x, iz: curIn.z, ir: curIn.r, im: curIn.m});
     snapT = (st.mv ? 1 / CONFIG.snapshotHz : 1 / CONFIG.idleHz);
   };
 
@@ -50,7 +55,7 @@ export function bindSync(sess, api, loadChar) {
     switch (m.k) {
       case 'i': whenRemote(() => api.setRemoteInput(m)); break;
       case 'c': whenRemote(() => api.applyCmd(m.t, m.a)); break;
-      case 's': whenRemote(() => api.applyState(m)); break;
+      case 's': whenRemote(() => { api.applyState(m); if (m.ix !== undefined) api.setRemoteInput({x: m.ix, z: m.iz, r: m.ir, m: m.im}); }); break;
       case 'hello': { const st = api.snapshot(); if (st) sess.send({k: 's', n: ++seq, ...st, f: 1}); api.syncEnvOut && api.syncEnvOut(); break; }
       case 'env': api.applyEnv && api.applyEnv(m); break;
       default: break;   // 'sig','mic','map' do module khác xử lý

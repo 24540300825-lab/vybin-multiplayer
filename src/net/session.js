@@ -26,7 +26,7 @@ export class Session {
     this.room = CONFIG.room; this.tab = uuid(); this.slot = null; this.uid = null; this.map = null;
     this.sb = null; this.ch = null; this.state = 'idle'; this.peer = null; this.rtt = null;
     this.h = {}; this._hb = null; this._pingT = null; this._joinedAt = Date.now(); this._dead = false;
-    this._stopTick = null; this._reviving = false; this._hiddenAt = 0; this._lastIn = 0; this._badSince = 0; this._listeners = [];
+    this._tx = {n: 0, fail: 0, w: []}; this._rx = {w: [], s: []}; this._stopTick = null; this._reviving = false; this._hiddenAt = 0; this._lastIn = 0; this._badSince = 0; this._listeners = [];
   }
   on(ev, fn) { (this.h[ev] ||= []).push(fn); return () => { this.h[ev] = this.h[ev].filter(f => f !== fn); }; }
   emit(ev, a) { (this.h[ev] || []).forEach(f => { try { f(a); } catch (e) { console.error('[session]', ev, e); } }); }
@@ -38,7 +38,7 @@ export class Session {
     const createClient = mod.createClient || (mod.default && mod.default.createClient);
     this.sb = createClient(CONFIG.supabaseUrl || 'http://mock', CONFIG.supabaseAnonKey || 'mock', {
       auth: {persistSession: true, autoRefreshToken: true, storageKey: 'vybin-auth'},
-      realtime: {params: {eventsPerSecond: 20}},
+      realtime: {params: {eventsPerSecond: 40}},
     });
     // 1) phiên ẩn danh (tự khôi phục sau F5 vì lưu trong localStorage)
     let {data: {session}} = await this.sb.auth.getSession();
@@ -192,13 +192,23 @@ export class Session {
     if (m.k === 'ka') return;
     if (m.k === 'ping') { this.send({k: 'pong', t: m.t}); return; }
     if (m.k === 'pong') { this.rtt = Math.round(performance.now() - m.t); this.emit('rtt', this.rtt); return; }
+    this._rx.w.push(performance.now()); if (m.k === 's') this._rx.s.push({t: performance.now()});
     this.emit('msg', m);
   }
   // gửi broadcast (không đi qua DB)
   send(m) {
-    if (!this.ch || this.state !== 'online') return false;
+    if (!this.ch || this.state !== 'online') { this._tx.fail++; return false; }
+    this._tx.n++; this._tx.w.push(performance.now());
     this.ch.send({type: 'broadcast', event: 'g', payload: m});
     return true;
+  }
+  // Số liệu mạng game (để chẩn đoán lag): tin gửi/nhận mỗi giây, khoảng lặng dài nhất giữa 2 snapshot của đối phương trong 10s gần nhất
+  netStats() {
+    const now = performance.now(), cut = now - 10000, rx = this._rx;
+    this._tx.w = this._tx.w.filter(t => t > cut); rx.w = rx.w.filter(t => t > cut); rx.s = rx.s.filter(t => t.t > cut);
+    let gap = 0; for (let i = 1; i < rx.s.length; i++) gap = Math.max(gap, rx.s[i].t - rx.s[i - 1].t);
+    if (rx.s.length) gap = Math.max(gap, now - rx.s[rx.s.length - 1].t > 1500 && this.peer ? now - rx.s[rx.s.length - 1].t : 0);
+    return {txPerSec: +(this._tx.w.length / 10).toFixed(1), rxPerSec: +(rx.w.length / 10).toFixed(1), maxGapMs: Math.round(gap), sendFail: this._tx.fail, total: this._tx.n};
   }
   async setMap(map) {
     const {error} = await this.sb.rpc('set_room_map', {p_room: this.room, p_map: map});

@@ -557,12 +557,12 @@ export function init(ctx){
     if(DEF.remote&&net)correct(dt);
   }
   // ----- nhân vật remote: nắn dần về snapshot của chủ nhân vật (chủ là authority) -----
-  function correct(dt){const s=net,age=Math.min(0.5,(performance.now()-s.t)/1000);
+  function correct(dt){const s=net,age=Math.min(0.8,(performance.now()-s.t)/1000);
     const tx=s.x+s.vx*age,tz=s.z+s.vz*age,dx=tx-P.pos.x,dz=tz-P.pos.z,d=Math.hypot(dx,dz);
-    if(d>3){P.pos.set(tx,s.y,tz);P.level=s.l;P.yaw=s.w;plan=[];return}
+    if(d>9||(d>3&&s.l!==P.level)){P.pos.set(tx,s.y,tz);P.level=s.l;P.yaw=s.w;plan=[];return}      // chỉ 'dịch chuyển' khi lệch rất xa / khác tầng; còn lại lướt nhanh về đúng chỗ
     if(busy)return;
     if(P.mode==='free'){
-      const k=1-Math.exp(-dt*(d>0.6?7:3.5));P.pos.x+=dx*k;P.pos.z+=dz*k;
+      const k=1-Math.exp(-dt*(d>3?16:d>0.6?8:3.5));P.pos.x+=dx*k;P.pos.z+=dz*k;
       // tầng của bản sao tự suy ra từ lúc rời cầu thang; chỉ nhận tầng từ snapshot khi lệch KÉO DÀI (snapshot cũ 0.1–0.2s đã làm nhân vật tụt/nhảy tầng)
       if(!stairAt(P.pos.x,P.pos.z)&&!plan[0]){
         if(s.l===P.level)lvMis=0;

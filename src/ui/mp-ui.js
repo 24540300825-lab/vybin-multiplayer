@@ -41,6 +41,7 @@ export function mountMpUi({sess, chat, voice}) {
   function peer() {
     const on = !!sess.peer;
     pc.classList.toggle('off', !on); pc.classList.toggle('talk', on && voice.peerSpeaking);
+    if (sess.netStats) { const q = sess.netStats(); pc.title = `Mạng game: gửi ${q.txPerSec}/s · nhận ${q.rxPerSec}/s · im lặng dài nhất ${q.maxGapMs} ms`; }
     $('peSt').textContent = on ? ('Online' + (sess.rtt != null ? ' · ' + sess.rtt + ' ms' : '')) : 'Chưa vào / đã thoát';
     $('peMic').textContent = !on ? '' : voice.peerVoice ? (voice.peerMuted ? '🔇' : '🎙️') : '';
   }
@@ -169,6 +170,7 @@ export function mountMpUi({sess, chat, voice}) {
       `Hình vào ${n(d.kbpsVideoIn, ' kbps')} ${n(d.fpsIn)} fps ${n(d.resIn)}`,
       `Hình ra  ${n(d.kbpsVideoOut, ' kbps')} ${n(d.fpsOut)} fps ${n(d.resOut)}  (giới hạn: ${n(d.limit || 'none')})`,
       `Mức hình : ${L[LEVELS_ID[d.level]] || '—'}${d.vPause ? ' (đã tạm dừng hình)' : ''}`,
+      (() => { const q = sess.netStats ? sess.netStats() : null; return q ? `Mạng game : gửi ${q.txPerSec}/s · nhận ${q.rxPerSec}/s · im lặng dài nhất ${q.maxGapMs} ms · gửi lỗi ${q.sendFail}` : ''; })(),
       `Thời gian kết nối ${n(d.connectMs, ' ms')} · nối lại ${d.reconnects} lần · gián đoạn ${mmss(d.interruptMs)} · đã gọi ${mmss(d.duration * 1000)}`].join('\n');
   }
   const LEVELS_ID = ['high', 'mid', 'low'];
