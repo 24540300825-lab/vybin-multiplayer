@@ -1,23 +1,24 @@
-// Khung "Nhạc YouTube": video nhúng + dán link + playlist + danh sách bài.
+// Khung "Nhạc YouTube": video nhúng + dán link + playlist + danh sách bài. Giao diện: ui.css (#hYt). Nằm trong cột nhạc #hMusic (trên pill nhạc).
+import {ic} from './icons.js';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 export function mountYtUi(M, {onPick, onToggleOpen} = {}) {
-  const el = document.createElement('div'); el.id = 'hYt'; el.className = 'hud glass';
-  el.innerHTML = `<div class="yH"><b>📺 Nhạc YouTube</b><span style="flex:1"></span><button class="pl" id="yMin" title="Thu nhỏ video">–</button><button class="pl" id="yX" title="Đóng (nhạc vẫn phát)">✕</button></div>
+  const el = document.createElement('div'); el.id = 'hYt'; el.className = 'hud panel';
+  el.innerHTML = `<div class="yH"><b>${ic('youtube')} Nhạc YouTube</b><span class="sp"></span><button class="rb" id="yMin" title="Thu nhỏ video" aria-label="Thu nhỏ video">${ic('minus')}</button><button class="rb" id="yX" title="Đóng (nhạc vẫn phát)" aria-label="Đóng">${ic('x')}</button></div>
   <div class="yV" id="yV"><div class="yNo">Dán link video/playlist YouTube bên dưới rồi bấm ▶</div></div>
   <div class="yNow" id="yNow"></div>
-  <div class="yA"><input id="yIn" placeholder="Dán link YouTube (video hoặc playlist)…" autocomplete="off"><button class="pl" id="yAdd">Thêm</button></div>
-  <div class="yA"><button class="pl" id="ySr" title="Mở YouTube trong tab mới để tìm nhạc, rồi copy link dán vào đây">🔎 Tìm nhạc trên YouTube</button><button class="pl" id="ySh" title="Phát ngẫu nhiên">🔀</button><button class="pl" id="yRp" title="Lặp lại playlist">🔁</button></div>
-  <div class="yA"><select id="yPl"></select><button class="pl" id="yNew" title="Playlist mới">＋</button><button class="pl" id="yRn" title="Đổi tên">✎</button><button class="pl" id="yDl" title="Xoá playlist">🗑</button></div>
+  <div class="yA"><input id="yIn" placeholder="Dán link YouTube (video hoặc playlist)…" autocomplete="off"><button class="pb" id="yAdd">Thêm</button></div>
+  <div class="yA"><button class="pl" id="ySr" title="Mở YouTube trong tab mới để tìm nhạc, rồi copy link dán vào đây">${ic('search')} Tìm nhạc trên YouTube</button><button class="pl" id="ySh" title="Phát ngẫu nhiên">${ic('shuffle')}</button><button class="pl" id="yRp" title="Lặp lại playlist">${ic('repeat')}</button></div>
+  <div class="yA"><select id="yPl"></select><button class="pl" id="yNew" title="Playlist mới">${ic('plus')}</button><button class="pl" id="yRn" title="Đổi tên">${ic('pencil')}</button><button class="pl" id="yDl" title="Xoá playlist">${ic('trash')}</button></div>
   <div class="yL" id="yL"></div>
-  <div class="yF"><span>Chỉ phát qua trình nhúng của YouTube — không tải file nhạc về (trái điều khoản YouTube). Thư viện lưu trên máy bạn.</span><button class="pl" id="yEx" title="Sao lưu thư viện ra file">⬇</button><button class="pl" id="yIm" title="Nạp thư viện từ file">⬆</button></div>`;
-  document.body.appendChild(el);
+  <div class="yF"><span>Chỉ phát qua trình nhúng của YouTube — không tải file nhạc về (trái điều khoản YouTube). Thư viện lưu trên máy bạn.</span><button class="pl" id="yEx" title="Sao lưu thư viện ra file">${ic('download')}</button><button class="pl" id="yIm" title="Nạp thư viện từ file">${ic('upload')}</button></div>`;
+  (document.getElementById('hMusic') || document.body).prepend(el);
   const $ = id => el.querySelector('#' + id);
   M.mount($('yV'));
   let small = false;
   const render = () => {
     const L = M.lib; const pl = L.pls[L.pl];
     $('yPl').innerHTML = L.pls.map((p, i) => `<option value="${i}"${i === L.pl ? ' selected' : ''}>${esc(p.name)} (${p.items.length})</option>`).join('');
-    $('yL').innerHTML = pl.items.length ? pl.items.map((x, i) => `<div class="yI${i === L.i ? ' cur' : ''}" data-i="${i}"><span class="n">${i === L.i && M.playing ? '▶' : i + 1}</span><span class="t">${esc(x.t)}</span><button class="x" data-x="${i}" title="Bỏ khỏi playlist">✕</button></div>`).join('') : '<div class="yE">Chưa có bài nào.</div>';
+    $('yL').innerHTML = pl.items.length ? pl.items.map((x, i) => `<div class="yI${i === L.i ? ' cur' : ''}" data-i="${i}"><span class="n">${i === L.i && M.playing ? ic('play') : i + 1}</span><span class="t">${esc(x.t)}</span><button class="x" data-x="${i}" title="Bỏ khỏi playlist">${ic('x')}</button></div>`).join('') : '<div class="yE">Chưa có bài nào.</div>';
     $('yNow').textContent = M.title ? '♪ ' + M.title : '';
     $('ySh').classList.toggle('on', L.shuffle); $('yRp').classList.toggle('on', L.rep);
   };

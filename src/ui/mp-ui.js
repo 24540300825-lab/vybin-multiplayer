@@ -1,6 +1,9 @@
 // UI multiplayer: cổng trạng thái, thẻ người chơi còn lại, chat, voice. Chỉ thao tác DOM — không đụng vào vòng render 3D.
 import {NAME} from '../net/session.js';
 import {MAX_LEN} from '../net/chat.js';
+import {ic, paintIcons} from './icons.js';
+import {Notify} from './notify.js';
+const AV = (s, off) => 'assets/ui/avatars/' + s + (off && s === 'vy' ? '-off' : '') + '.v1.png';
 
 const $ = id => document.getElementById(id);
 const esc = s => s.replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
@@ -8,11 +11,11 @@ const toast = m => { const t = $('toast'); if (!t) return; t.textContent = m; t.
 export {toast};
 
 export function mountGate() {
-  const g = document.createElement('div'); g.id = 'mpGate'; g.innerHTML = '<div class="box glass"><div class="ic" id="mgI">⏳</div><div class="tt" id="mgT"></div><div class="ds" id="mgD"></div><div class="bt" id="mgB"></div></div>';
+  const g = document.createElement('div'); g.id = 'mpGate'; g.innerHTML = '<div class="box"><div class="ic" id="mgI"></div><div class="tt" id="mgT"></div><div class="ds" id="mgD"></div><div class="bt" id="mgB"></div></div>';
   document.body.appendChild(g);
   return {
     show(icon, title, desc, buttons = []) {
-      $('mgI').textContent = icon; $('mgT').textContent = title; $('mgD').textContent = desc;
+      $('mgI').innerHTML = ic({'⏳': 'dots', '🚪': 'out', '⚠️': 'info'}[icon] || '') || icon; $('mgT').textContent = title; $('mgD').textContent = desc;
       const b = $('mgB'); b.innerHTML = ''; buttons.forEach(([t, fn]) => { const e = document.createElement('button'); e.className = 'ib'; e.textContent = t; e.onclick = fn; b.appendChild(e); });
       g.classList.add('on');
     },
@@ -23,29 +26,28 @@ export function mountGate() {
 export function mountMpUi({sess, chat, voice}) {
   const me = sess.slot, other = me === 'bin' ? 'vy' : 'bin';
   // ---- nút trên thanh trên cùng
-  const top = $('hTop');
-  top.insertAdjacentHTML('afterbegin', '<button class="ib" id="iChat"><span>💬</span>Chat<b class="bdg" id="cBdg" style="display:none">0</b></button><button class="ib" id="iVoice"><span id="vIc">🎙️</span><i id="vTx">Voice</i></button><button class="ib" id="iVid"><span>📹</span>Video</button><button class="ib" id="iVoiceX" style="display:none" title="Rời voice"><span>✕</span></button>');
+  const note = $('iNote');
+  note.insertAdjacentHTML('afterend', `<button class="ib" id="iChat" title="Chat (phím T)" aria-label="Chat"><i class="ic">${ic('chat')}</i><b class="bdg" id="cBdg" style="display:none">0</b></button><button class="ib" id="iVoice" title="Voice" aria-label="Voice"><i class="ic" id="vIc">${ic('mic')}</i><i class="sr" id="vTx">Voice</i></button><button class="ib" id="iVid" title="Video call" aria-label="Video call"><i class="ic">${ic('video')}</i></button><button class="ib" id="iVoiceX" style="display:none" title="Rời cuộc gọi" aria-label="Rời cuộc gọi"><i class="ic">${ic('phoneEnd')}</i></button>`);
   // ---- thẻ đối phương
-  const pc = document.createElement('div'); pc.id = 'hPeer'; pc.className = 'hud glass';
-  pc.innerHTML = `<div class="av" id="peAv">${NAME[other][0]}</div><div style="flex:1;min-width:0"><div class="nm" id="peNm">${NAME[other]}</div><div class="lv" id="peSt">Đang chờ...</div></div><div id="peMic" class="pm"></div>`;
-  document.body.appendChild(pc);
-  const place = () => { const pr = document.getElementById('hProf'); if (pr) pc.style.setProperty('--peerTop', Math.round(pr.getBoundingClientRect().bottom + 8) + 'px'); };
-  place(); addEventListener('resize', place); setTimeout(place, 800);
+  const pc = document.createElement('div'); pc.id = 'hPeer'; pc.className = 'hud cap off'; pc.dataset.s = other;
+  pc.innerHTML = `<div class="av"><img id="peAv" src="${AV(other, true)}" alt="" width="64" height="64" draggable="false"></div><div class="tx"><div class="nm" id="peNm">${NAME[other].toUpperCase()}</div><div class="st" id="peSt">Chưa vào / Đã thoát</div></div><div id="peMic" class="pm"></div>`;
+  $('hLeft').appendChild(pc);
   // ---- panel chat
-  const cp = document.createElement('div'); cp.id = 'hChat'; cp.className = 'hud glass';
-  cp.innerHTML = `<h3>Chat <span id="chSt" class="chst"></span><button class="pl" id="chX">✕</button></h3><div id="chList"></div>
-    <div id="chIn"><textarea id="chTx" rows="1" maxlength="${MAX_LEN}" placeholder="Nhắn cho ${NAME[other]}… (Enter gửi · Shift+Enter xuống dòng)"></textarea><button class="ib" id="chGo">➤</button></div><div id="chErr"></div>`;
-  document.body.appendChild(cp);
+  const cp = document.createElement('div'); cp.id = 'hChat'; cp.className = 'hud panel';
+  cp.innerHTML = `<div class="ph"><h3>Chat</h3><span id="chSt" class="chst"></span><span class="sp"></span><button class="rb" id="chX" title="Đóng" aria-label="Đóng chat">${ic('x')}</button></div><div id="chList"></div>
+    <div id="chIn"><textarea id="chTx" rows="1" maxlength="${MAX_LEN}" placeholder="Nhắn cho ${NAME[other]}…" title="Enter: gửi · Shift+Enter: xuống dòng"></textarea><button id="chGo" title="Gửi" aria-label="Gửi">${ic('send')}</button></div><div id="chErr"></div>`;
+  $('hBR').prepend(cp);
 
   // ---------- peer card ----------
   function peer() {
     const on = !!sess.peer;
     pc.classList.toggle('off', !on); pc.classList.toggle('talk', on && voice.peerSpeaking);
     if (sess.netStats) { const q = sess.netStats(); pc.title = `Mạng game: gửi ${q.txPerSec}/s · nhận ${q.rxPerSec}/s · im lặng dài nhất ${q.maxGapMs} ms`; }
-    $('peSt').textContent = on ? ('Online' + (sess.rtt != null ? ' · ' + sess.rtt + ' ms' : '')) : 'Chưa vào / đã thoát';
-    $('peMic').textContent = !on ? '' : voice.peerVoice ? (voice.peerMuted ? '🔇' : '🎙️') : '';
+    $('peSt').textContent = on ? ('Online' + (sess.rtt != null ? ' · ' + sess.rtt + ' ms' : '')) : 'Chưa vào / Đã thoát';
+    const src = AV(other, !on); if ($('peAv').getAttribute('src') !== src) $('peAv').src = src;
+    $('peMic').innerHTML = !on ? '' : voice.peerVoice ? ic(voice.peerMuted ? 'micOff' : 'mic') : '';
   }
-  sess.on('peer', ({present, slot}) => { peer(); toast(present ? NAME[slot] + ' đã vào phòng' : NAME[other] + ' đã rời phòng'); });
+  sess.on('peer', ({present, slot}) => { peer(); const t = present ? NAME[slot] + ' đã vào phòng' : NAME[other] + ' đã rời phòng'; toast(t); Notify.add({type: 'peer', title: t}); });
   sess.on('rtt', peer); peer();
   sess.on('status', ({state, text}) => {
     let b = $('mpNet'); if (!b) { b = document.createElement('div'); b.id = 'mpNet'; document.body.appendChild(b); }
@@ -80,12 +82,12 @@ export function mountMpUi({sess, chat, voice}) {
 
   // ---------- cuộc gọi (voice + video) ----------
   const PH = {idle: '', asking: 'Đang xin quyền…', waiting: `Chờ ${NAME[other]} vào cuộc gọi`, connecting: 'Đang kết nối…', connected: 'Đang gọi', weak: 'Mạng yếu', recovering: 'Đang nối lại…', lost: 'Mất kết nối — đang thử lại', ended: 'Cuộc gọi đã kết thúc'};
-  const call = document.createElement('div'); call.id = 'hCall'; call.className = 'hud glass';
+  const call = document.createElement('div'); call.id = 'hCall'; call.className = 'hud panel';
   call.innerHTML = `<div class="cH"><span class="cDot" id="cDot"></span><b id="cSt">—</b><i id="cTm"></i><span class="cSp"></span>
-      <button class="pl" id="cSz" title="Đổi cỡ khung: nhỏ / vừa / lớn">⤢</button><button class="pl" id="cFs" title="Toàn màn hình (Esc để thoát)">⛶</button><button class="pl" id="cDg" title="Chẩn đoán">📊</button><button class="pl" id="cSet" title="Thiết bị & chất lượng">⚙</button><button class="pl" id="cMin" title="Thu nhỏ">–</button><button class="pl" id="cX" title="Đóng khung video (cuộc gọi vẫn tiếp tục)">✕</button></div>
-    <div class="cV"><video id="cRv" autoplay playsinline muted></video><div class="cNo" id="cNo"><div class="av">${NAME[other][0]}</div><span id="cNoT"></span></div><video id="cLv" autoplay playsinline muted></video></div>
+      <button class="pl" id="cSz" title="Đổi cỡ khung: nhỏ / vừa / lớn">${ic('angle')}</button><button class="pl" id="cFs" title="Toàn màn hình (Esc để thoát)">${ic('expand')}</button><button class="pl" id="cDg" title="Chẩn đoán">${ic('chart')}</button><button class="pl" id="cSet" title="Thiết bị & chất lượng">${ic('gear')}</button><button class="pl" id="cMin" title="Thu nhỏ">${ic('minus')}</button><button class="pl" id="cX" title="Đóng khung video (cuộc gọi vẫn tiếp tục)">${ic('x')}</button></div>
+    <div class="cV"><video id="cRv" autoplay playsinline muted></video><div class="cNo" id="cNo"><div class="av"><img src="${AV(other)}" alt=""></div><span id="cNoT"></span></div><video id="cLv" autoplay playsinline muted></video></div>
     <div id="cErr"></div><div class="cRz" id="cRz" title="Kéo để phóng to / thu nhỏ"></div>
-    <div class="cC"><button class="ib" id="cMic"><span>🎙️</span><i>Mic</i></button><button class="ib" id="cCam"><span>📹</span><i>Camera</i></button><button class="ib end" id="cEnd"><span>📞</span><i>Kết thúc</i></button></div>
+    <div class="cC"><button class="ib" id="cMic"><span>${ic('mic')}</span><i>Mic</i></button><button class="ib" id="cCam"><span>${ic('video')}</span><i>Camera</i></button><button class="ib end" id="cEnd"><span>${ic('phoneEnd')}</span><i>Kết thúc</i></button></div>
     <div class="cP" id="cSetP"><label>Micro <select id="cSelM"></select></label><label>Camera <select id="cSelC"></select></label>
       <div class="chips" id="cQ">${['auto:Tự động', 'high:Cao', 'mid:Vừa', 'low:Thấp'].map(x => `<span class="chip" data-q="${x.split(':')[0]}">${x.split(':')[1]}</span>`).join('')}</div></div>
     <div class="cP" id="cDgP"><pre id="cDgT"></pre><button class="pl" id="cDgCp">Sao chép</button></div>`;
@@ -108,7 +110,7 @@ export function mountMpUi({sess, chat, voice}) {
     } else { call.style.left = ''; call.style.top = ''; call.style.bottom = ''; }
   }
   applyLay(); addEventListener('resize', applyLay);
-  const setFull = v => { call.classList.toggle('full', v); document.body.classList.toggle('callFull', v); $('cFs').textContent = v ? '🗗' : '⛶'; };
+  const setFull = v => { call.classList.toggle('full', v); document.body.classList.toggle('callFull', v); $('cFs').innerHTML = ic(v ? 'shrink' : 'expand'); };
   $('cSz').onclick = () => { const i = SIZES.findIndex(w => w >= (lay.w || 300) - 5); lay.w = SIZES[(i + 1) % SIZES.length]; setFull(false); applyLay(); saveLay(); };
   $('cFs').onclick = () => setFull(!call.classList.contains('full'));
   $('cRv').ondblclick = () => setFull(!call.classList.contains('full'));
@@ -146,9 +148,9 @@ export function mountMpUi({sess, chat, voice}) {
   function cui(s) {
     lastS = s; const ph = s.phase;
     call.dataset.ph = ph; $('cSt').textContent = s.outgoing && ph !== 'asking' && ph !== 'lost' && ph !== 'recovering' ? (s.peerHere ? 'Đang gọi ' + NAME[other] + '…' : 'Chờ ' + NAME[other] + ' vào phòng') : PH[ph] || '';
-    $('cMic').classList.toggle('off', !s.micOn || s.muted); $('cMic').firstChild.textContent = !s.micOn ? '🎙️' : s.muted ? '🔇' : '🎙️'; $('cMic').lastChild.textContent = !s.micOn ? 'Bật mic' : s.muted ? 'Bật tiếng' : 'Tắt tiếng';
+    $('cMic').classList.toggle('off', !s.micOn || s.muted); $('cMic').firstChild.innerHTML = ic(!s.micOn || s.muted ? 'micOff' : 'mic'); $('cMic').lastChild.textContent = !s.micOn ? 'Bật mic' : s.muted ? 'Bật tiếng' : 'Tắt tiếng';
     $('cCam').classList.toggle('off', !s.camOn); $('cCam').lastChild.textContent = s.camOn ? 'Tắt camera' : 'Bật camera';
-    $('cCam').firstChild.textContent = s.camOn ? '📹' : '📷';
+    $('cCam').firstChild.innerHTML = ic(s.camOn ? 'video' : 'videoOff');
     const errs = []; if (s.micErr) errs.push('🎙️ ' + s.micErr); if (s.camErr) errs.push('📹 ' + s.camErr);
     if (!s.sigOk && s.active && s.phase !== 'lost') errs.push('📡 Tín hiệu tạm mất — cuộc gọi vẫn tiếp tục, đang nối lại tín hiệu…');
     if (s.vPause) errs.push('⏸️ Mạng yếu — tạm dừng hình để giữ tiếng');
@@ -156,12 +158,12 @@ export function mountMpUi({sess, chat, voice}) {
     document.querySelectorAll('#cQ .chip').forEach(c => c.classList.toggle('on', c.dataset.q === s.quality));
     // nút trên thanh trên cùng
     const b = $('iVoice'); b.classList.toggle('live', s.active); b.classList.toggle('talk', s.speaking);
-    $('vIc').textContent = !s.active ? '🎙️' : (!s.micOn || s.muted) ? '🔇' : '🎙️';
+    $('vIc').innerHTML = ic(s.active && (!s.micOn || s.muted) ? 'micOff' : 'mic');
     $('vTx').textContent = s.incoming ? '📞 Nghe máy' : s.outgoing && !s.asking ? 'Đang gọi…' : !s.active ? (s.listening ? 'Voice' : 'Voice') : !s.micOn ? 'Bật mic' : s.muted ? 'Đã tắt tiếng' : s.phase === 'connected' ? 'Đang nói chuyện' : s.phase === 'weak' ? 'Mạng yếu' : s.phase === 'recovering' || s.phase === 'lost' ? 'Nối lại…' : s.phase === 'waiting' ? 'Chờ ' + NAME[other] : 'Đang kết nối…';
-    $('iVoiceX').style.display = s.active ? '' : 'none';
+    $('iVoice').title = $('vTx').textContent; $('iVoiceX').style.display = s.active ? '' : 'none';
     $('iVid').classList.toggle('live', s.camOn || (s.active && shown));
     pc.classList.toggle('talk', !!s.peerSpeaking);
-    $('peMic').textContent = !sess.peer ? '' : s.peerVoice ? (s.peerMuted ? '🔇' : '🎙️') + (s.peerCam ? '📹' : '') : '';
+    $('peMic').innerHTML = !sess.peer ? '' : s.peerVoice ? ic(s.peerMuted ? 'micOff' : 'mic') + (s.peerCam ? ic('video') : '') : '';
     // tự mở khung video khi mình bật camera hoặc đối phương bật camera (lần đầu của cuộc gọi); cuộc gọi chỉ có tiếng thì không hiện gì
     if (!s.active && !s.listening) { autoShown = false; if (shown) showCall(false); }
     else if (!autoShown && (s.camOn || (s.peerCam && s.active))) { autoShown = true; collapsed = false; call.classList.remove('min'); showCall(true); }
