@@ -137,11 +137,13 @@ export function init(ctx){
       for(let k=0;k<=n;k++){const z=S.z1-k*(S.z1-S.z0)/n;rc.set(new THREE.Vector3(S.cx,30,z),new THREE.Vector3(0,-1,0));const h=rc.intersectObjects(meshes,false)[0];ys.push(h?h.point.y:null)}
       for(let k=0;k<=n;k++)if(ys[k]==null){let a=k-1,b=k+1;while(a>=0&&ys[a]==null)a--;while(b<=n&&ys[b]==null)b++;ys[k]=a<0?(b<=n?ys[b]:0):b>n?ys[a]:ys[a]+(ys[b]-ys[a])*(k-a)/(b-a)}
       const sm=ys.map((_,k)=>{let t=0,c=0;for(let d=-3;d<=3;d++){const q=k+d;if(q>=0&&q<=n){t+=ys[q];c++}}return t/c});
-      S.n=n;S.ys=sm.map((v,k)=>{let m=v;for(let d=-3;d<=3;d++){const q=k+d;if(q>=0&&q<=n)m=Math.max(m,ys[q])}return m});S.raw=ys;stairs.push(S)})}
+      S.n=n;const W=Math.max(3,Math.round(0.34/((S.z1-S.z0)/n)));S.ys=sm.map((v,k)=>{let m=v;for(let d=-W;d<=W;d++){const q=k+d;if(q>=0&&q<=n)m=Math.max(m,ys[q])}return m});S.raw=ys;stairs.push(S)})}
   const stairAt=(x,z)=>{for(const S of stairs)if(x>S.x0-0.05&&x<S.x1+0.05&&z>S.z0&&z<S.z1+0.05)return S;return null};
   const inStair=(x,z)=>!!stairAt(x,z);
   const stairY=(S,z)=>{if(z>=S.z1+0.05)return 0;const f=(S.z1-z)/(S.z1-S.z0)*S.n;if(f<=0)return S.ys[0]*(1-Math.max(0,(z-S.z1)/0.05));if(f>=S.n)return S.ys[S.n];const i=Math.floor(f);return S.ys[i]+(S.ys[i+1]-S.ys[i])*(f-i)};
-  const heightAt=(x,z,lv)=>{const S=stairAt(x,z);return S?stairY(S,z):(lv?A.L1:A.L0)};
+  const heightAt=(x,z,lv)=>{const S=stairAt(x,z);if(S)return stairY(S,z);
+    if(!lv)for(const T of stairs)if(x>T.x0-0.05&&x<T.x1+0.05&&z>T.z1+0.05&&z<T.z1+0.39)return T.ys[0]*(1-(z-T.z1-0.05)/0.34);   // chân trước chạm bậc đầu trước khi thân vào cầu thang
+    return lv?A.L1:A.L0};
   A.stairs=stairs;
   const pickStair=(x0,z0,x1,z1,up)=>{let best=stairs[0],bd=1e9;for(const S of stairs){const a=up?S.botZ:S.topZ,b=up?S.topZ:S.botZ,d=Math.hypot(x0-S.cx,z0-a)+Math.hypot(S.cx-x1,b-z1);if(d<bd){bd=d;best=S}}return best};
   const seat=box(MC.seat);A.seatC=seat.getCenter(new THREE.Vector3());A.seatTop=seat.max.y;
@@ -250,7 +252,7 @@ export function init(ctx){
     CLIMBCHAIR_L:'ACT_BIN_CLIMB ON CHAIR_L',CLIMBCHAIR_R:'ACT_BIN_CLIMB ON CHAIR_R',OFFCHAIR_L:'ACT_BIN_OFF CHAIR_L',OFFCHAIR_R:'ACT_BIN_OFF CHAIR_R',
     CLIMBBED_L:'ACT_BIN_SLEEP_CLIMB ON BED_L',CLIMBBED_R:'ACT_BIN_SLEEP_CLIMB ON BED_R',SLEEP_L:'ACT_BIN_SLEEP-LOOP BREATHE_L',SLEEP_R:'ACT_BIN_SLEEP-LOOP BREATHE_R',
     OFFBED_L:'ACT_BIN_SLEEP_OFF BED_L',OFFBED_R:'ACT_BIN_SLEEP_OFF BED_R'};
-  const DEF_BIN={id:'bin',K:KB,eye:{close:'ACT_BIN_EYE_CLOSE',open:'ACT_BIN_EYE_OPEN',blink:'ACT_BIN_BLINK'},eyeMeshes:['Sphere002','Sphere003'],trim:null,colors:{BLACK:'#16161b',SKIN:'#f2c9b3',BLUE:'#2b37b5',ORANGE:'#f26b1d'},pos:new THREE.Vector3(4.5,0,-1.5),yaw:0.4,ctrl:'wasd'};
+  const DEF_BIN={id:'bin',K:KB,eye:{close:'ACT_BIN_EYE_CLOSE',open:'ACT_BIN_EYE_OPEN',blink:'ACT_BIN_BLINK'},eyeMeshes:['Sphere002','Sphere003'],trim:null,idleBurst:true,colors:{BLACK:'#16161b',SKIN:'#f2c9b3',BLUE:'#2b37b5',ORANGE:'#f26b1d'},pos:new THREE.Vector3(4.5,0,-1.5),yaw:0.4,ctrl:'wasd'};
   function makeChar(chrG,DEF){
   const K=DEF.K;
   let emitOff=0;const em=(t,a)=>{if(!DEF.remote&&!emitOff&&api.emit)api.emit(t,a)};
@@ -357,6 +359,14 @@ export function init(ctx){
   const runMode={v:false};
   let restT=0,idleHeld=false;
   const toRest=(instant)=>{play('REST',{fade:instant?0:0.25});restT=0;idleHeld=false};
+  // idle: Vy lặp liên tục sau 5s; Bin (idleBurst) đứng RESTPOSE rồi cứ 5–10s diễn trọn clip IDLE 1 lần (đủ 106 khung) rồi về RESTPOSE
+  let idleDone=false,nextIdleAt=5+Math.random()*5;
+  mixer.addEventListener('finished',e=>{if(DEF.idleBurst&&e.action===acts[K.IDLE])idleDone=true});
+  function idleTick(dt){
+    if(cur===acts[K.IDLE]&&idleHeld){if(DEF.idleBurst&&idleDone){idleDone=false;toRest();nextIdleAt=5+Math.random()*5}}
+    else if(cur===acts[K.REST]){restT+=dt;if(restT>(DEF.idleBurst?nextIdleAt:5)){idleDone=false;play('IDLE',DEF.idleBurst?{fade:0.12,once:true}:{fade:0.1});idleHeld=true}}
+    else toRest();
+  }
   const wp=(x,z,setLevel,run)=>({t:'wp',x,z,setLevel,run:run||runMode.v});
 
   // vị trí root cho từng phía (L/R): hông cuối clip leo phải trùng tâm ghế / giường
@@ -364,6 +374,15 @@ export function init(ctx){
     const tx=A.seatC.x+A.fwd.x*CFG.sitFwd,tz=A.seatC.z+A.fwd.z*CFG.sitFwd;
     return new THREE.Vector3(tx-(an.x*c+an.z*s),A.CY+CFG.sitYAdj,tz-(-an.x*s+an.z*c));}
   const chairStandOf=side=>{const v=chairPose(side);v.y=A.CY;return v};
+  // ghế làm việc là vật cản cho đường đi A*/click-để-đi (WASD đã có CHB). Chừa lại 2 ô đứng hai bên ghế để còn bước tới ngồi.
+  {const g=G,lv=A.chairL,cb=new THREE.Box3().setFromObject(CHAIR);
+    if(!cb.isEmpty()){
+      const stands=['L','R'].map(sd=>chairStandOf(sd));
+      const mk=G._chair||(G._chair={mine:new Set(),stands:[]});mk.stands.push(...stands);
+      const i0=cl(Math.floor((cb.min.x-g.R-g.x0)/g.c),0,g.W-1),i1=cl(Math.floor((cb.max.x+g.R-g.x0)/g.c),0,g.W-1),j0=cl(Math.floor((cb.min.z-g.R-g.z0)/g.c),0,g.H-1),j1=cl(Math.floor((cb.max.z+g.R-g.z0)/g.c),0,g.H-1);
+      for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const k=j*g.W+i,x=g.x0+(i+.5)*g.c,z=g.z0+(j+.5)*g.c;
+        if(!(x>cb.min.x&&x<cb.max.x&&z>cb.min.z&&z<cb.max.z)&&mk.stands.some(v=>Math.hypot(v.x-x,v.z-z)<0.22)){if(mk.mine.has(k)){blocked[lv][k]=0;mk.mine.delete(k)}continue}
+        if(!blocked[lv][k]){blocked[lv][k]=1;mk.mine.add(k)}}}}
   const bedPose=side=>new THREE.Vector3(side==='L'?A.bedBox.min.x-CFG.bedSide:A.bedBox.max.x+CFG.bedSide,A.L1,A.bedBox.min.z+CFG.bedHeadZ);
   const bedRootY=()=>A.mattress.max.y-CFG.bedHipH;
 
@@ -418,7 +437,7 @@ export function init(ctx){
     {const _i=plan[0];if(busy||!(_i&&_i.t==='wp'))P.sp=0;}
     if(busy){updateBusy(dt);return}
     const it=plan[0];
-    if(!it){ if(P.mode==='free'){ if(cur===acts[K.IDLE]&&idleHeld){} else if(cur===acts[K.REST]){restT+=dt;if(restT>5){play('IDLE',{fade:0.1});idleHeld=true}} else toRest(); } return; }
+    if(!it){ if(P.mode==='free')idleTick(dt); return; }
     switch(it.t){
       case 'wp':{
         const dx=it.x-P.pos.x,dz=it.z-P.pos.z,d=Math.hypot(dx,dz);
@@ -434,7 +453,7 @@ export function init(ctx){
         break;}
       case 'face':{const diff=angDiff(it.yaw,P.yaw);
         if(Math.abs(diff)<0.04){P.yaw=it.yaw;plan.shift();break}
-        P.yaw+=clamp(diff,-9*dt,9*dt);play('IDLE',{fade:0.2});break;}
+        P.yaw+=clamp(diff,-9*dt,9*dt);play(DEF.idleBurst?'REST':'IDLE',{fade:0.2});break;}
       case 'climbBed':{plan.shift();if(occ['bed'+it.side]&&occ['bed'+it.side]!==DEF.id){plan=[];toast('Phía giường này có người');break}occ['bed'+it.side]=DEF.id;P.yaw=0;P.level=1;P.side=it.side;const s=bedPose(it.side);P.stand=s.clone();P.pos.x=s.x;P.pos.z=s.z;
         anchor=HIP['CLIMBBED_'+it.side].e.clone();startBusy('climbBed','CLIMBBED_'+it.side,null,A.L1,bedRootY());break;}
       case 'climbChair':{plan.shift();if(occ.chair&&occ.chair!==DEF.id){plan=[];toast('Ghế đang có người');break}occ.chair=DEF.id;P.yaw=A.chairYaw;P.side=it.side;const s=chairStandOf(it.side);P.stand=s.clone();P.pos.x=s.x;P.pos.z=s.z;
@@ -538,10 +557,7 @@ export function init(ctx){
       play(inp.run?'RUN':'WALK',{fade:0.15});idleHeld=false;
     }else{
       P.sp=0;
-      {
-        if(cur===acts[K.IDLE]&&idleHeld){}
-        else if(cur===acts[K.REST]){restT+=dt;if(restT>5){play('IDLE',{fade:0.1});idleHeld=true}}
-        else toRest();}
+      idleTick(dt);
     }
   }
 
@@ -552,7 +568,7 @@ export function init(ctx){
     for(const x of ['L','R'])if(occ['bed'+x]===DEF.id&&P.mode!=='bed'&&!(busy&&busy.kind==='climbBed')&&!plan.some(i=>i.t==='climbBed'))occ['bed'+x]=null;
     if(!busy&&!plan[0]&&P.mode==='free')pushOut();
     if(DEF.ctrl==='wasd'){const S=stairAt(P.pos.x,P.pos.z);if(P._S&&!S&&!plan[0])P.level=P.pos.z<P._S.midZ?1:0;P._S=S;}
-    if(!busy&&P.mode==='free'){const h=heightAt(P.pos.x,P.pos.z,P.level);P.pos.y+=(h-P.pos.y)*(1-Math.exp(-dt*(stairAt(P.pos.x,P.pos.z)?40:16)));}
+    if(!busy&&P.mode==='free'){const h=heightAt(P.pos.x,P.pos.z,P.level);P.pos.y+=(h-P.pos.y)*(1-Math.exp(-dt*(stairAt(P.pos.x,P.pos.z)?70:16)));}
     if(DEF.remote&&net)correct(dt);
   }
   // ----- nhân vật remote: nắn dần về snapshot của chủ nhân vật (chủ là authority) -----
