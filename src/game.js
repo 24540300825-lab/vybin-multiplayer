@@ -10,6 +10,7 @@ import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import {FXAAShader} from 'three/addons/shaders/FXAAShader.js';
 
 import {$,sstep,clamp,K,CFG,angDiff} from './shared.js';
+import {MAP_CONFIGS} from './map-configs.js';
 import {TU,applyToon,patchLeafMask,hexV,TP,DEPTH_LEAF} from './toon.js';
 import {Perf} from './perf.js';
 import './hud.js';
@@ -119,9 +120,7 @@ export function init(ctx){
   const box=n=>new THREE.Box3().setFromObject(byName[n]);
 
   // anchors
-  const MAPS={
-    studio:{name:'Studio (cũ)',tread:/^Stair_Tread_\d+$/,mezz:['Mezz_Floor'],seat:'Desk_Chair_Seat',chair:/^Desk_Chair\d*$/,walk0:[0.3,9.7,-7.6,0.62],l1:[0.22,9.6,-7.6,null],cl1:[0.4,9.6,-7.6,-4.3],garden:true,out:/^(Plane|tree|bush|SF_|Sketchfab)/,lift:4.35},
-    house:{name:'Nhà 2 tầng (mới)',treadNames:['Stair_Treads','StairR_Treads'],mezz:['Mezz_Floor','Mezz_Ext_Floor'],seat:'Chair_Seat',chair:/^Desk_Chair\d*$/,walk0:[0.3,9.7,-7.6,-0.2],l1:[0.22,9.78,-7.6,-4.25],cl1:[0.4,9.6,-7.6,-4.3],garden:false,tint:{CH_floor:0xdcb88e},hideFlat:true,hide:/^(Plane|Plane003|SF_BiomeSurface.*|Stylized Grass\.003)$/,gtex:'Plane003',out:/^(OUT_|tree-|bush-|grass-|rock-|flower-|\.SF_|Sketchfab)/,lift:0}};
+  const MAPS=MAP_CONFIGS;
   const MC=MAPS[MAPID]||MAPS.studio;
   if(MC.tint)env.traverse(o=>{if(o.isMesh&&o.material&&MC.tint[o.material.name]!=null)o.material.color.set(MC.tint[o.material.name])});
   if(MC.hideFlat)env.traverse(o=>{if(o.isMesh&&!(o.material&&o.material.name)){const b=new THREE.Box3().setFromObject(o);if((b.max.x-b.min.x)*(b.max.z-b.min.z)>20&&b.max.y-b.min.y<1.2)o.visible=false}});

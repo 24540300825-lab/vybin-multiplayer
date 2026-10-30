@@ -41,10 +41,12 @@ WASD + Shift (chạy) + E (tương tác) + click để đi; chuột phải/kéo 
 - `src/maps.js` danh sách map, chuyển map (fade + reload, đồng bộ qua `rooms.map_id`).
 - `src/perf.js` đo fps/p95/hitch/draw calls/tris.
 
+> **Mở rộng về sau: đọc `docs/EXTENDING.md`** (thêm minigame/tính năng bằng 1 file + 1 dòng, thêm map = 1 khối dữ liệu `src/map-configs.js`, giao thức có số phiên bản).
+
 ## 4. Thêm map mới
 1. Xuất `.glb` → chạy `python3 tools/optimize_glb.py in.glb assets/map-xxx.glb` (nén texture, không đụng mesh/animation).
 2. `python3 tools/build_manifest.py` (sinh lại `src/manifest.js` kèm hash cache).
-3. Khai báo trong `src/assets.js` (`def('map-xxx',{owner:'xxx'})`), `src/maps.js` (`MAP_LIST`), và cấu hình `MC.xxx` trong `src/game.js` (giống `MC.house`).
+3. Khai báo trong `src/assets.js` (`def('map-xxx',{owner:'xxx'})`), `src/maps.js` (`MAP_LIST`), và cấu hình trong `src/map-configs.js` (giống `MC.house`).
 
 ## 5. Thêm tính năng đồng bộ
 Phát qua `api.emit(kind, data)` (game.js) và xử lý trong `bindSync` (sync.js). Dữ liệu nhỏ/hiếm → broadcast; dữ liệu cần lưu → bảng + RLS mới trong migration `002_*.sql`.

@@ -1,6 +1,7 @@
 // Phiên multiplayer: đăng nhập ẩn danh → giữ slot BIN/VY (RPC nguyên tử) → kênh realtime private (broadcast + presence).
 // Không ghi DB cho dữ liệu tần suất cao (vị trí/animation) — chỉ dùng Broadcast.
 import {CONFIG} from '../config.js';
+import {APP_VERSION, PROTO} from '../version.js';
 
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
 export const OTHER = {bin: 'vy', vy: 'bin'};
@@ -154,7 +155,7 @@ export class Session {
       ch.subscribe(async (st, err) => {
         if (ch !== this.ch) return;      // kênh cũ đã bị thay thế
         if (st === 'SUBSCRIBED') {
-          await ch.track({slot: this.slot, uid: this.uid, tab: this.tab, at: this._joinedAt});
+          await ch.track({slot: this.slot, uid: this.uid, tab: this.tab, at: this._joinedAt, pv: PROTO, app: APP_VERSION});
           this.setState('online');
           if (first) { first = false; clearTimeout(to); res(); } else { this._beat(); this.emit('reconnected'); }
         } else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') {
@@ -179,6 +180,8 @@ export class Session {
     const was = this.peer && this.peer.slot, now = peer && peer.slot;
     this.peer = peer;
     if (was !== now) this.emit('peer', {present: !!peer, slot: now || null});
+    if (peer && !this._verWarned) { const pv = peer.pv || 1; if (pv !== PROTO) { this._verWarned = true; this.emit('version', {mismatch: true, theirs: peer.app || '?', mine: APP_VERSION}); } else if (peer.app && peer.app !== APP_VERSION) { this._verWarned = true; this.emit('version', {mismatch: false, theirs: peer.app, mine: APP_VERSION}); } }
+    if (!peer) this._verWarned = false;
   }
   _kick() {
     if (this._dead) return; this._shutdown();

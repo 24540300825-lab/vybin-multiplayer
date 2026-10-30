@@ -76,6 +76,7 @@ async function boot() {
     api.envOut = o => sess.send({k: 'env', ...o});
     sess.on('msg', m => { if (m.k === 'map' && isMap(m.map) && m.map !== mapId) { toast('Đối phương chuyển sang: ' + MAP_LIST[m.map].name); prefetchMap(m.map); goToMap(m.map); } });
     sess.on('peer', ({present}) => { if (!present) return; });
+    sess.on('version', v => toast(v.mismatch ? '⚠️ Hai máy đang chạy bản game khác nhau — bấm Ctrl+F5 (tải lại) để chơi đồng bộ' : 'Đối phương đang chạy bản game khác — nếu thấy lạ, bấm Ctrl+F5'));
     const chat = new Chat(sess), voice = new Voice(sess);
     const ui = mountMpUi({sess, chat, voice});
     try { const {mountChatNotify} = await import('./ui/chat-notify.js'); mountChatNotify({chat, openChat: ui.setOpen}); } catch (e) { console.warn('chat-notify', e); }
@@ -88,6 +89,14 @@ async function boot() {
     addEventListener('pageshow', e => { if (e.persisted) voice.resume().catch(() => {}); });     // sau đổi map/F5: tự vào lại cuộc gọi nếu trước đó đang gọi
     $('mpLeave') && ($('mpLeave').onclick = async () => { await sess.leave(); location.reload(); });
   }
+  // ---------- 5) tính năng cắm thêm (minigame…): lỗi 1 tính năng không ảnh hưởng game ----------
+  try {
+    const {createFeatureHost} = await import('./features/host.js'), {FEATURES} = await import('./features/registry.js');
+    const {toast} = await import('./ui/mp-ui.js');
+    const host = createFeatureHost({sess, api, slot, other: slot === 'bin' ? 'vy' : 'bin', mapId, toast});
+    window.VYFEATURES = host;
+    FEATURES.forEach(load => load().then(m => host.register(m.default)).catch(e => console.warn('[features] không nạp được', e)));
+  } catch (e) { console.warn('[features]', e); }
   LB(100, 'Xong!'); setTimeout(hide, 300);
 }
 boot().catch(fail);
