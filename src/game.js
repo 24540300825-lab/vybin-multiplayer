@@ -836,53 +836,48 @@ export function init(ctx){
   // ===== TƯỜNG KÍNH MỜ + DYNAMIC WALL FADE =====
   // Nhà là mặt cắt (mở phía camera). Thêm "tường kính" ở mặt trước (rất mờ, chỉ đủ biết có tường — viền + ánh phản xạ theo góc nhìn)
   // và cho tường bên phải (hiện có sẵn, nằm giữa camera và nội thất) mờ dần theo vị trí camera. Tường không chắn đường click, không đổi bóng đổ.
-  const GLASS={front:null,east:[],uA:0};
-  function splitMeshX(m,cut){const g=m.geometry,pos=g.attributes.position;m.updateWorldMatrix(true,false);
-    const idx=g.index?g.index.array:null,n=idx?idx.length:pos.count,A=[],B=[],v=new THREE.Vector3();
-    for(let i=0;i<n;i+=3){let cx=0;for(let k=0;k<3;k++){v.fromBufferAttribute(pos,idx?idx[i+k]:i+k).applyMatrix4(m.matrixWorld);cx+=v.x}cx/=3;
-      const t=cx>cut?B:A;for(let k=0;k<3;k++)t.push(idx?idx[i+k]:i+k)}
-    if(!A.length||!B.length)return null;
-    const mk=arr=>{const ng=g.clone();ng.setIndex(arr);return ng};
-    const e=new THREE.Mesh(mk(B),m.material);m.geometry=mk(A);
-    e.position.copy(m.position);e.quaternion.copy(m.quaternion);e.scale.copy(m.scale);e.castShadow=m.castShadow;e.receiveShadow=m.receiveShadow;e.name=m.name+'_E';
-    m.parent.add(e);e.updateMatrixWorld(true);return e}
+  const GLASS={front:null,top:null};
+  // Shader kính dùng chung cho mặt trước (đứng) và mặt đỉnh (nằm): khung viền đục màu kem có vạch sáng, chân tường đặc (tầng trệt) + dầm sàn gác,
+  // kính xanh nhạt rất mờ ở giữa có vệt phản chiếu mềm + viền sáng theo góc nhìn (Fresnel). Giữa gần như trong suốt để thấy rõ nội thất.
+  const GLASS_VS='varying vec2 vUv;varying vec3 vW;void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.0);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}';
+  const GLASS_FS='uniform float uA,uMode;uniform vec3 uGlass,uFrame,uCam;uniform vec2 uSz;varying vec2 vUv;varying vec3 vW;'
+    +'float band(float t,float c,float w){float d=(t-c)/w;return exp(-d*d);}'
+    +'void main(){'
+    +'vec2 m=vUv*uSz;float ed=min(min(m.x,uSz.x-m.x),min(m.y,uSz.y-m.y));'
+    +'vec3 V=normalize(uCam-vW);'
+    +'float frame=1.0-smoothstep(0.075,0.095,ed);'                         // khung viền ngoài đục
+    +'float hl=(smoothstep(0.075,0.09,ed)*(1.0-smoothstep(0.095,0.12,ed)))*0.55;'   // vạch sáng ngay mép trong khung
+    +'float glow=(1.0-smoothstep(0.1,0.55,ed))*0.07;'                       // kính hơi đục dần về phía viền
+    +'float sill=0.0,sillHl=0.0,beam=0.0,beamHl=0.0,frost=0.0,fr,sheen;'
+    +'if(uMode<0.5){float y=vW.y;'
+    +'  sill=1.0-smoothstep(0.37,0.4,y);sillHl=smoothstep(0.4,0.415,y)*(1.0-smoothstep(0.43,0.45,y))*0.5;'   // chân tường đặc tầng trệt
+    +'  frost=(1.0-smoothstep(0.4,1.6,y))*0.12;'
+    +'  fr=pow(1.0-clamp(abs(V.z),0.0,1.0),2.0);'
+    +'  sheen=band(vUv.x*uSz.x*0.55+vUv.y*uSz.y*0.35,3.4,0.9)*0.05+band(vUv.x*uSz.x*0.55+vUv.y*uSz.y*0.35,7.2,0.35)*0.035;'
+    +'}else{fr=pow(1.0-clamp(abs(V.y),0.0,1.0),2.0);'
+    +'  sheen=band(m.x*0.7+m.y*0.5,4.0,1.1)*0.04+band(m.x*0.7+m.y*0.5,8.3,0.4)*0.03;}'
+    +'float sa=max(max(frame,max(sill,beam)),0.0);'                         // phần đục (khung, chân tường, dầm)
+    +'float ag=0.045+0.06*fr+glow+frost+sheen+max(hl,max(sillHl,beamHl));' // phần kính
+    +'float a=sa*0.94+ag*(1.0-sa*0.94);'
+    +'vec3 col=mix(uGlass,uFrame,sa);col=mix(col,vec3(1.0),clamp(max(hl,max(sillHl,beamHl))*0.8+sheen*2.0,0.0,0.6)*(1.0-sa));'
+    +'gl_FragColor=vec4(col,clamp(a,0.0,0.96)*uA);}';
+  function glassMat(w,h,mode){return new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,vertexShader:GLASS_VS,fragmentShader:GLASS_FS,
+    uniforms:{uA:{value:1},uMode:{value:mode},uSz:{value:new THREE.Vector2(w,h)},uGlass:{value:new THREE.Vector3(0.93,0.97,1)},uFrame:{value:new THREE.Vector3(1,0.95,0.86)},uCam:{value:new THREE.Vector3()}}})}
   function buildGlass(){
     const GC=MC.glass;if(!GC)return;
-    if(GC.front){const F=GC.front,w=F.x1-F.x0,h=F.y1-F.y0;
-      const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,
-        uniforms:{uA:{value:1},uCol:{value:new THREE.Vector3(1,0.96,0.9)},uCam:{value:new THREE.Vector3()}},
-        vertexShader:'varying vec2 vUv;varying vec3 vW;void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.0);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}',
-        fragmentShader:'uniform float uA;uniform vec3 uCol,uCam;varying vec2 vUv;varying vec3 vW;void main(){'
-          // kiểu "tường cắt" trong game: chân tường đặc (mỗi tầng) + dải kính mờ đục dần về phía chân + khung viền/trụ góc + giữa cực mờ để nhìn rõ nội thất
-          +'float y=vW.y,lh=y<3.05?y:max(y-3.1,0.0);'
-          +'float sk=y<3.05?0.4:0.2;float skirt=1.0-smoothstep(sk-0.04,sk,lh);'
-          +'float frost=(1.0-smoothstep(0.44,1.0,lh))*0.09;'
-          +'float beamB=smoothstep(2.96,3.0,y)*(1.0-smoothstep(3.08,3.12,y))*0.8;'
-          +'float rim=smoothstep(5.72,5.8,y)*0.85;'
-          +'float ed=min(vUv.x,1.0-vUv.x)*'+w.toFixed(2)+';float post=(1.0-smoothstep(0.06,0.14,ed))*0.8;'
-          +'vec3 V=normalize(uCam-vW);float fr=pow(1.0-clamp(abs(V.z),0.0,1.0),2.0);'
-          +'float a=max(max(skirt*0.92,frost),max(max(beamB,rim),post));a=max(a,0.07+0.05*fr);'
-          +'gl_FragColor=vec4(uCol*(0.86+0.14*(1.0-skirt)),a*uA);}'});
+    if(GC.front){const F=GC.front,w=F.x1-F.x0,h=F.y1-F.y0,mat=glassMat(w,h,0);
       const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);m.position.set((F.x0+F.x1)/2,F.y0+h/2,F.z);m.renderOrder=4;m.castShadow=false;m.receiveShadow=false;m.frustumCulled=false;m.name='GLASS_FRONT';
       scene.add(m);GLASS.front={m,mat,F}}
-    if(GC.east){const E=GC.east,meshes=[];
-      if(E.split){const o=byName[E.split];if(o&&o.isMesh){const e=splitMeshX(o,E.cut);if(e)meshes.push(e)}}
-      if(E.names)env.traverse(o=>{if(o.isMesh&&E.names.test(o.name))meshes.push(o)});
-      const cl=new Map();
-      meshes.forEach(o=>{if(Array.isArray(o.material))return;let c=cl.get(o.material);
-        if(!c){c=o.material.clone();c.transparent=true;cl.set(o.material,c);GLASS.east.push(c)}
-        o.material=c;o.renderOrder=1;toonify(o)});
-      GLASS.E=E}
+    if(GC.top){const T=GC.top,w=T.x1-T.x0,d=T.z1-T.z0,mat=glassMat(w,d,1);
+      const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),mat);m.rotation.x=-Math.PI/2;m.position.set((T.x0+T.x1)/2,T.y,(T.z0+T.z1)/2);m.renderOrder=4;m.castShadow=false;m.receiveShadow=false;m.frustumCulled=false;m.name='GLASS_TOP';
+      scene.add(m);GLASS.top={m,mat,T}}
   }
-  const _gv=new THREE.Vector3();
   function glassStep(){
-    const cam=camera.position;
-    if(GLASS.front){const {mat,F}=GLASS.front,d=cam.z-F.z;
-      const l=TU.uAmbS.value,lum=Math.min(1,Math.max(0.3,(l.x*0.3+l.y*0.59+l.z*0.11)*0.95));
-      mat.uniforms.uCol.value.set(1*lum,0.96*lum,0.9*lum);mat.uniforms.uCam.value.copy(cam);
-      mat.uniforms.uA.value=d>0?Math.min(1,Math.max(0,(d-3)/6)):0}   // camera sát/vào trong tường thì tường biến mất hẳn
-    if(GLASS.east.length){const E=GLASS.E,t=Math.min(1,Math.max(0,(cam.x-E.x0)/(E.x1-E.x0))),k=t*t*(3-2*t),op=1-0.66*k;
-      for(const c of GLASS.east){c.opacity=op;c.depthWrite=op>0.97}}
+    const cam=camera.position,l=TU.uAmbS.value,lum=Math.min(1,Math.max(0.3,(l.x*0.3+l.y*0.59+l.z*0.11)*0.95));
+    for(const G of [GLASS.front,GLASS.top]){if(!G)continue;const u=G.mat.uniforms;
+      u.uGlass.value.set(0.93*lum,0.97*lum,1*lum);u.uFrame.value.set(1*lum,0.95*lum,0.86*lum);u.uCam.value.copy(cam)}
+    if(GLASS.front){const d=cam.z-GLASS.front.F.z;GLASS.front.mat.uniforms.uA.value=d>0?Math.min(1,Math.max(0,(d-3)/6)):0}   // camera sát/vào trong tường thì tường biến mất hẳn
+    if(GLASS.top){const d=cam.y-GLASS.top.T.y;GLASS.top.mat.uniforms.uA.value=Math.min(1,Math.max(0,(d-1)/4))}               // camera thấp hơn nóc thì nóc biến mất
   }
   buildGlass();
   (function optimizeEnv(){

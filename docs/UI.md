@@ -74,9 +74,9 @@ Pin = 3 lớp đúng Figma 63×76: `pin-tail.svg` (đuôi trắng) → `.pf` (v�
 - Đổi map: `goToMap` fade đen → reload; cờ `sessionStorage.vyFade` làm trang mới bắt đầu từ đen rồi hiện dần ra ảnh loading.
 
 
-## Tường kính mờ + Dynamic Wall Fade (`buildGlass/glassStep` trong `game.js`, cấu hình `MC.glass` ở `map-configs.js`)
+## Tường kính (mặt trước + mặt đỉnh) (`buildGlass/glassStep` trong `game.js`, cấu hình `MC.glass`)
 
-Nhà là mặt cắt nên thêm "tường" để nhìn như xuyên qua kính: (1) **mặt trước** = 1 mặt phẳng kính rất mờ (alpha ≈ .07, viền + ánh phản xạ theo góc nhìn, biến mất khi camera sát/vào trong); (2) **tường phía đông** (nằm giữa camera và nội thất) mờ dần theo vị trí camera (opacity 1 → .12 khi camera ở x ≥ `x1`). Tường không chắn click/va chạm, không đổi bóng đổ. Cấu hình: `glass:{front:{x0,x1,z,y0,y1}, east:{names:/regex/ hoặc split:'tên mesh',cut:x, x0, x1}}`. `chairFlip:true` = đảo hướng ngồi (ghế trên lầu nhà mới ngồi quay vào bàn).
+Nhà là mặt cắt nên thêm 2 mặt kính: **mặt trước** (đứng) và **mặt đỉnh** (nằm trên nóc). 2 mặt bên để nguyên. Shader dùng chung: khung viền đục màu kem + vạch sáng mép trong, chân tường đặc ở tầng trệt, kính xanh nhạt rất mờ ở giữa (vệt phản chiếu mềm + Fresnel theo góc nhìn) nên nội thất vẫn rõ; KHÔNG có đường ngang ở giữa. Camera sát/vào trong tường (trước) hoặc thấp hơn nóc (đỉnh) thì tự biến mất. Không chắn click/va chạm, không đổ bóng. Cấu hình: `glass:{front:{x0,x1,z,y0,y1}, top:{x0,x1,z0,z1,y}}`. `chairFlip:true` = đảo hướng ngồi (ghế trên lầu nhà mới quay vào bàn).
 
 ## Đĩa nhạc
 
