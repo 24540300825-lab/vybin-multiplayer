@@ -99,3 +99,15 @@ canvas{display:block}
 #hCall.min .cRz{display:none}
 #hCall.min .cV,#hCall.min .cC,#hCall.min .cP,#hCall.min #cErr{display:none}#hCall.min{width:auto}
 @media(max-width:900px){#hCall:not(.full){top:auto;bottom:150px;width:min(var(--callW,240px),calc(100vw - 28px))}}
+
+#mYtB{background:none;border:0;color:var(--tx);font-size:16px;cursor:pointer;padding:2px 5px;border-radius:8px}#mYtB:hover{background:#fff3}
+#hMus input#mVol{width:44px!important}
+#hYt{position:fixed;left:14px;bottom:96px;width:min(340px,calc(100vw - 28px));max-height:calc(100vh - 140px);overflow:auto;z-index:7;padding:8px;display:none;flex-direction:column;gap:6px;font-size:12px}#hYt.on{display:flex}
+#hYt .yH{display:flex;align-items:center;gap:6px}#hYt .pl{padding:2px 7px;font-size:13px}#hYt .pl.on{background:#ffd27a55}
+#hYt .yV{position:relative;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden;flex:none}#hYt .yV iframe{width:100%;height:100%;border:0;display:block}.yNo{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:10px;font-size:12px;opacity:.75}
+#hYt.sm .yV{width:160px;align-self:flex-start}
+#hYt .yNow{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#hYt .yNow:empty{display:none}
+#hYt .yA{display:flex;gap:6px;align-items:center}#hYt .yA input{flex:1;min-width:0;background:#fff2;color:var(--tx);border:1px solid var(--gb);border-radius:8px;padding:5px 8px}#hYt .yA select{flex:1;min-width:0;background:#fff2;color:var(--tx);border:1px solid var(--gb);border-radius:8px;padding:4px}
+#hYt .yL{max-height:170px;overflow:auto;border-radius:8px;background:#0003}.yI{display:flex;gap:6px;align-items:center;padding:5px 7px;cursor:pointer}.yI:hover{background:#fff2}.yI.cur{background:#fff3;color:var(--ac)}.yI .n{width:18px;text-align:center;opacity:.7;flex:none}.yI .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.yI .x{background:none;border:0;color:inherit;opacity:.5;cursor:pointer}.yI .x:hover{opacity:1}.yE{padding:10px;opacity:.7;text-align:center}
+#hYt .yF{display:flex;gap:6px;align-items:center;font-size:10px;opacity:.7}#hYt .yF span{flex:1}
+@media(max-width:900px){#hYt{bottom:150px}}

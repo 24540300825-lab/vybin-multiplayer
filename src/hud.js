@@ -1,5 +1,7 @@
 import {$} from './shared.js';
 import {Lofi} from './lofi.js';
+import {createYTMusic} from './music-yt.js';
+import {mountYtUi} from './ui/music-ui.js';
 // ===== HUD / UI mới (kiểu game) =====
 (function buildHUD(){
   const $=id=>document.getElementById(id),V=()=>window.VY;
@@ -80,13 +82,24 @@ import {Lofi} from './lofi.js';
   $('tkOk').onclick=addT;$('tkTx').onkeydown=e=>{if(e.key==='Enter')addT()};
   // --- chụp ảnh
   $('iCam').onclick=()=>{window.__shot=()=>{const a=document.createElement('a');a.download='vy-bin-'+Date.now()+'.png';a.href=V().renderer.domElement.toDataURL('image/png');a.click();toast('Đã lưu ảnh')}};
-  // --- nhạc
-  const T=Lofi.tracks;let playing=false;
-  const showT=()=>{const t=T[Lofi.idx];$('mTt').textContent=t.name;$('mSt').textContent=t.sub+' · '+t.bpm+' BPM';$('mPlay').textContent=playing?'⏸':'▶';[...$('mList').children].forEach((d,i)=>d.classList.toggle('cur',i===Lofi.idx))};
-  T.forEach((t,i)=>{const d=document.createElement('div');d.textContent=(i+1)+'. '+t.name+' — '+t.sub;d.onclick=()=>{Lofi.setTrack(i);if(!playing)play();showT()};$('mList').appendChild(d)});
-  async function play(){playing=await Lofi.toggle();showT()}
-  $('mPlay').onclick=play;$('mNext').onclick=()=>{Lofi.setTrack(Lofi.idx+1);showT()};$('mPrev').onclick=()=>{Lofi.setTrack(Lofi.idx-1);showT()};
-  $('mLs').onclick=()=>$('mList').classList.toggle('on');
-  const mv=$('mVol'),sv=$('sVolS');mv.value=sv.value=0.5;mv.oninput=()=>{sv.value=mv.value;Lofi.vol(+mv.value)};sv.oninput=()=>{mv.value=sv.value;Lofi.vol(+sv.value)};
+  // --- nhạc: 2 nguồn — Lofi (tạo trong game) và YouTube (phát nhúng + thư viện playlist)
+  const T=Lofi.tracks;let playing=false,src=load('vyMusicSrc','lofi')==='yt'?'yt':'lofi';
+  let ytUi=null;
+  const YTM=createYTMusic({toast,onChange:()=>{ytUi&&ytUi.render();showT()}});
+  const showT=()=>{
+    if(src==='yt'){const it=YTM.curItem;$('mTt').textContent=YTM.title||'YouTube';$('mSt').textContent='YouTube · '+YTM.lib.pls[YTM.lib.pl].name;$('mPlay').textContent=YTM.playing?'⏸':'▶';$('mCv').textContent='📺';[...$('mList').children].forEach(d=>d.classList.remove('cur'));return}
+    const t=T[Lofi.idx];$('mTt').textContent=t.name;$('mSt').textContent=t.sub+' · '+t.bpm+' BPM';$('mPlay').textContent=playing?'⏸':'▶';$('mCv').textContent='♪';[...$('mList').children].forEach((d,i)=>d.classList.toggle('cur',i===Lofi.idx))};
+  const stopLofi=async()=>{if(Lofi.on){await Lofi.toggle();playing=false}};
+  const useSrc=async s=>{if(s===src)return;src=s;save('vyMusicSrc',s);if(s==='yt')await stopLofi();else YTM.pause();showT()};
+  T.forEach((t,i)=>{const d=document.createElement('div');d.textContent=(i+1)+'. '+t.name+' — '+t.sub;d.onclick=async()=>{await useSrc('lofi');Lofi.setTrack(i);if(!playing)await play();showT()};$('mList').appendChild(d)});
+  async function play(){if(src==='yt'){await YTM.toggle();showT();return}playing=await Lofi.toggle();showT()}
+  $('mPlay').onclick=play;
+  $('mNext').onclick=()=>{if(src==='yt')YTM.next();else{Lofi.setTrack(Lofi.idx+1);showT()}};
+  $('mPrev').onclick=()=>{if(src==='yt')YTM.prev();else{Lofi.setTrack(Lofi.idx-1);showT()}};
+  $('mLs').onclick=()=>{$('mList').classList.toggle('on')};
+  ytUi=mountYtUi(YTM,{onPick:async i=>{await useSrc('yt');await YTM.playAt(i)}});
+  const yb=document.createElement('button');yb.id='mYtB';yb.textContent='📺';yb.title='Nhạc YouTube & playlist';yb.onclick=()=>{ytUi.open();if(ytUi.isOpen&&src!=='yt'&&YTM.lib.pls[YTM.lib.pl].items.length)useSrc('yt')};$('mLs').after(yb);
+  $('mCv').onclick=()=>yb.click();$('mCv').style.cursor='pointer';
+  const mv=$('mVol'),sv=$('sVolS');mv.value=sv.value=0.5;const setVol=v=>{Lofi.vol(v);YTM.vol(v)};YTM.vol(0.5);mv.oninput=()=>{sv.value=mv.value;setVol(+mv.value)};sv.oninput=()=>{mv.value=sv.value;setVol(+sv.value)};
   showT();
 })();
