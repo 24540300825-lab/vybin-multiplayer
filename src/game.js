@@ -138,7 +138,7 @@ export function init(ctx){
       for(let k=0;k<=n;k++){const z=S.z1-k*(S.z1-S.z0)/n;rc.set(new THREE.Vector3(S.cx,30,z),new THREE.Vector3(0,-1,0));const h=rc.intersectObjects(meshes,false)[0];ys.push(h?h.point.y:null)}
       for(let k=0;k<=n;k++)if(ys[k]==null){let a=k-1,b=k+1;while(a>=0&&ys[a]==null)a--;while(b<=n&&ys[b]==null)b++;ys[k]=a<0?(b<=n?ys[b]:0):b>n?ys[a]:ys[a]+(ys[b]-ys[a])*(k-a)/(b-a)}
       const sm=ys.map((_,k)=>{let t=0,c=0;for(let d=-3;d<=3;d++){const q=k+d;if(q>=0&&q<=n){t+=ys[q];c++}}return t/c});
-      S.n=n;S.ys=sm;stairs.push(S)})}
+      S.n=n;S.ys=sm.map((v,k)=>{let m=v;for(let d=-3;d<=3;d++){const q=k+d;if(q>=0&&q<=n)m=Math.max(m,ys[q])}return m});S.raw=ys;stairs.push(S)})}
   const stairAt=(x,z)=>{for(const S of stairs)if(x>S.x0-0.05&&x<S.x1+0.05&&z>S.z0&&z<S.z1+0.05)return S;return null};
   const inStair=(x,z)=>!!stairAt(x,z);
   const stairY=(S,z)=>{if(z>=S.z1+0.05)return 0;const f=(S.z1-z)/(S.z1-S.z0)*S.n;if(f<=0)return S.ys[0]*(1-Math.max(0,(z-S.z1)/0.05));if(f>=S.n)return S.ys[S.n];const i=Math.floor(f);return S.ys[i]+(S.ys[i+1]-S.ys[i])*(f-i)};
@@ -494,6 +494,7 @@ export function init(ctx){
       if(was&&W!==S)return false;
       if(!was){const fromBottom=P.level===0&&oz>=S.z1-0.03&&z<oz,fromTop=P.level===1&&oz<=S.z0+0.08&&z>oz;if(!fromBottom&&!fromTop)return false;}
       return true;}
+    if(was&&!ins){const atBot=z>=W.z1+0.05&&oz<W.z1+0.05,atTop=z<=W.z0&&oz>W.z0;if((!atBot&&!atTop)||x<W.x0+0.02||x>W.x1-0.02)return false}   // đang ở trên cầu thang: chỉ được ra ở chân/đỉnh, đúng bề ngang bậc
     if(lv===0){const w=MC.walk0;if(x<w[0]||x>w[1]||z<w[2]||z>w[3])return false}
     else{const w=MC.l1;if(x<w[0]||x>w[1]||z<w[2]||z>(w[3]==null?stairs[0].z0+0.02:w[3]))return false}
     if(lv===A.chairL&&CHB&&x>CHB[0]&&x<CHB[2]&&z>CHB[1]&&z<CHB[3]&&!(ox>CHB[0]&&ox<CHB[2]&&oz>CHB[1]&&oz<CHB[3]))return false;
@@ -552,7 +553,7 @@ export function init(ctx){
     for(const x of ['L','R'])if(occ['bed'+x]===DEF.id&&P.mode!=='bed'&&!(busy&&busy.kind==='climbBed')&&!plan.some(i=>i.t==='climbBed'))occ['bed'+x]=null;
     if(!busy&&!plan[0]&&P.mode==='free')pushOut();
     if(DEF.ctrl==='wasd'){const S=stairAt(P.pos.x,P.pos.z);if(P._S&&!S&&!plan[0])P.level=P.pos.z<P._S.midZ?1:0;P._S=S;}
-    if(!busy&&P.mode==='free'){const h=heightAt(P.pos.x,P.pos.z,P.level);P.pos.y+=(h-P.pos.y)*(1-Math.exp(-dt*16));}
+    if(!busy&&P.mode==='free'){const h=heightAt(P.pos.x,P.pos.z,P.level);P.pos.y+=(h-P.pos.y)*(1-Math.exp(-dt*(stairAt(P.pos.x,P.pos.z)?40:16)));}
     if(DEF.remote&&net)correct(dt);
   }
   // ----- nhân vật remote: nắn dần về snapshot của chủ nhân vật (chủ là authority) -----
