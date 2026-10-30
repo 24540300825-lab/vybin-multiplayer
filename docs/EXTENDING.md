@@ -34,7 +34,8 @@ Lỗi trong 1 tính năng chỉ làm **tính năng đó** tắt, game vẫn ch�
 Mẹo cầu thang: đặt các bậc có tên đúng mẫu, mỗi cầu thang 1 nhóm mesh; game tự đo độ cao bậc bằng tia ray nên không cần số liệu tay.
 
 ## 3. Thêm / đổi nhân vật hoặc animation
-- File `assets/char-<slot>.glb` (slot = `bin` hoặc `vy`). Giữ **tên clip animation** như cũ (`idle`, `walk`, `run`, `sleep`, `sit`… xem danh sách trong `game.js`); thêm clip mới thì chỉ cần thêm tên vào bảng clip rồi gọi.
+- File `assets/char-<slot>.glb` (slot = `bin` hoặc `vy`).
+- Game nhận clip theo **tên** trong file GLB: các clip dạng `ACT_…` (không chứa `__`) được tự đăng ký làm hành động, ví dụ `ACT_WALK`, `ACT_RUN`, `ACT_STANDING_IDLE`, `ACT_SITTING_IDLE`, `ACT_TYPING_IDLE`, `ACT_SLEEP-LOOP BREATHE`; clip mắt bắt đầu bằng tiền tố mắt đóng/mở/chớp (khai báo trong `DEF.eye`). **Giữ nguyên tên clip cũ khi đổi file**; clip mới đặt tên `ACT_TENMOI` thì tự có trong bảng `acts`, rồi gọi từ code/tính năng.
 - Đổi file → chạy `build_manifest.py` (hash mới tự phá cache; người chơi không cần xoá cache).
 
 ## 4. Giao thức & phiên bản
