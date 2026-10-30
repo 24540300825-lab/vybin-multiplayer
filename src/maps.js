@@ -1,3 +1,4 @@
+import {SFX} from './sfx.js';
 // Danh sách map (metadata + asset phụ thuộc). Thêm map mới: xem README → "Thêm map mới".
 export const MAP_LIST = {
   studio: {name: 'Studio (cũ)', icon: '🏢', desc: 'Gác lửng 1 cầu thang, vườn cây', assets: ['map-studio']},
@@ -19,6 +20,7 @@ export function prefetchMap(id) {
   }
 }
 export function goToMap(id, {fade = true} = {}) {
+  try { SFX.play('whoosh'); } catch (e) {}
   try { localStorage.setItem('vyMap', id); } catch (e) {}
   const fd = document.getElementById('fade');
   if (fade && fd) fd.classList.add('on');

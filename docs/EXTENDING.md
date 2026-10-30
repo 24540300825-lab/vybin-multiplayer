@@ -47,3 +47,19 @@ Mẹo cầu thang: đặt các bậc có tên đúng mẫu, mỗi cầu thang 1 
 1. Làm trên nhánh riêng → Vercel tự tạo **bản test** (preview).
 2. Hai người thử xong → gộp vào `main` → Vercel tự lên **bản chính**.
 3. Không hài lòng → `Vercel → Deployments → Promote` bản cũ (rollback 1 cú bấm).
+
+
+## Thêm / chỉnh âm thanh (SFX)
+
+Toàn bộ hiệu ứng âm thanh nằm trong `src/sfx.js`, tổng hợp bằng Web Audio — **không có file mp3**.
+
+- Thêm một âm mới: thêm một hàm vào bảng `LIB` (ví dụ `myPing: (t, o) => bell(t, 84, {peak: 0.1 * o.v})`), rồi gọi `SFX.play('myPing')` ở nơi cần. Nếu âm to/nhỏ lệch so với âm khác, chỉnh hệ số trong bảng `TRIM` (đo bằng cách render offline rồi đưa về đỉnh ~0.1–0.3).
+- Âm theo khoảng cách (nhân vật kia, cửa ở xa): `SFX.playAt('step', khoảng_cách_m, {range: 13})`.
+- Âm lặp (chuông gọi): thêm vào `LOOPS` rồi bật/tắt bằng `SFX.loop('tên', true/false)`.
+- Giao diện (hover, click, bật/tắt, kéo thanh, mở/đóng bảng, toast) tự có âm. Nút nào muốn tự quản âm riêng thì gắn `data-nosfx="1"`.
+- Người chơi chỉnh trong Cài đặt → Âm thanh (bật/tắt, âm lượng, âm môi trường); lưu trong trình duyệt (khóa `vySfx`).
+- Trình duyệt chỉ cho phát âm sau lần bấm đầu tiên — trước đó mọi lệnh `SFX.play` im lặng, không báo lỗi.
+
+## Cuộc gọi đến / đi
+
+`src/ui/call-ring.js` lắng nghe `Voice`: có người gọi (`state.incoming`) → popup + chuông lặp; bấm Nghe = `voice.join()`, Từ chối = `voice.decline()`; bên gọi (`state.outgoing`) nghe tiếng chờ, tự dập máy sau 45 giây nếu người kia đang trong phòng mà không nghe. Âm thanh của người gọi bị tắt (muted) cho tới khi bên nhận bấm Nghe.

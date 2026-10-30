@@ -3,6 +3,8 @@ import {CONFIG} from './config.js';
 import * as Assets from './assets.js';
 import {MAP_LIST, DEFAULT_MAP, isMap, goToMap, prefetchMap} from './maps.js';
 import {FILES} from './manifest.js';
+import {SFX} from './sfx.js';
+window.SFX = SFX; SFX.init();
 
 const $ = id => document.getElementById(id);
 const LB = (p, t) => { const b = $('lb'); if (b) b.style.width = Math.round(p) + '%'; if (t) $('lmsg').textContent = t; };
@@ -79,6 +81,7 @@ async function boot() {
     sess.on('version', v => toast(v.mismatch ? '⚠️ Hai máy đang chạy bản game khác nhau — bấm Ctrl+F5 (tải lại) để chơi đồng bộ' : 'Đối phương đang chạy bản game khác — nếu thấy lạ, bấm Ctrl+F5'));
     const chat = new Chat(sess), voice = new Voice(sess);
     const ui = mountMpUi({sess, chat, voice});
+    try { const {mountCallRing} = await import('./ui/call-ring.js'); mountCallRing({voice, sess, toast, other}); } catch (e) { console.warn('call-ring', e); }
     try { const {mountChatNotify} = await import('./ui/chat-notify.js'); mountChatNotify({chat, openChat: ui.setOpen}); } catch (e) { console.warn('chat-notify', e); }
     chat.start().catch(e => console.warn('chat', e));
     window.VYNET = {sess, chat, voice, api};

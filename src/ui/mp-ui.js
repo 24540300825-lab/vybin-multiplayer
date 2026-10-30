@@ -133,7 +133,7 @@ export function mountMpUi({sess, chat, voice}) {
   const viewing = () => shown && !collapsed;
   function bindVideo() {
     const on = viewing() && !document.hidden;
-    const ms = on && voice.remoteVideo && lastS.peerCam ? voice.remoteVideo : null;
+    const ms = on && voice.remoteVideo && lastS.peerCam && lastS.active ? voice.remoteVideo : null;   // chưa nghe máy thì không hiện hình người gọi
     if (rv.srcObject !== ms) { rv.srcObject = ms; if (ms) play(rv); }
     const ls = on && voice.camStream ? voice.camStream : null;
     if (lv.srcObject !== ls) { lv.srcObject = ls; if (ls) play(lv); }
@@ -145,7 +145,7 @@ export function mountMpUi({sess, chat, voice}) {
   function tick() { const s = lastS; $('cTm').textContent = (viewing() || collapsed) && s.connectedAt && s.active ? mmss(Date.now() - s.connectedAt) : ''; }
   function cui(s) {
     lastS = s; const ph = s.phase;
-    call.dataset.ph = ph; $('cSt').textContent = PH[ph] || '';
+    call.dataset.ph = ph; $('cSt').textContent = s.outgoing && ph !== 'asking' && ph !== 'lost' && ph !== 'recovering' ? (s.peerHere ? 'Đang gọi ' + NAME[other] + '…' : 'Chờ ' + NAME[other] + ' vào phòng') : PH[ph] || '';
     $('cMic').classList.toggle('off', !s.micOn || s.muted); $('cMic').firstChild.textContent = !s.micOn ? '🎙️' : s.muted ? '🔇' : '🎙️'; $('cMic').lastChild.textContent = !s.micOn ? 'Bật mic' : s.muted ? 'Bật tiếng' : 'Tắt tiếng';
     $('cCam').classList.toggle('off', !s.camOn); $('cCam').lastChild.textContent = s.camOn ? 'Tắt camera' : 'Bật camera';
     $('cCam').firstChild.textContent = s.camOn ? '📹' : '📷';
@@ -157,14 +157,14 @@ export function mountMpUi({sess, chat, voice}) {
     // nút trên thanh trên cùng
     const b = $('iVoice'); b.classList.toggle('live', s.active); b.classList.toggle('talk', s.speaking);
     $('vIc').textContent = !s.active ? '🎙️' : (!s.micOn || s.muted) ? '🔇' : '🎙️';
-    $('vTx').textContent = !s.active ? (s.listening ? 'Voice (nghe)' : 'Voice') : !s.micOn ? 'Bật mic' : s.muted ? 'Đã tắt tiếng' : s.phase === 'connected' ? 'Đang nói chuyện' : s.phase === 'weak' ? 'Mạng yếu' : s.phase === 'recovering' || s.phase === 'lost' ? 'Nối lại…' : s.phase === 'waiting' ? 'Chờ ' + NAME[other] : 'Đang kết nối…';
+    $('vTx').textContent = s.incoming ? '📞 Nghe máy' : s.outgoing && !s.asking ? 'Đang gọi…' : !s.active ? (s.listening ? 'Voice' : 'Voice') : !s.micOn ? 'Bật mic' : s.muted ? 'Đã tắt tiếng' : s.phase === 'connected' ? 'Đang nói chuyện' : s.phase === 'weak' ? 'Mạng yếu' : s.phase === 'recovering' || s.phase === 'lost' ? 'Nối lại…' : s.phase === 'waiting' ? 'Chờ ' + NAME[other] : 'Đang kết nối…';
     $('iVoiceX').style.display = s.active ? '' : 'none';
     $('iVid').classList.toggle('live', s.camOn || (s.active && shown));
     pc.classList.toggle('talk', !!s.peerSpeaking);
     $('peMic').textContent = !sess.peer ? '' : s.peerVoice ? (s.peerMuted ? '🔇' : '🎙️') + (s.peerCam ? '📹' : '') : '';
     // tự mở khung video khi mình bật camera hoặc đối phương bật camera (lần đầu của cuộc gọi); cuộc gọi chỉ có tiếng thì không hiện gì
     if (!s.active && !s.listening) { autoShown = false; if (shown) showCall(false); }
-    else if (!autoShown && (s.camOn || s.peerCam)) { autoShown = true; collapsed = false; call.classList.remove('min'); showCall(true); }
+    else if (!autoShown && (s.camOn || (s.peerCam && s.active))) { autoShown = true; collapsed = false; call.classList.remove('min'); showCall(true); }
     if (!s.peerCam && !s.camOn && s.phase === 'ended') showCall(false);
     bindVideo(); tick();
   }

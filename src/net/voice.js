@@ -53,7 +53,7 @@ export class Voice {
     this.weak = false; this.speaking = false; this.peerSpeaking = false; this.turnOk = null;
     this.viewing = true;           // mình có đang xem hình không (tab hiện + panel mở) — để bên kia ngừng gửi hình
     this.quality = 'auto'; this.level = 0; this._vPause = false; this._bad = 0; this._good = 0; this._worst = 0;
-    this.endedUntil = 0;
+    this.endedUntil = 0; this._declined = false; this._answered = false;      // _declined: mình đã từ chối cuộc gọi đang đổ chuông
     // thống kê / chẩn đoán
     this.diag = this._newDiag(); this.connectedAt = 0; this._joinAt = 0; this._downAt = 0;
     // nội bộ
@@ -86,7 +86,7 @@ export class Voice {
     return {active: this.active, asking: this.asking, listening: !!this.pc, micOn: this.micOn, camOn: this.camOn, muted: this.muted, peerMuted: this.peerMuted,
       peerVoice: this.peerVoice, peerCam: this.peerCam, conn: this.conn, phase: this.phase, weak: this.weak, sigOk: this.sigOk, speaking: this.speaking,
       peerSpeaking: this.peerSpeaking, micErr: this.micErr, camErr: this.camErr, quality: this.quality, level: this.level, vPause: this._vPause, turn: this.turnOk,
-      connectedAt: this.connectedAt, viewing: this.viewing};
+      connectedAt: this.connectedAt, viewing: this.viewing, incoming: this.incoming, outgoing: this.outgoing, declined: this._declined, peerHere: !!this.s.peer};
   }
   _upd() { this.emit('state', this.state()); }
   _newDiag() { return {rtt: null, lossIn: null, jitter: null, kbpsAudioIn: 0, kbpsVideoIn: 0, kbpsVideoOut: 0, fpsIn: 0, fpsOut: 0, resIn: '', resOut: '', ice: '', route: '', connectMs: null, reconnects: 0, interruptMs: 0, limit: '', codec: ''}; }
@@ -117,7 +117,9 @@ export class Voice {
     return this.s.send({k: 'voice', on: this.active ? 1 : 0, muted: this.muted, cam: this.camOn ? 1 : 0, view: this.viewing ? 1 : 0, ...extra});
   }
   _mediaHealthy() { return !!this.pc && this.conn === 'connected'; }
-  get _wantPc() { return this.active || this.peerVoice; }
+  get _wantPc() { return this.active || (this.peerVoice && !this._declined); }
+  get incoming() { return this.peerVoice && !this.active && !this.asking && !this._declined; }   // có người gọi đến, mình chưa nghe
+  get outgoing() { return this.active && !this.peerVoice && !this._answered; }                                       // mình đã gọi, bên kia chưa nghe
 
   // đối phương (mới) xuất hiện / kênh tín hiệu nối lại: báo trạng thái; KHÔNG dựng lại nếu media đang tốt
   async _hello() {
@@ -139,7 +141,7 @@ export class Voice {
       if (cam) await this._startCam();
       await iceP;
     } finally { this.asking = false; }
-    this.active = true; this._startWatch();
+    this.active = true; this._declined = false; this._answered = this.peerVoice; if (this.audioEl) this.audioEl.muted = false; this._startWatch();
     this._announce({req: !this.init && !this._mediaHealthy() ? 1 : 0});
     this._enq(async () => { if (this.init && this.s.peer && !this.pc) await this._rebuild(); else if (this.pc) { this._attachAll(); } });
     this._upd();
@@ -161,10 +163,17 @@ export class Voice {
   leave(reason) {
     if (reason === 'reload') this._saveResume();
     const had = this.active || !!this.pc;
-    this.active = false; this.asking = false; this.speaking = false; this.peerSpeaking = false; this.weak = false;
+    this.active = false; this._answered = false; this.asking = false; this.speaking = false; this.peerSpeaking = false; this.weak = false;
     this._stopCam(); this._stopMic(); this._stopWatch(); this._closePc(); this._stopMeters();
     this.conn = 'idle'; this.micErr = this.camErr = ''; this.peerVoice = false; this.peerCam = false; this.connectedAt = 0;
     if (had) { try { this.s.send(reason === 'reload' ? {k: 'voice', on: 0, rl: 1} : {k: 'voice', on: 0}); } catch (e) {} this.endedUntil = Date.now() + 3500; clearTimeout(this._endT); this._endT = setTimeout(() => this._upd(), 3600); }
+    this._upd();
+  }
+  // từ chối cuộc gọi đang đổ chuông: ngắt kết nối nghe lén, báo cho bên gọi biết
+  decline() {
+    if (!this.incoming) return;
+    this._declined = true; this._closePc(); this.conn = 'idle';
+    try { this.s.send({k: 'voice', on: 0, dec: 1}); } catch (e) {}
     this._upd();
   }
   async toggleMic() {            // bật/tắt HẲN micro (giải phóng thiết bị); khác với tắt tiếng
@@ -294,6 +303,7 @@ export class Voice {
     if (t.kind === 'audio') {
       this.remoteAudio = new MediaStream([t]);
       if (!this.audioEl) { const a = this.audioEl = document.createElement('audio'); a.autoplay = true; a.playsInline = true; a.style.display = 'none'; document.body.appendChild(a); }
+      this.audioEl.muted = !this.active;          // đang đổ chuông (chưa nghe máy) thì KHÔNG phát tiếng của người gọi
       this.audioEl.srcObject = this.remoteAudio; this.audioEl.play().catch(() => this.emit('needGesture'));
       this._meter('peer', this.remoteAudio);
     } else if (t.kind === 'video') {
@@ -373,13 +383,19 @@ export class Voice {
   }
   async _onVoice(m) {
     const prev = this.peerVoice, prevCam = this.peerCam, prevView = this.peerViewing;
-    this.peerVoice = !!m.on; this.peerMuted = !!m.muted; this.peerCam = !!m.cam; if ('view' in m) this.peerViewing = !!m.view;
+    this.peerVoice = !!m.on; if (m.on && this.active) this._answered = true; this.peerMuted = !!m.muted; this.peerCam = !!m.cam; if ('view' in m) this.peerViewing = !!m.view;
     if (!m.on) {
       this.peerSpeaking = false; this.peerCam = false;
-      if (prev) {             // đối phương kết thúc cuộc gọi
-        this._closePc(); if (!this.active) this.conn = 'idle';
-        this._note(m.rl ? 'Đối phương đang tải lại trang (đổi map?) — sẽ tự nối lại' : 'Đối phương đã kết thúc cuộc gọi'); this.emit('peerEnded');
+      if (m.dec && this.active && !prev) {        // bên kia từ chối khi đang đổ chuông → mình tự dập máy
+        this.emit('declined'); this.leave(); this._declined = false; return;
       }
+      if (prev) {             // đối phương kết thúc cuộc gọi
+        const wasActive = this.active, ringing = !this.active && !this._declined;
+        this._closePc(); if (!this.active) this.conn = 'idle';
+        if (wasActive) this._note(m.rl ? 'Đối phương đang tải lại trang (đổi map?) — sẽ tự nối lại' : 'Đối phương đã kết thúc cuộc gọi');
+        this.emit('peerEnded', {wasActive, missed: ringing && !m.rl, reload: !!m.rl});
+      }
+      this._declined = false;
     } else if (this.init) {
       // BIN: chỉ dựng offer khi cần. Tín hiệu nối lại / cập nhật mic-cam KHÔNG làm gián đoạn media đang tốt.
       if (this.s.peer && this._wantPc) {

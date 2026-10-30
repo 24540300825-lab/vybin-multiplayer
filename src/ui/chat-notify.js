@@ -16,34 +16,15 @@ const CSS = `
 @media(prefers-reduced-motion:reduce){.cpop{animation:none}.cpop.out{transform:none}}
 `;
 
-// ---------- âm thanh: tạo AudioContext lúc người chơi bấm/gõ lần đầu (trình duyệt chặn tự phát trước đó) ----------
-let ac = null;
-function unlock() {
-  try {
-    if (!ac) { const A = window.AudioContext || window.webkitAudioContext; if (!A) return; ac = new A(); }
-    if (ac.state === 'suspended') ac.resume().catch(() => {});
-  } catch (e) {}
-}
-let lastTing = 0;
-function ting() {
-  if (!ac || ac.state !== 'running') return;          // chưa có lần bấm đầu tiên → im lặng, không báo lỗi
-  const now = performance.now(); if (now - lastTing < 250) return; lastTing = now;
-  const t = ac.currentTime, out = ac.createGain(); out.gain.value = 0.18; out.connect(ac.destination);
-  [[1046.5, 0], [1568, 0.09]].forEach(([f, d]) => {    // hai nốt Đô–Sol cao, ngắn và nhẹ
-    const o = ac.createOscillator(), g = ac.createGain();
-    o.type = 'sine'; o.frequency.value = f;
-    g.gain.setValueAtTime(0.0001, t + d);
-    g.gain.exponentialRampToValueAtTime(1, t + d + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.35);
-    o.connect(g).connect(out); o.start(t + d); o.stop(t + d + 0.4);
-  });
-}
+import {SFX} from '../sfx.js';
+// âm báo tin nhắn dùng chung bộ SFX (một AudioContext); nút 🔔 ở đây chỉ bật/tắt riêng tiếng tin nhắn
+const unlock = () => {};
+const ting = () => SFX.play('msgIn');
 
 export function mountChatNotify({chat, openChat}) {
   const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
   const box = document.createElement('div'); box.id = 'chPops'; box.setAttribute('aria-live', 'polite'); document.body.appendChild(box);
-  ['pointerdown', 'keydown', 'touchstart'].forEach(ev => addEventListener(ev, unlock, {capture: true, passive: true}));
-
+  
   // ---- nút bật/tắt âm báo, đặt ngay sau nút Chat
   let sound = true; try { sound = localStorage.getItem(KEY) !== '0'; } catch (e) {}
   const anchor = $('iChat');
@@ -71,6 +52,7 @@ export function mountChatNotify({chat, openChat}) {
   }
 
   chat.on('msg', ({m, mine, silent}) => {
+    if (mine && m.pending && !silent) SFX.play('msgOut');
     if (mine || silent || m.pending) return;                                   // tin của mình / tin cũ tải lại → bỏ qua
     if (chat.open && document.visibilityState === 'visible') return;           // đang nhìn khung chat → không cần báo
     if (!chat.open) pop(m);

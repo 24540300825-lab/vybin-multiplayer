@@ -1,4 +1,5 @@
 import {$} from './shared.js';
+import {SFX} from './sfx.js';
 import {Lofi} from './lofi.js';
 import {createYTMusic} from './music-yt.js';
 import {mountYtUi} from './ui/music-ui.js';
@@ -75,13 +76,13 @@ import {mountYtUi} from './ui/music-ui.js';
   // --- task
   let tasks=load('vyTasks',[{t:'Hoàn thiện storyboard',h:'16:00',d:0},{t:'Render test animation',h:'18:00',d:0},{t:'Chỉnh thiết kế poster',h:'20:00',d:0},{t:'Đọc tài liệu',h:'22:00',d:0},{t:'Uống nước (2L)',h:'15:00',d:1}]);
   function rt(){const L=$('tkList');L.innerHTML='';tasks.forEach((k,i)=>{const r=document.createElement('div');r.className='tk'+(k.d?' done':'');const c=document.createElement('input');c.type='checkbox';c.checked=!!k.d;c.onchange=()=>{k.d=c.checked?1:0;save('vyTasks',tasks);rt()};
-    const s=document.createElement('span');s.textContent=k.t;const e=document.createElement('em');e.textContent=k.h;const u=document.createElement('u');u.textContent='✕';u.onclick=()=>{tasks.splice(i,1);save('vyTasks',tasks);rt()};r.append(c,s,e,u);L.appendChild(r)})}
+    const s=document.createElement('span');s.textContent=k.t;const e=document.createElement('em');e.textContent=k.h;const u=document.createElement('u');u.textContent='✕';u.onclick=()=>{SFX.play('del');tasks.splice(i,1);save('vyTasks',tasks);rt()};r.append(c,s,e,u);L.appendChild(r)})}
   rt();$('iTask').onclick=()=>{$('hTasks').classList.toggle('on');$('iTask').classList.toggle('on')};$('hTasks').classList.add('on');$('iTask').classList.add('on');
   $('tkPlus').onclick=()=>{const a=$('tkAdd');a.style.display=a.style.display==='none'?'flex':'none';$('tkTx').focus()};
-  const addT=()=>{const t=$('tkTx').value.trim();if(!t)return;tasks.push({t,h:$('tkTm').value||'--:--',d:0});$('tkTx').value='';save('vyTasks',tasks);rt()};
-  $('tkOk').onclick=addT;$('tkTx').onkeydown=e=>{if(e.key==='Enter')addT()};
+  const addT=()=>{const t=$('tkTx').value.trim();if(!t)return;tasks.push({t,h:$('tkTm').value||'--:--',d:0});SFX.play('taskAdd');$('tkTx').value='';save('vyTasks',tasks);rt()};
+  $('tkOk').dataset.nosfx='1';$('tkOk').onclick=addT;$('tkTx').onkeydown=e=>{if(e.key==='Enter')addT()};
   // --- chụp ảnh
-  $('iCam').onclick=()=>{window.__shot=()=>{const a=document.createElement('a');a.download='vy-bin-'+Date.now()+'.png';a.href=V().renderer.domElement.toDataURL('image/png');a.click();toast('Đã lưu ảnh')}};
+  $('iCam').onclick=()=>{window.__shot=()=>{const a=document.createElement('a');a.download='vy-bin-'+Date.now()+'.png';a.href=V().renderer.domElement.toDataURL('image/png');a.click();SFX.play('shutter');toast('Đã lưu ảnh')}};
   // --- nhạc: 2 nguồn — Lofi (tạo trong game) và YouTube (phát nhúng + thư viện playlist)
   const T=Lofi.tracks;let playing=false,src=load('vyMusicSrc','lofi')==='yt'?'yt':'lofi';
   let ytUi=null;
@@ -92,10 +93,11 @@ import {mountYtUi} from './ui/music-ui.js';
   const stopLofi=async()=>{if(Lofi.on){await Lofi.toggle();playing=false}};
   const useSrc=async s=>{if(s===src)return;src=s;save('vyMusicSrc',s);if(s==='yt')await stopLofi();else YTM.pause();showT()};
   T.forEach((t,i)=>{const d=document.createElement('div');d.textContent=(i+1)+'. '+t.name+' — '+t.sub;d.onclick=async()=>{await useSrc('lofi');Lofi.setTrack(i);if(!playing)await play();showT()};$('mList').appendChild(d)});
-  async function play(){if(src==='yt'){await YTM.toggle();showT();return}playing=await Lofi.toggle();showT()}
+  async function play(){if(src==='yt'){const on=await YTM.toggle();SFX.play(on?'musicPlay':'musicPause');showT();return}playing=await Lofi.toggle();SFX.play(playing?'musicPlay':'musicPause');showT()}
+  ['mPlay','mNext','mPrev'].forEach(i=>$(i).dataset.nosfx='1');
   $('mPlay').onclick=play;
-  $('mNext').onclick=()=>{if(src==='yt')YTM.next();else{Lofi.setTrack(Lofi.idx+1);showT()}};
-  $('mPrev').onclick=()=>{if(src==='yt')YTM.prev();else{Lofi.setTrack(Lofi.idx-1);showT()}};
+  $('mNext').onclick=()=>{SFX.play('musicSkip');if(src==='yt')YTM.next();else{Lofi.setTrack(Lofi.idx+1);showT()}};
+  $('mPrev').onclick=()=>{SFX.play('musicSkip');if(src==='yt')YTM.prev();else{Lofi.setTrack(Lofi.idx-1);showT()}};
   $('mLs').onclick=()=>{$('mList').classList.toggle('on')};
   ytUi=mountYtUi(YTM,{onPick:async i=>{await useSrc('yt');await YTM.playAt(i)}});
   const yb=document.createElement('button');yb.id='mYtB';yb.textContent='📺';yb.title='Nhạc YouTube & playlist';yb.onclick=()=>{ytUi.open();if(ytUi.isOpen&&src!=='yt'&&YTM.lib.pls[YTM.lib.pl].items.length)useSrc('yt')};$('mLs').after(yb);

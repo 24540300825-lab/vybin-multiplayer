@@ -14,6 +14,7 @@ import {MAP_CONFIGS} from './map-configs.js';
 import {TU,applyToon,patchLeafMask,hexV,TP,DEPTH_LEAF} from './toon.js';
 import {Perf} from './perf.js';
 import './hud.js';
+import {SFX} from './sfx.js';
 
 // API công khai cho lớp mạng (sync.js) — game không biết gì về Supabase.
 export const api={local:null,remote:null,emit:null,sendInput:null,onTick:null,envOut:null,peerChanged:null};
@@ -236,6 +237,7 @@ export function init(ctx){
     const d={node,a,peak:bt,end:c.duration,st:'closed'};doorMap.set(node,d);doorList.push(d)});
   function doorOf(o){for(let p=o;p;p=p.parent){const d=doorMap.get(p);if(d)return d}return null}
   function toggleDoor(d){
+    {const w=new THREE.Vector3();d.node.getWorldPosition(w);const L=api.local;const dist=L?Math.hypot(L.P.pos.x-w.x,L.P.pos.z-w.z):0;if(d.st==='closed')SFX.playAt('doorOpen',dist,{range:16});else if(d.st==='open')SFX.playAt('doorClose',dist,{range:16});}
     if(d.st==='closed'||d.st==='closing'&&false){d.a.reset();d.a.paused=false;d.a.play();d.st='opening'}
     else if(d.st==='open'){d.a.paused=false;d.st='closing'}
     else if(d.st==='opening'){/* đang mở: bỏ qua */}
@@ -247,12 +249,12 @@ export function init(ctx){
     Object.values(chairActs).forEach(x=>{if(x!==a)x.stop()});a.reset();a.setLoop(THREE.LoopOnce,1);a.clampWhenFinished=true;a.timeScale=1;a.play();}
 
 
-  const DEF_VY={id:'vy',K,eye:{close:'ACT_EYE_CLOSE',open:'ACT_EYE_OPEN',blink:'ACT_BLINK'},eyeMeshes:['Sphere','Sphere001'],trim:null,pos:new THREE.Vector3(2.5,0,-1.5),yaw:0.4,ctrl:'wasd'};
+  const DEF_VY={id:'vy',K,eye:{close:'ACT_EYE_CLOSE',open:'ACT_EYE_OPEN',blink:'ACT_BLINK'},eyeMeshes:['Sphere','Sphere001'],trim:null,foot:{walk:[0.255,0.76],run:[0.29,0.70]},pos:new THREE.Vector3(2.5,0,-1.5),yaw:0.4,ctrl:'wasd'};
   const KB={REST:'ACT_BIN_RESTPOSE',IDLE:'ACT_BIN_IDLE',WALK:'ACT_BIN_WALK',RUN:'ACT_BIN_RUN',
     CLIMBCHAIR_L:'ACT_BIN_CLIMB ON CHAIR_L',CLIMBCHAIR_R:'ACT_BIN_CLIMB ON CHAIR_R',OFFCHAIR_L:'ACT_BIN_OFF CHAIR_L',OFFCHAIR_R:'ACT_BIN_OFF CHAIR_R',
     CLIMBBED_L:'ACT_BIN_SLEEP_CLIMB ON BED_L',CLIMBBED_R:'ACT_BIN_SLEEP_CLIMB ON BED_R',SLEEP_L:'ACT_BIN_SLEEP-LOOP BREATHE_L',SLEEP_R:'ACT_BIN_SLEEP-LOOP BREATHE_R',
     OFFBED_L:'ACT_BIN_SLEEP_OFF BED_L',OFFBED_R:'ACT_BIN_SLEEP_OFF BED_R'};
-  const DEF_BIN={id:'bin',K:KB,eye:{close:'ACT_BIN_EYE_CLOSE',open:'ACT_BIN_EYE_OPEN',blink:'ACT_BIN_BLINK'},eyeMeshes:['Sphere002','Sphere003'],trim:null,idleBurst:true,colors:{BLACK:'#16161b',SKIN:'#f2c9b3',BLUE:'#2b37b5',ORANGE:'#f26b1d'},pos:new THREE.Vector3(4.5,0,-1.5),yaw:0.4,ctrl:'wasd'};
+  const DEF_BIN={id:'bin',K:KB,eye:{close:'ACT_BIN_EYE_CLOSE',open:'ACT_BIN_EYE_OPEN',blink:'ACT_BIN_BLINK'},eyeMeshes:['Sphere002','Sphere003'],trim:null,idleBurst:true,foot:{walk:[0.29,0.77],run:[0.20,0.68]},colors:{BLACK:'#16161b',SKIN:'#f2c9b3',BLUE:'#2b37b5',ORANGE:'#f26b1d'},pos:new THREE.Vector3(4.5,0,-1.5),yaw:0.4,ctrl:'wasd'};
   function makeChar(chrG,DEF){
   const K=DEF.K;
   let emitOff=0;const em=(t,a)=>{if(!DEF.remote&&!emitOff&&api.emit)api.emit(t,a)};
@@ -360,6 +362,20 @@ export function init(ctx){
   let restT=0,idleHeld=false;
   const toRest=(instant)=>{play('REST',{fade:instant?0:0.25});restT=0;idleHeld=false};
   // idle: Vy lặp liên tục sau 5s; Bin (idleBurst) đứng RESTPOSE rồi cứ 5–10s diễn trọn clip IDLE 1 lần (đủ 106 khung) rồi về RESTPOSE
+  // ----- âm thanh nhân vật: tiếng bước theo pha chạm đất của clip đi/chạy; remote nhỏ dần theo khoảng cách tới người chơi -----
+  const hearD=()=>{if(!DEF.remote)return 0;const L=api.local;return L?Math.hypot(L.P.pos.x-P.pos.x,L.P.pos.z-P.pos.z)+Math.abs(L.P.level-P.level)*4:99};
+  const sfxAt=(n,o)=>SFX.playAt(n,hearD(),o);
+  let footPh=0,wasType=false;
+  function sfxTick(){
+    const a=cur,run=a===acts[K.RUN];
+    if(P.mode==='free'&&!busy&&(a===acts[K.WALK]||run)&&a.getEffectiveWeight()>0.4){
+      const dur=a.getClip().duration,ph=((a.time%dur)+dur)%dur/dur,list=DEF.foot&&DEF.foot[run?'run':'walk'];
+      if(list&&Math.abs(ph-footPh)<0.6){for(const t of list)if(footPh<t&&ph>=t){const S=stairAt(P.pos.x,P.pos.z);sfxAt('step',{f:{s:S?'stair':'wood',run},range:13})}}
+      footPh=ph;}
+    else footPh=0;
+    const ty=P.mode==='type';
+    if(ty!==wasType){wasType=ty;const d=hearD();SFX.typing(DEF.id,ty,Math.max(0,1-d/12)**2)}
+  }
   let idleDone=false,nextIdleAt=5+Math.random()*5;
   mixer.addEventListener('finished',e=>{if(DEF.idleBurst&&e.action===acts[K.IDLE])idleDone=true});
   function idleTick(dt){
@@ -414,6 +430,7 @@ export function init(ctx){
     const a=play(key,{once:true,fade:0.15,restart:true});
     if(chairTag)playChair(chairTag,P.side);
     busy={kind,a,dur:a.getClip().duration,y0,y1};P.pos.y=y0;
+    sfxAt({climbBed:'bedClimb',offBed:'bedOff',climbChair:'sit',offChair:'standUp'}[kind],{range:14});
   }
   // clip off kết thúc lệch root (hông ở xa gốc) -> dời root theo đúng chỗ hông đã tới, tránh bị kéo/snap khi về REST
   function endDrift(key){const e=HIP[key]&&HIP[key].e,r=HIP.REST&&HIP.REST.s;if(!e||!r)return false;
@@ -425,9 +442,9 @@ export function init(ctx){
     if(b.kind==='climbBed'&&p>=CFG.eyeCloseAt)eyeClose();
     if(p>=0.995||(!b.a.isRunning()&&p>0.9)){
       busy=null;P.pos.y=b.y1;
-      if(b.kind==='climbBed'){P.mode='bed';if(plan[0]&&plan[0].t==='offBed'){}else{play('SLEEP_'+P.side,{fade:0.05});eyeClose();}}
+      if(b.kind==='climbBed'){P.mode='bed';if(plan[0]&&plan[0].t==='offBed'){}else{play('SLEEP_'+P.side,{fade:0.05});eyeClose();sfxAt('sleep',{range:12});}}
       else if(b.kind==='climbChair'){if(plan[0]&&plan[0].t==='offChair'){P.mode='sit'}else if(!K.SIT){P.mode='sit';}else if(plan[0]&&plan[0].t==='type'){plan.shift();P.mode='type';play('TYPE',{fade:0.05});}else{P.mode='sit';play('SIT',{fade:0.1});}}
-      else if(b.kind==='offBed'){occ['bed'+P.side]=null;const dr=endDrift('OFFBED_'+P.side);P.mode='free';P.level=1;P.stand=null;anchor=null;toRest(dr);}
+      else if(b.kind==='offBed'){sfxAt('wake',{range:12});occ['bed'+P.side]=null;const dr=endDrift('OFFBED_'+P.side);P.mode='free';P.level=1;P.stand=null;anchor=null;toRest(dr);}
       else if(b.kind==='offChair'){occ.chair=null;const dr=endDrift('OFFCHAIR_'+P.side);P.mode='free';P.level=A.chairL;P.stand=null;anchor=null;toRest(dr);}
     }
   }
@@ -591,7 +608,7 @@ export function init(ctx){
   function setNet(s){net=s}
   function dispose(){
     for(const x of ['L','R'])if(occ['bed'+x]===DEF.id)occ['bed'+x]=null;if(occ.chair===DEF.id)occ.chair=null;
-    mixer.stopAllAction();mixer.uncacheRoot(char);scene.remove(char);
+    SFX.typing(DEF.id,false);mixer.stopAllAction();mixer.uncacheRoot(char);scene.remove(char);
     const seen=new Set();char.traverse(o=>{if(o.geometry&&!seen.has(o.geometry)){seen.add(o.geometry);o.geometry.dispose()}
       const ms=Array.isArray(o.material)?o.material:o.material?[o.material]:[];ms.forEach(m=>{if(seen.has(m))return;seen.add(m);for(const k in m){const t=m[k];if(t&&t.isTexture&&!seen.has(t)){seen.add(t);t.dispose()}}m.dispose()})});
   }
@@ -601,7 +618,7 @@ export function init(ctx){
     const c=Math.cos(P.yaw),s=Math.sin(P.yaw);
     char.position.set(P.pos.x+off.x*c+off.z*s,P.pos.y+off.y,P.pos.z-off.x*s+off.z*c);
     if(cur===acts[K.WALK])cur.timeScale=CFG.walkAnim;else if(cur===acts[K.RUN])cur.timeScale=CFG.runAnim;
-    updateLayers(dt);mixer.update(dt);updateEyes(dt);blinkTick();
+    updateLayers(dt);mixer.update(dt);updateEyes(dt);blinkTick();sfxTick();
   }
   play('REST',{fade:0});
   return{id:DEF.id,DEF,char,P,K,acts,runMode,logic,finish,setNet,dispose,cmdMove,cmdSleep,cmdSit,cmdWake,cmdOffChair,blink:()=>{em('blink');blink(clock)},
@@ -1123,6 +1140,7 @@ export function init(ctx){
   let flash=0,flashT=5,tgtW=WEATHER.clear;
   const sunLight=window.__L.sun,hemiL=window.__L.hemi,ambL=window.__L.amb;
   const _tc=new THREE.Vector3(5,1.5,-4);
+  let sfxW=null,sfxAmbT=0;
   function envApply(dt){
     const t=TP.time;const k=keyAt(t);
     tgtW=WEATHER[TP.weather]||WEATHER.clear;
@@ -1162,6 +1180,9 @@ export function init(ctx){
     rainU.uAmt.value=Math.min(1,WC.rain);rainU.uInt.value=Math.max(0.4,WC.int);ripM.uniforms.uAmt.value=Math.min(1,WC.rain);rain.visible=WC.rain>0.03;ripples.visible=rain.visible;rainU.uCol.value.setRGB(0.55+0.4*k.day,0.62+0.35*k.day,0.78+0.2*k.day);snowU.uAmt.value=Math.min(1,WC.snow);snow.visible=WC.snow>0.03;
     garden.visible=!!TP.garden;if(gardenAnim.lamp)gardenAnim.lamp.emissiveIntensity=0.25+2.4*Math.max(k.lamp,WC.dim<0.5?0.3:0);TU.uWindA.value=WC.wind;TU.uWet.value=WC.wet;TU.uCloudSh.value=WC.cs*(0.2+0.8*k.day);rainU.uWind.value=WC.wind;
     if(RA.g)RA.g.gain.value=Math.min(1,WC.rain)*0.1*(0.4+0.35*WC.int);
+    // âm môi trường (gió, chim ban ngày, dế ban đêm) + tiếng báo khi thời tiết đổi
+    if(TP.weather!==sfxW){if(sfxW!=null&&dt>0)SFX.play('weather');sfxW=TP.weather}
+    sfxAmbT-=dt;if(sfxAmbT<=0){sfxAmbT=0.3;SFX.ambience({wind:WC.wind,rain:WC.rain,snow:WC.snow>0.3,fog:TP.weather==='fog',day:t>6.3&&t<18.2,night:t>19.5||t<5,clear:WC.cov>0.45})}
   }
   window.__envApply=envApply;
   function envStep(dt){
