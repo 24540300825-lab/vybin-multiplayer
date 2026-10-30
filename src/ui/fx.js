@@ -17,27 +17,49 @@ const can = el => mode === 'high' && el && el.animate;
 const live = new Set();      // các animation do fx tạo ra — chuyển sang chế độ Nhẹ thì huỷ ngay, không để chạy nốt
 const run = (el, kf, opt) => { const a = el.animate(kf, opt); live.add(a); const done = () => live.delete(a); a.addEventListener('finish', done); a.addEventListener('cancel', done); return a; };
 
-// chữ vừa đổi → trượt nhẹ + hiện dần (chỉ phần "vào"; phần "ra" bị thay ngay nên không cần)
+// chữ vừa đổi: chữ cũ trượt LÊN rồi mờ đi, chữ mới trượt từ DƯỚI lên (rõ ràng, nhưng chỉ transform + opacity).
+// Chỉ chạy khi NỘI DUNG thật sự khác lần trước — nếu game ghi lại đúng chữ cũ (như đồng hồ cập nhật mỗi nhịp) thì bỏ qua, không giật.
 function textIn(el) {
-  if (!can(el)) return;
+  const now = el.textContent;
+  if (el.__fxT === undefined) { el.__fxT = now; return; }
+  const was = el.__fxT; el.__fxT = now;
+  if (!can(el) || was === now || !was) return;
+  const host = el.offsetParent;
+  if (host && el.offsetWidth) {
+    const g = el.cloneNode(false); g.removeAttribute('id'); g.textContent = was; g.setAttribute('aria-hidden', 'true');
+    g.style.cssText += ';position:absolute;margin:0;pointer-events:none;left:' + el.offsetLeft + 'px;top:' + el.offsetTop + 'px;width:' + el.offsetWidth + 'px;height:' + el.offsetHeight + 'px';
+    host.appendChild(g);
+    const a = run(g, [{opacity: 1, transform: 'none'}, {opacity: 0, transform: 'translateY(-.9em)'}], {duration: 260, easing: 'cubic-bezier(.4,0,.8,.4)', fill: 'forwards'});
+    a.addEventListener('finish', () => g.remove()); a.addEventListener('cancel', () => g.remove());
+  }
   el.getAnimations().forEach(a => a.cancel());
-  run(el, [{opacity: 0, transform: 'translateY(.375em)'}, {opacity: 1, transform: 'none'}], {duration: 220, easing: ease});
+  run(el, [{opacity: 0, transform: 'translateY(.9em)'}, {opacity: 1, transform: 'none'}], {duration: 380, easing: 'cubic-bezier(.2,.9,.3,1.25)'});
 }
-// biểu tượng vừa đổi (phát ↔ tạm dừng, mic bật ↔ tắt…) → "bật" ra từ nhỏ + xoay nhẹ
+// biểu tượng vừa đổi (phát ↔ tạm dừng, mic bật ↔ tắt…) → "bật" nảy ra (thu nhỏ → phóng to → về cỡ thật). KHÔNG xoay.
+// Chỉ chạy khi biểu tượng thật sự khác lần trước (game vẽ lại cùng một biểu tượng thì bỏ qua).
 function iconIn(el) {
-  const s = el && el.firstElementChild; if (!can(s)) return;
-  run(s, [{opacity: 0, transform: 'scale(.55) rotate(-40deg)'}, {opacity: 1, transform: 'none'}], {duration: 240, easing: 'cubic-bezier(.34,1.56,.64,1)'});
+  const sig = el.innerHTML;
+  if (el.__fxI === undefined) { el.__fxI = sig; return; }
+  if (el.__fxI === sig) return;
+  el.__fxI = sig;
+  const s = el.firstElementChild; if (!can(s)) return;
+  run(s, [{opacity: 0, transform: 'scale(.3)'}, {opacity: 1, transform: 'scale(1.3)', offset: .55}, {opacity: 1, transform: 'none'}], {duration: 420, easing: 'cubic-bezier(.3,.7,.3,1)'});
 }
-// ảnh vừa đổi (avatar đối phương online ↔ offline) → mờ vào + phóng nhẹ
+// ảnh vừa đổi (avatar đối phương online ↔ offline) → mờ vào + phóng từ nhỏ, có chớp sáng. Chỉ chạy khi nguồn ảnh thật sự đổi.
 function imgIn(img) {
+  const src = img.getAttribute('src');
+  if (img.__fxS === undefined) { img.__fxS = src; return; }
+  if (img.__fxS === src) return;
+  img.__fxS = src;
   if (!can(img)) return;
-  const go = () => run(img, [{opacity: .15, transform: 'scale(.88)'}, {opacity: 1, transform: 'none'}], {duration: 300, easing: ease});
+  const go = () => run(img, [{opacity: .1, transform: 'scale(.7)', filter: 'brightness(1.6)'}, {opacity: 1, transform: 'scale(1.06)', filter: 'brightness(1.15)', offset: .6}, {opacity: 1, transform: 'none', filter: 'none'}], {duration: 520, easing: ease});
   if (img.complete) go(); else img.addEventListener('load', go, {once: true});
 }
 
 const WATCH = [
-  ['#mTt', textIn], ['#mSt', textIn], ['#peSt', textIn], ['#peNm', textIn], ['#cWt', textIn], ['#cDw', textIn], ['#cDd', textIn], ['#cT', textIn], ['#pNm', textIn], ['#pLv', textIn],
-  ['#mPlay', iconIn], ['#cW', iconIn], ['#iVoice', iconIn],
+  // KHÔNG có đồng hồ (#cT, #cDw, #cDd, #cWt, #cW): giờ cập nhật liên tục, animate sẽ giật
+  ['#mTt', textIn], ['#mSt', textIn], ['#peSt', textIn], ['#peNm', textIn], ['#pNm', textIn], ['#pLv', textIn],
+  ['#mPlay', iconIn], ['#iVoice', iconIn],
   ['#peAv', imgIn], ['#pAv', imgIn],
 ];
 function watch() {
@@ -45,6 +67,7 @@ function watch() {
   for (const [sel, fn] of WATCH) {
     const el = document.querySelector(sel); if (!el) continue;
     const isImg = el.tagName === 'IMG';
+    el.__fxT = el.textContent; el.__fxI = el.innerHTML; el.__fxS = el.getAttribute('src');   // mốc so sánh: chỉ animate khi nội dung thật sự khác
     let busy = false;
     const mo = new MutationObserver(() => { if (busy) return; busy = true; requestAnimationFrame(() => { busy = false; fn(el); }); });
     mo.observe(el, isImg ? {attributes: true, attributeFilter: ['src']} : {childList: true, characterData: true, subtree: true});

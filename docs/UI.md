@@ -53,6 +53,18 @@ Cuối `ui.css`, mục "CHUYỂN ĐỘNG": mọi chuyển ≤ .22s, đường co
 - `html[data-fx=high]` — **Đồ họa cao (Smart Animate)**: chuyển *trạng thái → trạng thái* có chuyển động: chữ đổi (tên bài, trạng thái, giờ…) trượt+mờ vào, biểu tượng (phát↔tạm dừng, mic…) "bật" ra, avatar đối phương mờ dần khi online↔offline, thẻ hồ sơ thu/mở (avatar co giãn, chỉ số cuộn lại, thẻ đối phương trượt theo), panel/hộp thoại bung ra có độ nảy, thông báo nhanh trượt lên, danh sách hiện lần lượt, vòng sóng quanh avatar khi đang nói chuyện.
 - Chọn ở `localStorage 'vyFx'` (`lite|high`); `src/ui/fx.js` đặt thuộc tính và gắn các bộ quan sát đổi nội dung (WATCH). Thêm phần tử cần animate chữ/icon/ảnh: thêm 1 dòng vào `WATCH`. Quy tắc cũ vẫn giữ: chỉ animate `transform`/`opacity` (trừ vài chỗ thu/mở thẻ hiếm khi xảy ra).
 
+## Nút tương tác ghim 3D (`src/ui/pins.js`)
+Pin giọt nước 63×76 (Figma): vòng trắng, đĩa cam nhạt `#ffe3a8`→`#ffd581`, icon nâu `#914a14`. Mỗi khung hình chiếu toạ độ 3D của vật thể (ghế = `A.seatC`, giường = `Bed`, TV = `TV_Screen`, cửa/thảm = `Doormat`) ra màn hình → nút luôn dính đúng chỗ khi camera xoay/nhân vật đi (không méo, kích thước cố định). Bấm: ghế → `cmdSit` (đi tới rồi ngồi), giường → `cmdSleep`, TV → đi tới đứng trước TV (anim xem TV làm sau), cửa → mở danh sách bản đồ. Trạng thái: hover (phồng 1.16 + sáng + hiện nhãn), bấm (lún .9 + gợn sóng), đang ngồi/ngủ (đĩa nâu, icon trắng, nhãn "Đứng dậy"/"Thức dậy"). Chế độ Cao: lơ lửng nhẹ + bật ra khi hiện; chế độ Nhẹ: tĩnh.
+Thêm nút mới: thêm 1 mục `{key,icon,label,at:()=>Vector3,act}` vào mảng `items` trong `game.js` (khối "nút tương tác ghim 3D") và 1 icon vào `ICON` của `pins.js`.
+
+## Thẻ Bin / nhạc / đồng hồ (số đo Figma mới)
+- Thẻ Bin: avatar 128 (đè 84 lên thẻ), tên "Bin" Audex 32 + "Lv.12" 16, **3 thanh có nhãn HP / STA / HAP** (nhãn 44 | thanh 229×12 | cách 64 | số 20 bold; hàng cao 27). Thanh "Tập trung" vẫn tính trong game nhưng ẩn (`hidden`).
+- Nhạc: capsule 537×90, đĩa trắng 64 (`assets/ui/album.v2.png`, **đứng yên**, không xoay), tên 24 Audex, phụ đề 16 `#c3c1c1`, prev/pause/next cách 36.
+- Đồng hồ: 430×126, giờ 64 Audex, vạch 3×76, thứ/ngày 20 bold (dòng 27), chip thời tiết 139×33 (nền đen .46, viền trắng 1, icon 32). **Không animation** (giờ cập nhật liên tục).
+
+## Đèn trong nhà
+`game.js` đọc vị trí các bóng đèn thả (`Pendant_*Bulb`), đèn sàn/bàn/đầu giường (tối đa 10) → uniform `uLP` (xyz + bán kính). Shader toon cộng "vũng sáng" ấm quanh mỗi đèn và hạ nhẹ độ sáng nền trong nhà ở xa đèn (`uLK`: 0.7 ban ngày → 1.2 ban đêm) để có sáng–tối thay vì phẳng.
+
 ## Màn loading
 - Nền: `assets/ui/loading.v1.webp` (1920×1080, ~130 KB; đổi ảnh → đổi tên file `.v2` vì /assets cache 1 năm). Ảnh hiện dần khi tải xong, zoom nhẹ 1.04→1.
 - Thẻ tiến độ góc phải dưới (`#lui`, lề phải 96 / dưới 64 như đồng hồ; màn gọn: 16): tên, %, thanh, dòng trạng thái. `LB(p,msg)` trong `src/main.js` cập nhật.

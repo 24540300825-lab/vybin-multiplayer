@@ -15,6 +15,7 @@ import {TU,applyToon,patchLeafMask,hexV,TP,DEPTH_LEAF} from './toon.js';
 import {Perf} from './perf.js';
 import './hud.js';
 import {SFX} from './sfx.js';
+import {initPins} from './ui/pins.js';
 
 // API công khai cho lớp mạng (sync.js) — game không biết gì về Supabase.
 export const api={local:null,remote:null,emit:null,sendInput:null,onTick:null,envOut:null,peerChanged:null};
@@ -70,7 +71,7 @@ export function init(ctx){
            _p=instanceMatrix*_p;
           #endif
           vWP=(modelMatrix*_p).xyz;}`);
-        sh.fragmentShader=(FOL?'#define FOLIAGE\n':'')+(GRD?'#define GROUNDX\n':'')+'uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <opaque_fragment>',`
+        sh.fragmentShader=(FOL?'#define FOLIAGE\n':'')+(GRD?'#define GROUNDX\n':'')+'uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <opaque_fragment>',`
         {float I=1.0,Ih=1.0,vis=1.0,Ig=0.0;
          #ifdef FOLIAGE
          {float lm=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));vec3 lf=mix(uLeafA,uLeafB,smoothstep(0.03,0.4,lm));
@@ -108,6 +109,10 @@ export function init(ctx){
          float rim=pow(1.0-clamp(dot(geometryNormal,geometryViewDir),0.0,1.0),uRimPow)*uRim;
          col+=uRimCol*uSunC*rim*(0.35+0.65*I);
          col+=diffuseColor.rgb*uLampC*inH*(0.2+0.35*I);
+         {float lp=0.0;for(int li=0;li<10;li++){if(float(li)>=uLN)break;vec3 ld=uLP[li].xyz-vWP;float q=clamp(1.0-dot(ld,ld)/(uLP[li].w*uLP[li].w),0.0,1.0);lp+=q*q;}
+          lp=min(lp,1.4);
+          col*=1.0-0.15*uLK*inH*(1.0-min(lp,1.0));
+          col+=diffuseColor.rgb*vec3(1.0,0.8,0.52)*lp*uLK*0.85;}
          outgoingLight=col+totalEmissiveRadiance;}
         #include <opaque_fragment>`)};
       m.customProgramCacheKey=()=>'vytoon8'+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;});});}
@@ -149,6 +154,16 @@ export function init(ctx){
     return lv?A.L1:A.L0};
   A.stairs=stairs;
   const pickStair=(x0,z0,x1,z1,up)=>{let best=stairs[0],bd=1e9;for(const S of stairs){const a=up?S.botZ:S.topZ,b=up?S.topZ:S.botZ,d=Math.hypot(x0-S.cx,z0-a)+Math.hypot(S.cx-x1,b-z1);if(d<bd){bd=d;best=S}}return best};
+  // ===== đèn trong nhà → các "vũng sáng" cục bộ (đèn thả bếp, đèn sàn, đèn bàn…): gần đèn sáng ấm, xa đèn tối dần =====
+  const LAMPS=[];
+  {env.updateMatrixWorld(true);const pend=[],other=[];
+   env.traverse(o=>{const n=o.name||'';
+     if(/^Pendant_(?:[A-Za-z0-9]+_)?Bulb(?:\.?\d+)?$/.test(n))pend.push(o);
+     else if(/^(FloorLamp_Shade|SideLamp_Shade|BedsideLamp_Shade(?:\.?\d+)?|Bedside_Lamp_Shade|DeskLamp_Head)$/.test(n))other.push(o)});
+   const add=(o,r)=>{const b=new THREE.Box3().setFromObject(o);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3());LAMPS.push(new THREE.Vector4(c.x,c.y-0.05,c.z,r))};
+   pend.forEach(o=>add(o,2.4));other.forEach(o=>add(o,/Floor|Side/.test(o.name)?2.0:1.3));
+   LAMPS.length=Math.min(LAMPS.length,10);
+   LAMPS.forEach((v,i)=>TU.uLP.value[i].copy(v));TU.uLN.value=LAMPS.length;window.__LAMPS=LAMPS}
   const seat=box(MC.seat);A.seatC=seat.getCenter(new THREE.Vector3());A.seatTop=seat.max.y;
   A.chairL=A.seatC.y>(A.L0+A.L1)/2?1:0;A.CY=[A.L0,A.L1][A.chairL];
   const CHAIR=Object.values(byName).find(o=>MC.chair.test(o.name)&&!o.isMesh)||byName['Desk_Chair'];
@@ -737,6 +752,23 @@ export function init(ctx){
   $('bSleep').onclick=cmdSleep;$('bWake').onclick=cmdWake;
   $('bSit').onclick=()=>cmdSit();$('bType').onclick=()=>{if(P.mode==='type')cmdSit('sit');else cmdSit('type')};
   $('bOff').onclick=cmdOffChair;$('bBlink').onclick=()=>local.blink();
+  let pinsUpd=null;
+  // ===== nút tương tác ghim 3D: ghế / giường / TV / cửa (src/ui/pins.js; thông số Figma trong docs/UI.md) =====
+  {const ctr=n=>{const o=byName[n];if(!o)return null;env.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(o);return b.isEmpty()?null:b};
+   const mid=(b,dy)=>b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+dy,(b.min.z+b.max.z)/2):null;
+   const sofaB=ctr('Sofa'),bedB=ctr('Bed'),tvB=ctr('TV_Screen')||ctr('TV_Panel'),doorB=ctr('Doormat')||ctr('Landing_Doormat')||ctr('Door_Entrance_Leaf')||ctr('GD_Door_Entrance_Leaf');
+   const chairPt=A.seatC?new THREE.Vector3(A.seatC.x,A.seatTop+0.62,A.seatC.z):null;
+   const bedPt=mid(bedB,0.25),tvPt=mid(tvB,0.35);
+   const doorPt=doorB?new THREE.Vector3((doorB.min.x+doorB.max.x)/2,doorB.max.y+(doorB.max.y-doorB.min.y>0.5?-0.8:0.15),(doorB.min.z+doorB.max.z)/2):null;
+   // TV: đi tới đứng trước TV (hướng về phía sofa/giữa phòng). Anim xem TV sẽ làm sau.
+   const tvStand=()=>{if(!tvB)return null;const c=tvB.getCenter(new THREE.Vector3()),to=sofaB?sofaB.getCenter(new THREE.Vector3()):new THREE.Vector3(5,0,-3.5);
+     const dx=to.x-c.x,dz=to.z-c.z,d=Math.hypot(dx,dz)||1;return{x:c.x+dx/d*Math.min(1.6,d*0.6),z:c.z+dz/d*Math.min(1.6,d*0.6),lv:c.y>2?1:0}};
+   const P0=local.P,items=[
+    {key:'tv',icon:'tv',label:'Xem TV',at:()=>tvPt,act:()=>{const s=tvStand();if(s)cmdMove(s.x,s.z,s.lv,false)}},
+    {key:'chair',icon:'chair',label:'Ngồi',at:()=>chairPt,state:()=>P0.mode==='sit'||P0.mode==='type'?{on:true,label:'Đứng dậy'}:null,act:()=>{if(P0.mode==='sit'||P0.mode==='type')cmdOffChair();else cmdSit()}},
+    {key:'bed',icon:'sleep',label:'Ngủ',at:()=>bedPt,state:()=>P0.mode==='bed'?{on:true,label:'Thức dậy'}:null,act:()=>{if(P0.mode==='bed')cmdWake();else cmdSleep()}},
+    {key:'door',icon:'door',label:'Bản đồ',at:()=>doorPt,act:()=>{const b=$('iMap');if(b)b.click()}}];
+   const pn=initPins({camera,items:items.filter(i=>i.at())});pinsUpd=pn.update;api.pins=pn;}
   // phím tắt (src/ui/shortcuts.js) → cùng các lệnh với nút ẩn ở trên
   {const ACT={walk:'bWalk',run:'bRun',sit:'bSit',type:'bType',off:'bOff',sleep:'bSleep',wake:'bWake'};addEventListener('vy:act',e=>{const b=ACT[e.detail];if(b)$(b).click()})}
   document.querySelectorAll('input[data-k]').forEach(el=>{const k=el.dataset.k;el.max=Math.max(+el.max,k==='run'?10:k==='walk'?6:3);el.value=CFG[k];$('v'+k).textContent=el.value;el.oninput=()=>{CFG[k]=+el.value;$('v'+k).textContent=el.value;try{localStorage.setItem('vyCfg',JSON.stringify({v:3,walk:CFG.walk,run:CFG.run,walkAnim:CFG.walkAnim,runAnim:CFG.runAnim}))}catch(e){}}});
@@ -1224,7 +1256,7 @@ export function init(ctx){
     const des=c=>c.clone().lerp(grayOf(c),WC.des);
     const sunC=des(k.sun),aS=des(k.ambS),aG=des(k.ambG);const sI=Math.min(1.15,(0.35+0.65*k.sunI)*(0.4+0.6*WC.dim)*Math.max(fade,0.2))*(1+flash*1.2),aI=0.95+flash*0.5;
     const raw=(c,v)=>{const w=c.clone().convertLinearToSRGB();v.value.set(w.r,w.g,w.b)};raw(sunC,TU.uSunC);TU.uSunC.value.multiplyScalar(sI);raw(aS,TU.uAmbS);TU.uAmbS.value.multiplyScalar(aI);raw(aG,TU.uAmbG);TU.uAmbG.value.multiplyScalar(aI);
-    const lamp=Math.max(k.lamp,WC.dim<0.5?0.3:0)*0.95;TU.uLampC.value.set(1.0*lamp,0.62*lamp,0.3*lamp);
+    const lamp=Math.max(k.lamp,WC.dim<0.5?0.3:0)*0.95;TU.uLampC.value.set(1.0*lamp,0.62*lamp,0.3*lamp);TU.uLK.value=0.7+0.5*Math.min(1,Math.max(k.lamp,WC.dim<0.5?0.3:0));
     // sky
     skyU.cTop.value.copy(des(k.top));skyU.cMid.value.copy(des(k.mid));skyU.cPink.value.copy(des(k.pink));skyU.cHor.value.copy(des(k.hor));
     const dayB=0.25+0.75*k.day;skyU.cCl.value.copy(des(k.hor).lerp(new THREE.Color('#ffffff'),0.45*k.day)).multiplyScalar(dayB*(1-0.25*WC.des));
@@ -1305,7 +1337,7 @@ export function init(ctx){
           else{TP.post=false;try{localStorage.setItem('vyPostLvl','2')}catch(e){}toast('Post-fx lỗi: đã tắt tự động (giữ nguyên toon + ánh sáng)');}}}}
       else renderer.render(scene,camera);
       if(window.__shot){const f=window.__shot;window.__shot=null;f()}
-      adaptRes(rawDt);}
+      adaptRes(rawDt);if(pinsUpd)pinsUpd();}
   }
   function loop(){requestAnimationFrame(loop);rawDt=R.getDelta();Perf.frame(rawDt*1000);
     // BẮT KỊP THỜI GIAN THẬT: máy yếu/khung hình tụt <20fps trước đây bị ép dt<=0.05s => thế giới chạy CHẬM so với đồng hồ thật, trong khi máy kia vẫn chạy đúng tốc độ

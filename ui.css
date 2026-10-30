@@ -64,16 +64,18 @@ button{font-family:inherit}
 .pcard{position:relative;display:flex;align-items:center}
 .pcard .av{position:relative;z-index:2;flex:none;width:8rem;height:8rem;border-radius:50%}
 .pcard .av img{display:block;width:100%;height:100%;border-radius:50%;pointer-events:none}
-#hProf .pbody{margin-left:-5.25rem;min-width:33rem;box-sizing:border-box;padding:.5rem 3rem .5rem 6.75rem;border-radius:2rem;display:flex;flex-direction:column;gap:0}
-#hProf .hd{display:flex;align-items:baseline;gap:.5rem;height:1.5rem;position:relative}
-#hProf .nm{font:400 1.25rem/1.2 var(--f-d)}
-#hProf .lv{font:700 var(--t0)/1 var(--f-b);color:var(--ink3)}
-#hProf .tg{position:absolute;right:-2rem;top:-.5rem;width:2rem;height:2rem;font-size:1rem}
+#hProf .pbody{margin-left:-5.25rem;min-width:32.8125rem;box-sizing:border-box;padding:.7rem 3.875rem .7rem 6.75rem;border-radius:2rem;display:flex;flex-direction:column;gap:0}
+#hProf .hd{display:flex;align-items:baseline;gap:.5rem;height:2.3125rem;position:relative}
+#hProf .nm{font:400 2rem/1.157 var(--f-d)}
+#hProf .lv{font:700 1rem/1 var(--f-b);color:var(--ink3)}
+#hProf .tg{position:absolute;right:-3rem;top:-.25rem;width:2rem;height:2rem;font-size:1rem}
 #hProf .stats{display:flex;flex-direction:column}
-.stat{display:flex;align-items:center;gap:2rem;height:1.5rem}
-.stat .trk{flex:1;min-width:0;height:.75rem;border-radius:.375rem;background:var(--track);overflow:hidden}
+.stat{display:grid;grid-template-columns:2.75rem 14.3125rem 1fr;align-items:center;height:1.6875rem}   /* Figma BAR: nhãn 44 | thanh 229×12 | cách 64 | số 20 bold */
+.stat[hidden]{display:none}
+.stat .lb{font:900 1rem/1 var(--f-b)}
+.stat .trk{height:.75rem;border-radius:.375rem;background:var(--track);overflow:hidden}
 .stat .trk i{display:block;height:100%;width:50%;border-radius:.75rem 0 0 .75rem/.375rem 0 0 .375rem;transition:width .3s var(--ease,ease)}   /* đầu trái thon như Figma */
-.stat b{flex:none;width:2.5rem;text-align:right;font:700 1.25rem/1.5rem var(--f-b);font-variant-numeric:tabular-nums}
+.stat b{margin-left:4rem;white-space:nowrap;text-align:left;font:700 1.25rem/1.6875rem var(--f-b);font-variant-numeric:tabular-nums}
 #bHp{background:var(--red)}#bSt{background:var(--orange)}#bMo{background:var(--green)}#bFo{background:var(--blue)}   /* 3 màu Figma + xanh dương cho "Tập trung" */
 /* thu gọn: chỉ còn avatar nhỏ + tên */
 #hProf.min .av{width:4rem;height:4rem}
@@ -223,13 +225,13 @@ button{font-family:inherit}
 .yI .t small{opacity:.6;margin-left:.5rem}
 
 /* ---------- đồng hồ (Figma: capsule 430×126, giờ Audex 64) ---------- */
-#hClock{display:flex;align-items:center;gap:1.25rem;box-sizing:border-box;height:8rem;padding:1.25rem 2.5rem;border-radius:2rem}
+#hClock{display:flex;align-items:center;gap:1.1875rem;box-sizing:border-box;height:7.875rem;padding:1.25rem 2.625rem;border-radius:2rem}
 #hClock .t{font:400 4rem/1.15 var(--f-d);font-variant-numeric:tabular-nums;white-space:nowrap}
 #hClock .vr{flex:none;width:.1875rem;height:4.75rem;border-radius:.125rem;background:#fff}
-#hClock .dt{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;font:700 1.25rem/1.75rem var(--f-b);white-space:nowrap}
-#hClock .wx{display:inline-flex;align-items:center;gap:.5rem;height:2rem;box-sizing:border-box;padding:0 .75rem;margin-top:0;border:1px solid #fff;border-radius:2rem;background:var(--chipbg);font:700 var(--t1)/1 var(--f-b)}
-#hClock .wx .ic{font-size:1.25rem}
-#hClock .wx #cW[data-w=w_overcast]{font-size:2rem;margin:-.25rem 0}
+#hClock .dt{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;font:700 1.25rem/1.6875rem var(--f-b);white-space:nowrap}
+#hClock .wx{display:inline-flex;align-items:center;gap:.5rem;height:2.0625rem;box-sizing:border-box;padding:0 .5625rem 0 .625rem;margin-top:0;border:1px solid #fff;border-radius:2rem;background:var(--chipbg);font:700 var(--t1)/1 var(--f-b)}
+#hClock .wx .ic{font-size:2rem;width:2rem;height:2rem;display:grid;place-items:center}
+
 
 /* ---------- toast ---------- */
 #toast{position:fixed;left:50%;bottom:4rem;transform:translateX(-50%);z-index:12;max-width:min(36rem,calc(100vw - 2rem));box-sizing:border-box;padding:.75rem 1.5rem;border-radius:2rem;background:var(--panel);border:1px solid var(--line);-webkit-backdrop-filter:blur(.75rem);backdrop-filter:blur(.75rem);text-align:center;opacity:0;transition:opacity .25s;pointer-events:none}
@@ -557,3 +559,41 @@ html[data-fx=high] #load.black #lui{transform:translateY(.75rem) scale(.97)}
   #hChat{width:calc(100vw - 2rem)}
   #hCall:not(.full){top:auto;bottom:9rem;left:1rem;width:min(var(--callW,240px),calc(100vw - 2rem))}
 }
+
+/* ---------- nút tương tác ghim 3D (Figma: pin 63×76 — vòng trắng, đĩa cam nhạt, icon nâu #914a14) ---------- */
+#pins{position:fixed;inset:0;z-index:5;pointer-events:none}
+.pin{position:absolute;left:0;top:0;width:3.9375rem;height:4.75rem;margin:-4.75rem 0 0 -1.96875rem;padding:0;border:0;background:none;cursor:pointer;pointer-events:auto;font:700 var(--t1)/1.2 var(--f-b);color:#fff;
+  --ps:#914a14;--pf:#e9b96b;opacity:1;transition:opacity .18s ease;-webkit-tap-highlight-color:transparent}
+.pin.off{opacity:0;pointer-events:none}
+.pin .pw,.pin .pb{position:absolute;inset:0;display:block}
+.pin .pb{transform-origin:50% 100%;transition:transform .16s cubic-bezier(.2,.9,.3,1.2)}
+.pin .pc{position:absolute;left:0;top:0;width:3.9375rem;height:3.9375rem;box-sizing:border-box;padding:.6875rem;border-radius:50%;border:.1875rem solid #fff;
+  background:radial-gradient(circle at 50% 38%,#fff4dc 0,#ffe3a8 60%,#ffd581 100%);
+  box-shadow:0 0 0 .25rem rgba(255,255,255,.38),inset 0 0 0 .25rem rgba(255,255,255,.5),0 .25rem .75rem rgba(90,45,0,.3)}
+.pin .pc svg{display:block;fill:var(--pf);stroke:var(--ps);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.pin .pt{position:absolute;left:50%;bottom:.0625rem;width:1.125rem;height:.9rem;margin-left:-.5625rem;background:#fff;clip-path:polygon(0 0,100% 0,50% 100%)}
+.pin .pr{position:absolute;left:0;top:0;width:3.9375rem;height:3.9375rem;border-radius:50%;box-shadow:0 0 0 .1875rem #fff;opacity:0;pointer-events:none}
+.pin .pl{position:absolute;left:calc(100% + .5rem);top:.875rem;white-space:nowrap;padding:.375rem .875rem;border-radius:999px;background:rgba(40,24,10,.72);text-shadow:0 .0625rem .125rem rgba(0,0,0,.4);opacity:0;transform:translateX(-.375rem);transition:opacity .14s ease,transform .18s ease;pointer-events:none}
+/* hover: phồng lên, vòng sáng cam đậm hơn, hiện nhãn */
+.pin:hover .pb,.pin:focus-visible .pb{transform:scale(1.16)}
+.pin:hover .pc,.pin:focus-visible .pc{box-shadow:0 0 0 .375rem rgba(255,255,255,.55),inset 0 0 0 .25rem rgba(255,255,255,.7),0 0 1.25rem rgba(255,176,60,.9),0 .25rem .75rem rgba(90,45,0,.3)}
+.pin:hover .pl,.pin:focus-visible .pl{opacity:1;transform:none}
+/* bấm xuống: lún nhẹ */
+.pin:active .pb{transform:scale(.9);transition-duration:.06s}
+/* đã chọn / đang làm (đang ngồi, đang ngủ): đĩa nâu, icon trắng — bấm lần nữa để đứng dậy / thức dậy */
+.pin.on{--ps:#fff;--pf:rgba(255,255,255,.28)}
+.pin.on .pc{background:radial-gradient(circle at 50% 38%,#c0752f 0,#a55e1f 60%,#914a14 100%)}
+.pin.on .pt{background:#fff}
+/* gợn sóng khi vừa bấm */
+.pin.pop .pr{animation:pinPing .55s ease-out}
+@keyframes pinPing{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.9)}}
+@keyframes pinBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-.3125rem)}}
+@keyframes pinIn{0%{transform:scale(.4) translateY(.75rem)}60%{transform:scale(1.12)}100%{transform:none}}
+/* Nhẹ: không nhấp nhô, không gợn sóng — vẫn đổi trạng thái tức thì */
+html[data-fx=lite] .pin,html[data-fx=lite] .pin .pb,html[data-fx=lite] .pin .pl{transition:none!important}
+html[data-fx=lite] .pin.pop .pr{animation:none}
+/* Đồ họa cao: lơ lửng nhẹ + bật ra khi hiện */
+html[data-fx=high] .pin:not(.off) .pw{animation:pinBob 2.6s ease-in-out var(--pd,0s) infinite}
+html[data-fx=high] .pin:not(.off) .pc{animation:pinIn .45s cubic-bezier(.3,1.4,.5,1) both}
+html[data-fx=high] .pin:hover .pw,html[data-fx=high] .pin:focus-visible .pw{animation-play-state:paused}
+@media(hover:none){.pin .pl{display:none}}
