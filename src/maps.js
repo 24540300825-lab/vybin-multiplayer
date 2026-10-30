@@ -22,6 +22,7 @@ export function prefetchMap(id) {
 export function goToMap(id, {fade = true} = {}) {
   try { SFX.play('whoosh'); } catch (e) {}
   try { localStorage.setItem('vyMap', id); } catch (e) {}
+  if (fade) { try { sessionStorage.setItem('vyFade', '1'); } catch (e) {} }   // trang mới bắt đầu từ đen rồi hiện dần ra ảnh loading
   const fd = document.getElementById('fade');
   if (fade && fd) fd.classList.add('on');
   setTimeout(() => { location.hash = 'map=' + id; location.reload(); }, fade ? 620 : 0);

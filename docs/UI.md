@@ -48,3 +48,9 @@ Hồ sơ (mũi tên trên thẻ Bin), thanh hành động (mũi tên bên phải
 
 ## Chuyển động
 Cuối `ui.css`, mục "CHUYỂN ĐỘNG": mọi chuyển ≤ .22s, đường cong `--ease`. Nút: sáng/mờ + toả sáng (glow) khi rê, co nhẹ khi bấm. Panel / hộp thoại: mờ + trượt nhẹ khi mở và khi đóng (`@starting-style` + `display allow-discrete`; trình duyệt cũ thì bật/tắt ngay). Tôn trọng `prefers-reduced-motion`.
+
+## Màn loading
+- Nền: `assets/ui/loading.v1.webp` (1920×1080, ~130 KB; đổi ảnh → đổi tên file `.v2` vì /assets cache 1 năm). Ảnh hiện dần khi tải xong, zoom nhẹ 1.04→1.
+- Thẻ tiến độ góc phải dưới (`#lui`, lề phải 96 / dưới 64 như đồng hồ; màn gọn: 16): tên, %, thanh, dòng trạng thái. `LB(p,msg)` trong `src/main.js` cập nhật.
+- Vào game: ảnh tối dần về đen (.5s, class `black`) → đen mờ dần để lộ game (.6s, class `out`). Màn lỗi/cổng dùng `hide()` (mờ ngay).
+- Đổi map: `goToMap` fade đen → reload; cờ `sessionStorage.vyFade` làm trang mới bắt đầu từ đen rồi hiện dần ra ảnh loading.

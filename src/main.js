@@ -7,7 +7,7 @@ import {SFX} from './sfx.js';
 window.SFX = SFX; SFX.init();
 
 const $ = id => document.getElementById(id);
-const LB = (p, t) => { const b = $('lb'); if (b) b.style.width = Math.round(p) + '%'; if (t) $('lmsg').textContent = t; };
+const LB = (p, t) => { const b = $('lb'); if (b) b.style.width = Math.round(p) + '%'; const n = $('lpct'); if (n) n.textContent = Math.round(p) + '%'; if (t) $('lmsg').textContent = t; };
 const fail = e => { console.error(e); $('lmsg').textContent = 'LỖI: ' + (e && e.message || e); $('lmsg').style.color = '#ff8080'; };
 addEventListener('unhandledrejection', e => console.error('[unhandled]', e.reason));
 
@@ -15,7 +15,9 @@ async function boot() {
   let sess = null, slot, mapId, gate = null;
   const {mountGate} = await import('./ui/mp-ui.js');
   gate = mountGate();
-  const hide = () => { $('load').classList.add('out'); setTimeout(() => $('load').style.display = 'none', 750); };
+  const hide = () => { $('load').classList.add('out'); setTimeout(() => $('load').style.display = 'none', 750); };   // dùng cho màn lỗi/cổng: mờ đi ngay
+  // vào game: ảnh loading tối dần về đen (.5s) → đen mờ dần để lộ game (.6s)
+  const reveal = () => { const l = $('load'); l.classList.add('black'); setTimeout(() => { l.classList.add('out'); setTimeout(() => l.style.display = 'none', 700); }, 520); };
 
   // ---------- 1) phiên ----------
   if (CONFIG.multiplayer) {
@@ -100,6 +102,6 @@ async function boot() {
     window.VYFEATURES = host;
     FEATURES.forEach(load => load().then(m => host.register(m.default)).catch(e => console.warn('[features] không nạp được', e)));
   } catch (e) { console.warn('[features]', e); }
-  LB(100, 'Xong!'); setTimeout(hide, 300);
+  LB(100, 'Xong!'); setTimeout(reveal, 250);
 }
 boot().catch(fail);

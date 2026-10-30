@@ -357,6 +357,33 @@ input[type=range]:disabled{opacity:.45}
 #sKeys .kreset{margin-top:1rem}
 
 /* =====================================================================
+   MÀN LOADING — ảnh nền toàn màn + thẻ tiến độ góc phải dưới (cùng lề với đồng hồ: phải 96, dưới 64)
+   Vào: đen → ảnh (khi vừa đổi map) · Ra: ảnh tối dần về đen → đen mờ dần để lộ game
+   ===================================================================== */
+#load{position:fixed;inset:0;z-index:10;background:#0b0d12;overflow:hidden;transition:opacity .6s ease}
+#load.out{opacity:0;pointer-events:none}
+#lbg{position:absolute;z-index:0;inset:0;width:100%;height:100%;object-fit:cover;object-position:55% 50%;opacity:0;transform:scale(1.04);transition:opacity .45s ease;will-change:transform,opacity;animation:lzoom 14s ease-out forwards;user-select:none;pointer-events:none}
+#lbg.ok{opacity:1}
+@keyframes lzoom{to{transform:scale(1)}}
+#load.pre #lbg{opacity:0;transition:none}
+#load::before{content:"";position:absolute;z-index:1;inset:0;background:linear-gradient(to top left,rgba(12,9,6,.62),rgba(12,9,6,0) 46%),linear-gradient(to top,rgba(12,9,6,.28),rgba(12,9,6,0) 30%);pointer-events:none}
+#load::after{content:"";position:absolute;z-index:3;inset:0;background:#0b0d12;opacity:0;pointer-events:none;transition:opacity .5s ease}
+#load.black::after{opacity:1}
+#lui{position:absolute;z-index:2;right:6rem;bottom:4rem;box-sizing:border-box;width:26rem;max-width:calc(100vw - 2rem);padding:1.25rem 2rem 1.5rem;border-radius:2rem;background:rgba(20,15,11,.46);color:#fff;font:700 1rem/1.3 var(--f-b);display:flex;flex-direction:column;gap:.75rem;transition:opacity .35s ease,transform .35s var(--ease,ease)}
+#load.black #lui{opacity:0;transform:translateY(.5rem)}
+#lui .lh{display:flex;align-items:center;gap:.75rem}
+#lttl{flex:1;font:400 1.5rem/1.2 var(--f-d);letter-spacing:.03em}
+#lpct{font:700 1.25rem/1 var(--f-b);font-variant-numeric:tabular-nums;color:var(--ink2,#fff)}
+.lspin{flex:none;width:1.25rem;height:1.25rem;border-radius:50%;border:.1875rem solid rgba(255,255,255,.28);border-top-color:#fff;animation:lspin .8s linear infinite}
+@keyframes lspin{to{transform:rotate(360deg)}}
+#lbar{height:.5rem;border-radius:.25rem;background:rgba(255,255,255,.22);overflow:hidden}
+#lbar i{display:block;height:100%;width:4%;border-radius:.25rem;background:linear-gradient(90deg,#ffd27a,#ff9a6a);box-shadow:0 0 .75rem rgba(255,190,110,.55);transition:width .35s var(--ease,ease)}
+#lmsg{font:700 var(--t1,1rem)/1.3 var(--f-b);color:var(--ink2,rgba(255,255,255,.82));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:1180px),(max-height:640px){#lui{right:1rem;bottom:1rem;width:22rem;padding:1rem 1.5rem 1.25rem}}
+@media(max-width:640px){#lui{left:1rem;right:1rem;width:auto}}
+@media(prefers-reduced-motion:reduce){#lbg{animation:none;transform:none}.lspin{animation-duration:2s}}
+
+/* =====================================================================
    CHUYỂN ĐỘNG — phản hồi TỨC THÌ (vào .09s), nhả êm (.16s)
    Quy tắc: chỉ animate transform + opacity (chạy trên GPU, không phải đợi luồng chính đang bận vẽ 3D).
    Glow = lớp ::before có sẵn bóng tĩnh, chỉ đổi opacity — KHÔNG animate filter / box-shadow / backdrop.
