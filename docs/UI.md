@@ -55,11 +55,13 @@ Cuối `ui.css`, mục "CHUYỂN ĐỘNG": mọi chuyển ≤ .22s, đường co
 
 ## Nút tương tác ghim 3D (`src/ui/pins.js`)
 Pin giọt nước 63×76 (Figma): vòng trắng, đĩa cam nhạt `#ffe3a8`→`#ffd581`, icon nâu `#914a14`. Mỗi khung hình chiếu toạ độ 3D của vật thể (ghế = `A.seatC`, giường = `Bed`, TV = `TV_Screen`, cửa/thảm = `Doormat`) ra màn hình → nút luôn dính đúng chỗ khi camera xoay/nhân vật đi (không méo, kích thước cố định). Bấm: ghế → `cmdSit` (đi tới rồi ngồi), giường → `cmdSleep`, TV → đi tới đứng trước TV (anim xem TV làm sau), cửa → mở danh sách bản đồ. Trạng thái: hover (phồng 1.16 + sáng + hiện nhãn), bấm (lún .9 + gợn sóng), đang ngồi/ngủ (đĩa nâu, icon trắng, nhãn "Đứng dậy"/"Thức dậy"). Chế độ Cao: lơ lửng nhẹ + bật ra khi hiện; chế độ Nhẹ: tĩnh.
-Thêm nút mới: thêm 1 mục `{key,icon,label,at:()=>Vector3,act}` vào mảng `items` trong `game.js` (khối "nút tương tác ghim 3D") và 1 icon vào `ICON` của `pins.js`.
+Thêm nút mới: thêm 1 mục `{key,icon,label,at:()=>Vector3,act}` vào mảng `items` trong `game.js` (khối "nút tương tác ghim 3D") và 1 icon (SVG xuất NGUYÊN từ Figma) vào `assets/ui/pins/` + khai báo trong `IMG` của `pins.js`.
+
+Pin = 3 lớp đúng Figma 63×76: `pin-tail.svg` (đuôi trắng) → `.pf` (vòng ngoài 63px: fill trắng 2% + viền trắng 45% + **background blur 5px** — chính nó tạo vệt sáng ở đáy vòng; tắt blur ở chế độ nhẹ) → `pin-body.svg` (vòng trắng + đĩa gradient #FFE7C6→#FFDC8B) → icon nâu. Hover/Click/Đang-dùng do mình thiết kế thêm.
 
 ## Thẻ Bin / nhạc / đồng hồ (số đo Figma mới)
 - Thẻ Bin: avatar 128 (đè 84 lên thẻ), tên "Bin" Audex 32 + "Lv.12" 16, **3 thanh có nhãn HP / STA / HAP** (nhãn 44 | thanh 229×12 | cách 64 | số 20 bold; hàng cao 27). Thanh "Tập trung" vẫn tính trong game nhưng ẩn (`hidden`).
-- Nhạc: capsule 537×90, đĩa trắng 64 (`assets/ui/album.v2.png`, **đứng yên**, không xoay), tên 24 Audex, phụ đề 16 `#c3c1c1`, prev/pause/next cách 36.
+- Nhạc: capsule 537×90, đĩa trắng 64 (`assets/ui/album.v3.png`, **đứng yên**, không xoay), tên 24 Audex, phụ đề 16 `#c3c1c1`, prev/pause/next cách 36.
 - Đồng hồ: 430×126, giờ 64 Audex, vạch 3×76, thứ/ngày 20 bold (dòng 27), chip thời tiết 139×33 (nền đen .46, viền trắng 1, icon 32). **Không animation** (giờ cập nhật liên tục).
 
 ## Đèn trong nhà
@@ -70,3 +72,16 @@ Thêm nút mới: thêm 1 mục `{key,icon,label,at:()=>Vector3,act}` vào mản
 - Thẻ tiến độ góc phải dưới (`#lui`, lề phải 96 / dưới 64 như đồng hồ; màn gọn: 16): tên, %, thanh, dòng trạng thái. `LB(p,msg)` trong `src/main.js` cập nhật.
 - Vào game: ảnh tối dần về đen (.5s, class `black`) → đen mờ dần để lộ game (.6s, class `out`). Màn lỗi/cổng dùng `hide()` (mờ ngay).
 - Đổi map: `goToMap` fade đen → reload; cờ `sessionStorage.vyFade` làm trang mới bắt đầu từ đen rồi hiện dần ra ảnh loading.
+
+
+## Tường kính mờ + Dynamic Wall Fade (`buildGlass/glassStep` trong `game.js`, cấu hình `MC.glass` ở `map-configs.js`)
+
+Nhà là mặt cắt nên thêm "tường" để nhìn như xuyên qua kính: (1) **mặt trước** = 1 mặt phẳng kính rất mờ (alpha ≈ .07, viền + ánh phản xạ theo góc nhìn, biến mất khi camera sát/vào trong); (2) **tường phía đông** (nằm giữa camera và nội thất) mờ dần theo vị trí camera (opacity 1 → .12 khi camera ở x ≥ `x1`). Tường không chắn click/va chạm, không đổi bóng đổ. Cấu hình: `glass:{front:{x0,x1,z,y0,y1}, east:{names:/regex/ hoặc split:'tên mesh',cut:x, x0, x1}}`. `chairFlip:true` = đảo hướng ngồi (ghế trên lầu nhà mới ngồi quay vào bàn).
+
+## Đĩa nhạc
+
+`assets/ui/album.v3.png` (từ Figma). Khi đang phát nhạc, đĩa quay chậm vô hạn (`.pill .cv.spin img`, 14s/vòng; chỉ transform; vẫn chạy ở chế độ nhẹ).
+
+## Màn chọn nhân vật (`src/ui/pick.js`, Figma "Frame 5")
+
+Nền loading mờ + phủ đen .79; 2 capsule 497×164 (Vy trên, Bin dưới; avatar 128, tên + Lv + 3 thanh HP/STA/HAP). **Lần đầu** vào: hiện màn chọn; lựa chọn lưu trong trình duyệt (`localStorage.vyChar`) → **các lần sau tự vào đúng nhân vật**, không hỏi lại. Đổi: Cài đặt → Nhân vật → "Đổi nhân vật". Nhân vật đang có người khác dùng bị khoá (server: `peek_slots`, `claim_slot_as`, migration `002_pick_char.sql`; bản client cũ vẫn dùng `claim_slot` như trước). `?as=bin|vy` ép nhân vật khi test (không lưu).

@@ -19,7 +19,12 @@ async function boot() {
   // vào game: ảnh loading tối dần về đen (.5s) → đen mờ dần để lộ game (.6s)
   const reveal = () => { const l = $('load'); l.classList.add('black'); setTimeout(() => { l.classList.add('out'); setTimeout(() => l.style.display = 'none', 700); }, 520); };
 
-  // ---------- 1) phiên ----------
+  // ---------- 1) nhân vật + phiên ----------
+  // Lần đầu: màn CHỌN NHÂN VẬT (BIN / VY). Máy nhớ lựa chọn (localStorage 'vyChar') → các lần sau tự vào đúng nhân vật, không hỏi lại.
+  // ?as=bin|vy ép nhân vật (dùng khi test), không lưu.
+  const {pickChar, savedChar, saveChar} = await import('./ui/pick.js');
+  const forced = (CONFIG.as === 'bin' || CONFIG.as === 'vy') ? CONFIG.as : null;
+  let pref = forced || savedChar(), note = '';
   if (CONFIG.multiplayer) {
     const {Session} = await import('./net/session.js');
     sess = new Session();
@@ -28,16 +33,29 @@ async function boot() {
       if (state === 'dup') { hide(); gate.show('🪟', 'Đang mở ở tab khác', 'Tài khoản/slot này đang được dùng ở một tab khác. Dùng tab đó hoặc bấm nút bên dưới để chuyển sang tab này.', [['Dùng tab này', () => location.reload()]]); }
     });
     LB(5, 'Đang kết nối phòng "' + CONFIG.room + '"...');
-    try { const r = await sess.connect(); slot = r.slot; mapId = r.map; }
-    catch (e) {
+    const fatal = e => {
       hide();
       if (e.code === 'full') gate.show('🚪', 'Phòng đã đủ 2 người', 'BIN và VY đều đã có người. Thử lại sau, hoặc vào phòng khác bằng ?room=ten-phong.', [['Thử lại', () => location.reload()]]);
       else gate.show('⚠️', 'Không kết nối được', String(e.message || e), [['Thử lại', () => location.reload()], ['Chơi một mình', () => { const u = new URL(location.href); u.searchParams.set('solo', '1'); location.href = u; }]]);
-      return;
+    };
+    try { await sess.init(); } catch (e) { fatal(e); return; }
+    for (;;) {
+      if (!pref) {
+        const taken = await sess.peek();
+        if (taken.length >= 2) { fatal(Object.assign(new Error('full'), {code: 'full'})); return; }
+        pref = await pickChar({taken, note}); note = '';
+        if (!forced) saveChar(pref);
+      }
+      try { const r = await sess.connect(pref); slot = r.slot; mapId = r.map; break; }
+      catch (e) {
+        if (e.code === 'taken') { note = (pref === 'bin' ? 'Bin' : 'Vy') + ' đang có người khác dùng — hãy chọn nhân vật còn lại.'; pref = null; continue; }
+        fatal(e); return;
+      }
     }
   } else {
-    slot = (CONFIG.as === 'bin' || CONFIG.as === 'vy') ? CONFIG.as : (localStorage.getItem('vySlot') || 'vy');
-    try { localStorage.setItem('vySlot', slot); } catch (e) {}
+    if (!pref) { pref = await pickChar({}); }
+    slot = pref;
+    if (!forced) saveChar(slot);
     mapId = (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap');
   }
   if (!isMap(mapId)) mapId = DEFAULT_MAP;

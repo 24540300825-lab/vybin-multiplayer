@@ -21,6 +21,23 @@ const RPC = {
     if (!s) { s = !sl.bin ? 'bin' : !sl.vy ? 'vy' : null; if (!s) return err('room_full'); sl[s] = {uid: u, seen: now}; } else sl[s].seen = now;
     save(d); return {data: {slot: s, map: d.rooms[p_room].map_id, user_id: u}, error: null};
   },
+  peek_slots({p_room}) {
+    const u = uid(); if (!u) return err('not_authenticated');
+    const sl = load().slots[p_room] || {}, now = Date.now();
+    return {data: Object.keys(sl).filter(k => sl[k].uid !== u && now - sl[k].seen <= 90000).sort(), error: null};
+  },
+  claim_slot_as({p_room, p_pref, p_default_map = 'house'}) {
+    const u = uid(); if (!u) return err('not_authenticated');
+    if (!/^[a-z0-9_-]{1,32}$/.test(p_room || '')) return err('bad_room');
+    if (p_pref !== 'bin' && p_pref !== 'vy') return err('bad_pref');
+    const d = load(); d.rooms[p_room] ||= {map_id: p_default_map}; const sl = d.slots[p_room] ||= {};
+    const now = Date.now();
+    for (const k of Object.keys(sl)) if (sl[k].uid !== u && now - sl[k].seen > 90000) delete sl[k];
+    if (sl[p_pref] && sl[p_pref].uid !== u) return err('slot_taken');
+    for (const k of Object.keys(sl)) if (sl[k].uid === u && k !== p_pref) delete sl[k];
+    sl[p_pref] = {uid: u, seen: now};
+    save(d); return {data: {slot: p_pref, map: d.rooms[p_room].map_id, user_id: u}, error: null};
+  },
   touch_slot({p_room}) { const d = load(), sl = d.slots[p_room] || {}, k = Object.keys(sl).find(k => sl[k].uid === uid()); if (k) { sl[k].seen = Date.now(); save(d); } return {data: !!k, error: null}; },
   leave_slot({p_room}) { const d = load(), sl = d.slots[p_room] || {}; for (const k of Object.keys(sl)) if (sl[k].uid === uid()) delete sl[k]; save(d); return {data: null, error: null}; },
   set_room_map({p_room, p_map}) { const d = load(); const sl = d.slots[p_room] || {}; if (!Object.values(sl).some(x => x.uid === uid())) return err('not_in_room'); d.rooms[p_room].map_id = p_map; save(d); return {data: p_map, error: null}; },

@@ -157,6 +157,10 @@ button{font-family:inherit}
 .pill{display:flex;align-items:center;gap:2.25rem;box-sizing:border-box;padding:.75rem 1.5rem;border-radius:999px;min-height:5.5rem}
 .pill .cv{position:relative;flex:none;width:4rem;height:4rem;border:0;padding:0;background:none;border-radius:50%;cursor:pointer}
 .pill .cv img{display:block;width:100%;height:100%;border-radius:50%}
+/* đĩa nhạc: đang phát thì xoay chậm mãi (như đĩa than); tạm dừng thì đứng yên tại góc hiện tại */
+.pill .cv img{animation:discSpin 14s linear infinite;animation-play-state:paused}
+.pill .cv.spin img{animation-play-state:running}
+@keyframes discSpin{to{transform:rotate(360deg)}}
 .pill .ytb{display:none;position:absolute;right:-.25rem;bottom:-.25rem;width:1.5rem;height:1.5rem;border-radius:50%;background:var(--bad);font-size:.875rem}
 .pill .cv.yt .ytb{display:grid}
 .pill .mi{width:14rem;min-width:0}
@@ -481,6 +485,8 @@ html[data-fx=lite]{--cap:linear-gradient(to right,rgba(24,18,12,.52),rgba(24,18,
 html[data-fx=lite] .cap,html[data-fx=lite] .panel,html[data-fx=lite] .mbox,html[data-fx=lite] #toast,html[data-fx=lite] #lui{-webkit-backdrop-filter:none;backdrop-filter:none}
 html[data-fx=lite] *,html[data-fx=lite] *::before,html[data-fx=lite] *::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}
 html[data-fx=lite] .lspin{animation:lspin .8s linear infinite!important}
+html[data-fx=lite] .pill .cv img{animation:discSpin 14s linear infinite!important;animation-play-state:paused!important}
+html[data-fx=lite] .pill .cv.spin img{animation-play-state:running!important}
 html[data-fx=lite] #lbg{opacity:1;transform:none}
 /* ---- ĐỒ HỌA CAO (Smart Animate) ---- */
 @keyframes fxRise{from{opacity:0;transform:translateY(.5rem)}to{opacity:1;transform:none}}
@@ -560,40 +566,70 @@ html[data-fx=high] #load.black #lui{transform:translateY(.75rem) scale(.97)}
   #hCall:not(.full){top:auto;bottom:9rem;left:1rem;width:min(var(--callW,240px),calc(100vw - 2rem))}
 }
 
-/* ---------- nút tương tác ghim 3D (Figma: pin 63×76 — vòng trắng, đĩa cam nhạt, icon nâu #914a14) ---------- */
+/* ---------- nút tương tác ghim 3D (Figma: pin 63×76 — vòng ngoài mờ, vòng trắng, đĩa kem #FFE7C6→#FFDC8B, icon nâu #914A14, đuôi trắng) ---------- */
 #pins{position:fixed;inset:0;z-index:5;pointer-events:none}
-.pin{position:absolute;left:0;top:0;width:3.9375rem;height:4.75rem;margin:-4.75rem 0 0 -1.96875rem;padding:0;border:0;background:none;cursor:pointer;pointer-events:auto;font:700 var(--t1)/1.2 var(--f-b);color:#fff;
-  --ps:#914a14;--pf:#e9b96b;opacity:1;transition:opacity .18s ease;-webkit-tap-highlight-color:transparent}
+.pin{position:absolute;left:0;top:0;width:3.9375rem;height:4.75rem;margin:-4.625rem 0 0 -1.96875rem;padding:0;border:0;background:none;cursor:pointer;pointer-events:auto;font:700 var(--t1)/1.2 var(--f-b);color:#fff;opacity:1;transition:opacity .18s ease;-webkit-tap-highlight-color:transparent}
 .pin.off{opacity:0;pointer-events:none}
 .pin .pw,.pin .pb{position:absolute;inset:0;display:block}
-.pin .pb{transform-origin:50% 100%;transition:transform .16s cubic-bezier(.2,.9,.3,1.2)}
-.pin .pc{position:absolute;left:0;top:0;width:3.9375rem;height:3.9375rem;box-sizing:border-box;padding:.6875rem;border-radius:50%;border:.1875rem solid #fff;
-  background:radial-gradient(circle at 50% 38%,#fff4dc 0,#ffe3a8 60%,#ffd581 100%);
-  box-shadow:0 0 0 .25rem rgba(255,255,255,.38),inset 0 0 0 .25rem rgba(255,255,255,.5),0 .25rem .75rem rgba(90,45,0,.3)}
-.pin .pc svg{display:block;fill:var(--pf);stroke:var(--ps);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
-.pin .pt{position:absolute;left:50%;bottom:.0625rem;width:1.125rem;height:.9rem;margin-left:-.5625rem;background:#fff;clip-path:polygon(0 0,100% 0,50% 100%)}
-.pin .pr{position:absolute;left:0;top:0;width:3.9375rem;height:3.9375rem;border-radius:50%;box-shadow:0 0 0 .1875rem #fff;opacity:0;pointer-events:none}
+.pin .pb{transform-origin:50% 94%;transition:transform .16s cubic-bezier(.2,.9,.3,1.2)}
+.pin .pt,.pin .pg,.pin .pi{position:absolute;display:block;pointer-events:none;-webkit-user-drag:none}
+/* Figma: vòng ngoài 63px = fill trắng 2% + viền trắng 45% + BACKGROUND BLUR 5px (làm mờ đuôi pin & cảnh phía sau → vệt sáng ở đáy vòng) */
+.pin .pf{position:absolute;left:0;top:0;width:3.9375rem;height:3.9375rem;box-sizing:border-box;border-radius:50%;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.45);-webkit-backdrop-filter:blur(.3125rem);backdrop-filter:blur(.3125rem);pointer-events:none;transition:box-shadow .16s ease}
+.pin .pt,.pin .pg{left:0;top:0;width:100%;height:100%}
+.pin .pd{position:absolute;left:.5rem;top:.5rem;width:2.9375rem;height:2.9375rem;border-radius:50%;opacity:0;background:radial-gradient(circle,#c98241 0,#a85f20 55%,#914a14 100%);transition:opacity .16s ease;pointer-events:none}
+.pin .pr{position:absolute;left:0;top:0;width:3.9375rem;height:3.9375rem;border-radius:50%;box-shadow:0 0 0 .125rem #fff;opacity:0;pointer-events:none}
 .pin .pl{position:absolute;left:calc(100% + .5rem);top:.875rem;white-space:nowrap;padding:.375rem .875rem;border-radius:999px;background:rgba(40,24,10,.72);text-shadow:0 .0625rem .125rem rgba(0,0,0,.4);opacity:0;transform:translateX(-.375rem);transition:opacity .14s ease,transform .18s ease;pointer-events:none}
-/* hover: phồng lên, vòng sáng cam đậm hơn, hiện nhãn */
+/* hover: phồng lên + vòng sáng cam + hiện nhãn */
 .pin:hover .pb,.pin:focus-visible .pb{transform:scale(1.16)}
-.pin:hover .pc,.pin:focus-visible .pc{box-shadow:0 0 0 .375rem rgba(255,255,255,.55),inset 0 0 0 .25rem rgba(255,255,255,.7),0 0 1.25rem rgba(255,176,60,.9),0 .25rem .75rem rgba(90,45,0,.3)}
+.pin:hover .pf,.pin:focus-visible .pf{box-shadow:0 0 .75rem .125rem rgba(255,170,50,.9)}
 .pin:hover .pl,.pin:focus-visible .pl{opacity:1;transform:none}
 /* bấm xuống: lún nhẹ */
 .pin:active .pb{transform:scale(.9);transition-duration:.06s}
-/* đã chọn / đang làm (đang ngồi, đang ngủ): đĩa nâu, icon trắng — bấm lần nữa để đứng dậy / thức dậy */
-.pin.on{--ps:#fff;--pf:rgba(255,255,255,.28)}
-.pin.on .pc{background:radial-gradient(circle at 50% 38%,#c0752f 0,#a55e1f 60%,#914a14 100%)}
-.pin.on .pt{background:#fff}
+/* đang làm (đang ngồi/ngủ): đĩa nâu, icon trắng — bấm lần nữa để đứng dậy / thức dậy */
+.pin.on .pd{opacity:1}
+.pin.on .pi{filter:brightness(0) invert(1)}
 /* gợn sóng khi vừa bấm */
 .pin.pop .pr{animation:pinPing .55s ease-out}
 @keyframes pinPing{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.9)}}
 @keyframes pinBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-.3125rem)}}
 @keyframes pinIn{0%{transform:scale(.4) translateY(.75rem)}60%{transform:scale(1.12)}100%{transform:none}}
-/* Nhẹ: không nhấp nhô, không gợn sóng — vẫn đổi trạng thái tức thì */
-html[data-fx=lite] .pin,html[data-fx=lite] .pin .pb,html[data-fx=lite] .pin .pl{transition:none!important}
+/* Nhẹ: tĩnh */
+html[data-fx=lite] .pin .pf{-webkit-backdrop-filter:none;backdrop-filter:none}
+html[data-fx=lite] .pin,html[data-fx=lite] .pin .pb,html[data-fx=lite] .pin .pl,html[data-fx=lite] .pin .pd{transition:none!important}
 html[data-fx=lite] .pin.pop .pr{animation:none}
 /* Đồ họa cao: lơ lửng nhẹ + bật ra khi hiện */
 html[data-fx=high] .pin:not(.off) .pw{animation:pinBob 2.6s ease-in-out var(--pd,0s) infinite}
-html[data-fx=high] .pin:not(.off) .pc{animation:pinIn .45s cubic-bezier(.3,1.4,.5,1) both}
+html[data-fx=high] .pin:not(.off) .pb{animation:pinIn .45s cubic-bezier(.3,1.4,.5,1) both}
 html[data-fx=high] .pin:hover .pw,html[data-fx=high] .pin:focus-visible .pw{animation-play-state:paused}
 @media(hover:none){.pin .pl{display:none}}
+
+/* ---------- màn CHỌN NHÂN VẬT (Figma "Frame 5": nền blur 20.75 + phủ đen .79; capsule 497×164, bo 323, gradient multiply; avatar 128) ---------- */
+#load.pick #lui{display:none}
+#pick{position:absolute;z-index:2;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;background:rgba(0,0,0,.79);-webkit-backdrop-filter:blur(1.296875rem);backdrop-filter:blur(1.296875rem);color:#fff;transition:opacity .4s ease}
+#pick.out{opacity:0;pointer-events:none}
+#pick .pk-col{display:flex;flex-direction:column;gap:2.5625rem}
+#pick .pk{position:relative;display:flex;align-items:center;gap:1.25rem;box-sizing:border-box;width:31.0625rem;height:10.25rem;padding:0 2rem 0 1.0625rem;border:0;border-radius:20.1875rem;background:var(--cap-h);color:#fff;text-align:left;cursor:pointer;font:700 1rem/1.3 var(--f-b);text-shadow:0 .0625rem .125rem rgba(0,0,0,.35);transition:transform .22s var(--ease,ease),filter .22s,opacity .3s,box-shadow .22s;-webkit-tap-highlight-color:transparent}
+#pick .pa{flex:none;width:8rem;height:8rem;border-radius:50%}
+#pick .pa img{display:block;width:100%;height:100%;border-radius:50%;pointer-events:none}
+#pick .pi{flex:1;min-width:0;display:flex;flex-direction:column}
+#pick .hd{display:flex;align-items:baseline;gap:.5rem;height:2.3125rem;white-space:nowrap}
+#pick .nm{font:400 2rem/1.157 var(--f-d)}
+#pick .lv{font:700 1rem/1 var(--f-b);color:var(--ink3)}
+#pick .tk{margin-left:auto;font:700 .875rem/1 var(--f-b);color:var(--ac);background:rgba(0,0,0,.35);border-radius:999px;padding:.3125rem .625rem}
+#pick .stats{display:flex;flex-direction:column}
+#pick .stat{grid-template-columns:2.5rem 11.25rem 1fr}
+#pick .stat b{margin-left:1rem}
+#pick .stat .trk i.h{background:var(--red)}#pick .stat .trk i.s{background:var(--orange)}#pick .stat .trk i.m{background:var(--green)}
+#pick .pk:hover:not(:disabled){transform:scale(1.025);filter:brightness(1.18);box-shadow:0 0 0 .125rem rgba(255,213,129,.55),0 .5rem 2rem rgba(0,0,0,.4)}
+#pick .pk:focus-visible{outline:0;box-shadow:0 0 0 .1875rem var(--ac)}
+#pick .pk:active:not(:disabled){transform:scale(.985)}
+#pick .pk:disabled{cursor:not-allowed;opacity:.5}
+#pick .pk:disabled .pa img{filter:grayscale(1)}
+#pick.go .pk:not(.sel){opacity:0;transform:scale(.96)}
+#pick.go .pk.sel{transform:scale(1.04);filter:brightness(1.25);box-shadow:0 0 0 .125rem var(--ac),0 0 2.5rem rgba(255,213,129,.45)}
+#pick .pk-note{margin:0;max-width:31rem;text-align:center;font:700 1rem/1.4 var(--f-b);color:var(--ac)}
+html[data-fx=high] #pick .pk{animation:pkIn .55s var(--ease,ease) both}
+html[data-fx=high] #pick .pk:nth-child(2){animation-delay:.1s}
+@keyframes pkIn{from{opacity:0;transform:translateY(1.25rem) scale(.97)}to{opacity:1;transform:none}}
+html[data-fx=lite] #pick{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(0,0,0,.88)}
+@media(max-width:1180px),(max-height:640px){#pick .pk{transform-origin:center}}

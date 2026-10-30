@@ -33,7 +33,9 @@ export class Session {
   emit(ev, a) { (this.h[ev] || []).forEach(f => { try { f(a); } catch (e) { console.error('[session]', ev, e); } }); }
   setState(s, text) { if (this.state === s && !text) return; this.state = s; this.emit('status', {state: s, text: text || ''}); }
 
-  async connect() {
+  // Bước 1: dựng client + phiên ẩn danh (chưa giữ slot) — để màn chọn nhân vật còn hỏi được "ai đang có người".
+  async init() {
+    if (this.sb) return;
     this.setState('connecting', 'Đang kết nối...');
     const mod = await import(/* @vite-ignore */ CONFIG.mock || CONFIG.supabaseJs);
     const createClient = mod.createClient || (mod.default && mod.default.createClient);
@@ -41,7 +43,7 @@ export class Session {
       auth: {persistSession: true, autoRefreshToken: true, storageKey: 'vybin-auth'},
       realtime: {params: {eventsPerSecond: 40}},
     });
-    // 1) phiên ẩn danh (tự khôi phục sau F5 vì lưu trong localStorage)
+    // phiên ẩn danh (tự khôi phục sau F5 vì lưu trong localStorage)
     let {data: {session}} = await this.sb.auth.getSession();
     if (!session) {
       const r = await this.sb.auth.signInAnonymously();
@@ -50,6 +52,16 @@ export class Session {
     }
     this.uid = session.user.id; this._token = session.access_token;
     try { this.sb.auth.onAuthStateChange((ev, ss) => { if (ss && ss.access_token) { this._token = ss.access_token; try { this.sb.realtime.setAuth(ss.access_token); } catch (e) {} } }); } catch (e) {}
+  }
+  // Nhân vật nào đang có NGƯỜI KHÁC giữ (['bin'] / ['vy'] / []). Server cũ chưa có hàm → trả [] (không khoá gì).
+  async peek() {
+    try { const {data, error} = await this.sb.rpc('peek_slots', {p_room: this.room}); if (error) throw error; return Array.isArray(data) ? data : []; }
+    catch (e) { console.warn('[session] peek', e); return []; }
+  }
+  // Bước 2: giữ slot theo nhân vật đã chọn (pref = 'bin' | 'vy'; bỏ trống = kiểu cũ: vào trước BIN, vào sau VY) rồi dựng kênh realtime.
+  async connect(pref) {
+    await this.init();
+    this.pref = pref === 'bin' || pref === 'vy' ? pref : null;
     // 2) giữ slot
     await this._claim();
     // 3) kênh realtime
@@ -64,9 +76,10 @@ export class Session {
   }
 
   async _claim() {
-    const {data, error} = await this.sb.rpc('claim_slot', {p_room: this.room});
+    const {data, error} = this.pref ? await this.sb.rpc('claim_slot_as', {p_room: this.room, p_pref: this.pref}) : await this.sb.rpc('claim_slot', {p_room: this.room});
     if (error) {
       const m = String(error.message || error);
+      if (m.includes('slot_taken')) { const e = new Error('slot_taken'); e.code = 'taken'; throw e; }
       if (m.includes('room_full')) { this.setState('full', 'Phòng đã đủ 2 người (BIN & VY).'); const e = new Error('room_full'); e.code = 'full'; throw e; }
       throw new Error('claim_slot: ' + m);
     }
@@ -81,7 +94,7 @@ export class Session {
       if (data === false) { await this._claim(); this.emit('reclaimed', {slot: this.slot}); return true; }
     } catch (e) {
       console.warn('[session] heartbeat', e);
-      if (e && e.code === 'full') { this.setState('full', 'Chỗ của bạn đã có người khác vào.'); this._shutdown(); }
+      if (e && (e.code === 'full' || e.code === 'taken')) { this.setState('full', 'Chỗ của bạn đã có người khác vào.'); this._shutdown(); }
     }
     return false;
   }

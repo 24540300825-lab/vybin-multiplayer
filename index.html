@@ -63,7 +63,7 @@ try{if(sessionStorage.getItem('vyFade')){sessionStorage.removeItem('vyFade');l.c
   <div class="vrow"><i class="ic" data-ic="vol"></i><input type="range" id="mVol" min="0" max="1" step="0.05" value="0.5" aria-label="Âm lượng nhạc"><button class="pb" id="mYtB" title="Nhạc YouTube & playlist"><i class="ic" data-ic="youtube"></i><span>YouTube</span></button></div>
  </section>
  <div class="hud cap pill" id="hMus">
-  <button class="cv" id="mCv" title="Nhạc YouTube & playlist" aria-label="Mở nhạc YouTube"><img src="assets/ui/album.v2.png" alt="" width="64" height="64" draggable="false"><i class="ytb ic" data-ic="youtube"></i></button>
+  <button class="cv" id="mCv" title="Nhạc YouTube & playlist" aria-label="Mở nhạc YouTube"><img src="assets/ui/album.v3.png" alt="" width="64" height="64" draggable="false"><i class="ytb ic" data-ic="youtube"></i></button>
   <div class="mi" id="mInfo"><div class="tt" id="mTt">Lofi Study Playlist</div><div class="st" id="mSt">Youtube - List nhạc</div></div>
   <div class="mc"><button id="mPrev" title="Bài trước" aria-label="Bài trước" data-ic="prev"></button><button id="mPlay" title="Phát / dừng" aria-label="Phát / dừng" data-ic="play"></button><button id="mNext" title="Bài sau" aria-label="Bài sau" data-ic="next"></button></div>
   <button class="tg" id="mLs" title="Danh sách nhạc" aria-expanded="false" aria-label="Danh sách nhạc" data-ic="up"></button>
@@ -89,6 +89,7 @@ try{if(sessionStorage.getItem('vyFade')){sessionStorage.removeItem('vyFade');l.c
  <details class="sec" open><summary>Âm thanh</summary>
   <label>Âm lượng nhạc <input type="range" id="sVolS" min="0" max="1" step="0.05"></label>
   <label>Âm hiệu ứng (bước chân, cuộc gọi…) <input type="checkbox" id="sSfxOn" checked></label><label>Âm lượng hiệu ứng <input type="range" id="sSfx" min="0" max="1" step="0.05" value="0.8"></label><label>Âm môi trường (gió, chim, dế) <input type="checkbox" id="sAmb" checked></label></details>
+ <details class="sec"><summary>Nhân vật</summary><label>Máy này đang là <b id="sWho">Bin</b> <button type="button" class="pl" id="sChg">Đổi nhân vật</button></label></details>
  <details class="sec"><summary>Nâng cao</summary><div id="sAdv"></div></details>
  <p class="help"><b>Bin:</b> WASD đi, Shift chạy, E = ngồi/ngủ/dậy gần đồ vật. Click sàn = đi (nhấp đúp = chạy), click giường = ngủ, click ghế = ngồi. Kéo trái = xoay nhẹ, kéo phải = pan, lăn = zoom.</p>
 </div></div>

@@ -22,6 +22,8 @@ import {Fx} from './ui/fx.js';
   const ctl=$('sCtl');['sW','sR','sWA','sRA','cCol'].forEach(id=>{const e=$(id);if(e&&e.parentElement&&e.parentElement.tagName==='LABEL')ctl.appendChild(e.parentElement)});
   $('iSet').onclick=()=>$('hSet').classList.add('on');$('sX').onclick=()=>$('hSet').classList.remove('on');$('hSet').onclick=e=>{if(e.target.id==='hSet')$('hSet').classList.remove('on')};
 
+  $('sWho').textContent=(window.LOCAL_SLOT==='bin')?'Bin':'Vy';
+  $('sChg').onclick=()=>{if(!confirm('Đổi nhân vật? Trang sẽ tải lại và hiện màn chọn Bin / Vy.'))return;try{localStorage.removeItem('vyChar')}catch(e){}const u=new URL(location.href);u.searchParams.delete('as');location.href=u.toString()};
   {const MAPID=window.MAPID,MI={studio:['building','Studio (cũ)','Gác lửng 1 cầu thang, vườn cây'],house:['home','Nhà 2 tầng (mới)','2 cầu thang, giường & bàn làm việc']};
    $('mpList').innerHTML=Object.keys(MI).map(k=>`<div class="mapc${k===MAPID?' cur':''}" data-m="${k}"><span class="ic">${ic(MI[k][0])}</span><div><b>${MI[k][1]}${k===MAPID?' · đang ở':''}</b><small>${MI[k][2]}</small></div></div>`).join('');
    $('iMap').onclick=()=>$('hMap').classList.add('on');$('mX').onclick=()=>$('hMap').classList.remove('on');$('hMap').onclick=e=>{if(e.target.id==='hMap')$('hMap').classList.remove('on')};
@@ -108,8 +110,8 @@ import {Fx} from './ui/fx.js';
   let ytUi=null;
   const YTM=createYTMusic({toast,onChange:()=>{ytUi&&ytUi.render();showT()},auth:async()=>{const s=window.VYNET&&window.VYNET.sess;return s?{token:await s.token(),room:s.room}:null}});
   const showT=()=>{
-    if(src==='yt'){const it=YTM.curItem;$('mTt').textContent=YTM.title||'YouTube';$('mSt').textContent='YouTube · '+YTM.lib.pls[YTM.lib.pl].name;$('mPlay').innerHTML=ic(YTM.playing?'pause':'play');$('mCv').classList.add('yt');[...$('mList').children].forEach(d=>d.classList.remove('cur'));return}
-    const t=T[Lofi.idx];$('mTt').textContent=t.name;$('mSt').textContent=t.sub+' · '+t.bpm+' BPM';$('mPlay').innerHTML=ic(playing?'pause':'play');$('mCv').classList.remove('yt');[...$('mList').children].forEach((d,i)=>d.classList.toggle('cur',i===Lofi.idx))};
+    if(src==='yt'){const it=YTM.curItem;$('mTt').textContent=YTM.title||'YouTube';$('mSt').textContent='YouTube · '+YTM.lib.pls[YTM.lib.pl].name;$('mPlay').innerHTML=ic(YTM.playing?'pause':'play');$('mCv').classList.add('yt');$('mCv').classList.toggle('spin',!!YTM.playing);[...$('mList').children].forEach(d=>d.classList.remove('cur'));return}
+    const t=T[Lofi.idx];$('mTt').textContent=t.name;$('mSt').textContent=t.sub+' · '+t.bpm+' BPM';$('mPlay').innerHTML=ic(playing?'pause':'play');$('mCv').classList.remove('yt');$('mCv').classList.toggle('spin',!!playing);[...$('mList').children].forEach((d,i)=>d.classList.toggle('cur',i===Lofi.idx))};
   const stopLofi=async()=>{if(Lofi.on){await Lofi.toggle();playing=false}};
   const useSrc=async s=>{if(s===src)return;src=s;save('vyMusicSrc',s);if(s==='yt')await stopLofi();else YTM.pause();showT()};
   T.forEach((t,i)=>{const d=document.createElement('div');d.textContent=(i+1)+'. '+t.name+' — '+t.sub;d.onclick=async()=>{await useSrc('lofi');Lofi.setTrack(i);if(!playing)await play();saveLofi();showT()};$('mList').appendChild(d)});

@@ -3,14 +3,15 @@
 // Chỉ dùng transform/opacity. Bấm nút → gọi đúng lệnh của nhân vật (đi tới ghế rồi ngồi, lên giường nằm ngủ…).
 import * as THREE from 'three';
 
-const ICON = {
-  // 48×48, nét nâu #914a14, nền #e9b96b (theo icon Figma: andrsrxn:chair-office, cuida:tv-outline, icon-park:sleep-one, andrsrxn:door-in)
-  chair: '<rect x="14" y="5" width="20" height="17" rx="5"/><rect x="11" y="24" width="26" height="7" rx="3"/><path d="M24 31v7M14 43l10-5 10 5" fill="none"/>',
-  tv: '<rect x="5" y="9" width="38" height="25" rx="4"/><path d="M17 40h14M24 34v6" fill="none"/>',
-  sleep: '<path d="M9 8h12L9 22h12M27 20h9l-9 10h9M33 5h6l-6 7h6" fill="none"/>',
-  door: '<path d="M26 8H13a2 2 0 0 0-2 2v28a2 2 0 0 0 2 2h13" fill="none"/><path d="M26 8l9 4v26l-9 2z"/><path d="M5 24h15M15 18l-6 6 6 6" fill="none"/>',
+// Pin + 4 icon lấy NGUYÊN từ Figma (file SVG trong assets/ui/pins/). Vị trí/kích thước icon trong pin 63×76 đúng theo Figma.
+const IMG = {   // [file, left, top, width, height] (px thiết kế)
+  chair: ['chair', 9, 8, 46, 46],
+  tv: ['tv', 8, 10, 48, 48],
+  sleep: ['sleep', 8, 0, 52, 52],
+  door: ['door', 12.5, 8.5, 40, 41],
 };
-const svg = k => '<svg viewBox="0 0 48 48" width="100%" height="100%" aria-hidden="true">' + ICON[k] + '</svg>';
+const rem = n => (n / 16) + 'rem';
+const icon = k => { const [f, l, t, w, h] = IMG[k]; return '<img class="pi" alt="" draggable="false" src="assets/ui/pins/' + f + '.svg" style="left:' + rem(l) + ';top:' + rem(t) + ';width:' + rem(w) + ';height:' + rem(h) + '">'; };
 
 export function initPins({camera, items}) {
   const root = document.createElement('div');
@@ -21,7 +22,7 @@ export function initPins({camera, items}) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'pin off'; b.dataset.k = it.key;
     b.style.setProperty('--pd', (i * -0.6) + 's');
-    b.innerHTML = '<span class="pw"><span class="pb"><span class="pc">' + svg(it.icon) + '</span><span class="pt"></span><span class="pr"></span></span><span class="pl"></span></span>';
+    b.innerHTML = '<span class="pw"><span class="pb"><img class="pt" alt="" draggable="false" src="assets/ui/pins/pin-tail.svg"><i class="pf"></i><img class="pg" alt="" draggable="false" src="assets/ui/pins/pin-body.svg"><i class="pd"></i>' + icon(it.icon) + '<i class="pr"></i></span><span class="pl"></span></span>';
     const lab = b.querySelector('.pl');
     b.onclick = e => {
       e.stopPropagation();
