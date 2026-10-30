@@ -62,7 +62,7 @@ button{font-family:inherit}
 
 /* ---------- thẻ nhân vật (Figma: AVATAR + MUL-CAPSULE + BAR) ---------- */
 .pcard{position:relative;display:flex;align-items:center}
-.pcard .av{position:relative;z-index:2;flex:none;width:8rem;height:8rem;border-radius:50%;transition:width .25s,height .25s,box-shadow .15s}
+.pcard .av{position:relative;z-index:2;flex:none;width:8rem;height:8rem;border-radius:50%}
 .pcard .av img{display:block;width:100%;height:100%;border-radius:50%;pointer-events:none}
 #hProf .pbody{margin-left:-5.25rem;min-width:33rem;box-sizing:border-box;padding:.5rem 3rem .5rem 6.75rem;border-radius:2rem;display:flex;flex-direction:column;gap:0}
 #hProf .hd{display:flex;align-items:baseline;gap:.5rem;height:1.5rem;position:relative}
@@ -72,7 +72,7 @@ button{font-family:inherit}
 #hProf .stats{display:flex;flex-direction:column}
 .stat{display:flex;align-items:center;gap:2rem;height:1.5rem}
 .stat .trk{flex:1;min-width:0;height:.75rem;border-radius:.375rem;background:var(--track);overflow:hidden}
-.stat .trk i{display:block;height:100%;width:50%;border-radius:.75rem 0 0 .75rem/.375rem 0 0 .375rem;transition:width .5s}   /* đầu trái thon như Figma */
+.stat .trk i{display:block;height:100%;width:50%;border-radius:.75rem 0 0 .75rem/.375rem 0 0 .375rem;transition:width .3s var(--ease,ease)}   /* đầu trái thon như Figma */
 .stat b{flex:none;width:2.5rem;text-align:right;font:700 1.25rem/1.5rem var(--f-b);font-variant-numeric:tabular-nums}
 #bHp{background:var(--red)}#bSt{background:var(--orange)}#bMo{background:var(--green)}#bFo{background:var(--blue)}   /* 3 màu Figma + xanh dương cho "Tập trung" */
 /* thu gọn: chỉ còn avatar nhỏ + tên */
@@ -82,25 +82,23 @@ button{font-family:inherit}
 #hProf.min .tg{top:-.75rem}
 #hProf.min .tg svg{transform:rotate(180deg)}
 /* thẻ đối phương (Figma: Vy card 419×82, avatar 64) */
-#hPeer{margin-left:1.5rem;display:flex;align-items:center;gap:1.5rem;box-sizing:border-box;min-width:26rem;padding:.5rem 1.5rem .5rem .5rem;border-radius:2.5rem;transition:opacity .3s}
+#hPeer{margin-left:1.5rem;display:flex;align-items:center;gap:1.5rem;box-sizing:border-box;min-width:26rem;padding:.5rem 1.5rem .5rem .5rem;border-radius:2.5rem;transition:opacity .2s ease}
 #hPeer .av{width:4rem;height:4rem}
 #hLeft:has(#hProf.min) #hPeer{margin-left:-.5rem}   /* avatar Bin thu nhỏ 64 → thẻ Vy lùi theo để tâm avatar vẫn thẳng trục */
 #hPeer.talk .av{box-shadow:0 0 0 .25rem #7cf08a,0 0 1rem #7cf08a}
 #hPeer.off[data-s=bin] .av img{filter:grayscale(1) brightness(.92)}
 #hPeer .tx{flex:1;min-width:0;display:flex;flex-direction:column}
-#hPeer .nm{font:400 1.5rem/1.2 var(--f-d)}
-#hPeer .st{font:700 var(--t1)/1.4 var(--f-b);color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hPeer .nm{font:400 1.5rem/1.2 var(--f-d);text-box:trim-both cap alphabetic;margin-bottom:.875rem}
+#hPeer .st{font:700 var(--t1)/1.4 var(--f-b);color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-box:trim-both cap alphabetic;padding:.25rem 0;margin:-.25rem 0}   /* cắt khoảng trống trên/dưới chữ → khối chữ nằm đúng TÂM avatar dù font nào; padding âm margin để không xén dấu/đuôi chữ */
 #hPeer:not(.off) .st::before{content:"";display:inline-block;width:.5rem;height:.5rem;border-radius:50%;background:#7cf08a;margin-right:.5rem;vertical-align:.0625rem}
 #hPeer .pm{display:flex;gap:.5rem;font-size:1.25rem}
 #hPeer .pm:empty{display:none}
 
 /* ---------- thanh biểu tượng trên cùng (Figma: Frame 12, icon 40, cách nhau 64) ---------- */
 #hTop{display:flex;gap:2.25rem;align-items:center;margin:-.5rem -.46rem 0 0}   /* ô icon 36, tâm cách đều 84 (Figma sau khi thu nhỏ); lề âm = để MÉP icon (không phải mép nút) thẳng hàng với mép capsule bên dưới, đỉnh icon cao nhất = đỉnh avatar bên trái */
-#hTop .ib{font-size:0;position:relative;width:3rem;height:3rem;border-radius:1rem;border:0;background:none;color:#fff;cursor:pointer;display:grid;place-items:center;padding:0;transition:transform .15s}
+#hTop .ib{font-size:0;position:relative;width:3rem;height:3rem;border-radius:1rem;border:0;background:none;color:#fff;cursor:pointer;display:grid;place-items:center;padding:0}
 #hTop .ib .ic,#hTop .ib>span{font-size:2.25rem;filter:drop-shadow(var(--sh))}
 #hTop .ib>span{font-size:2rem;line-height:1}
-#hTop .ib:hover{transform:translateY(-.125rem) scale(1.08)}
-#hTop .ib:active{transform:scale(.94)}
 #hTop .ib.on::after{content:"";position:absolute;left:50%;bottom:-.25rem;width:.5rem;height:.5rem;margin-left:-.25rem;border-radius:50%;background:var(--ac)}
 #hTop .ib.live{color:#7cf08a}
 #hTop .ib.talk{filter:drop-shadow(0 0 .75rem #7cf08a)}
@@ -159,8 +157,8 @@ button{font-family:inherit}
 .pill .ytb{display:none;position:absolute;right:-.25rem;bottom:-.25rem;width:1.5rem;height:1.5rem;border-radius:50%;background:var(--bad);font-size:.875rem}
 .pill .cv.yt .ytb{display:grid}
 .pill .mi{width:14rem;min-width:0}
-.pill .tt{font:400 1.5rem/1.2 var(--f-d);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pill .st{font:700 var(--t1)/1.4 var(--f-b);color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill .tt{font:400 1.5rem/1.2 var(--f-d);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-box:trim-both cap alphabetic;padding:.25rem 0;margin:-.25rem 0 .25rem}
+.pill .st{font:700 var(--t1)/1.4 var(--f-b);color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-box:trim-both cap alphabetic;padding:.25rem 0;margin:-.25rem 0}
 .pill .mc{display:flex;gap:.875rem;align-items:center;margin:0 -.625rem}   /* Figma: icon 20/16/20 cách nhau 54; lề âm = bù khoảng trống trong nút 40 để MÉP icon thẳng với lề capsule */
 .pill .mc button{width:2.5rem;height:2.5rem;padding:0;border:0;border-radius:50%;background:none;color:#fff;font-size:1.5rem;display:grid;place-items:center;cursor:pointer}
 .pill .mc button:hover{background:var(--fill)}.pill .mc button:active{transform:scale(.9)}
@@ -285,7 +283,7 @@ input[type=range]:disabled{opacity:.45}
 #chGo{flex:none;width:2.5rem;height:2.5rem;border-radius:50%;border:0;background:var(--ac);color:var(--ac-ink);font-size:1.125rem;display:grid;place-items:center;cursor:pointer;padding:0}
 #chErr{font-size:.875rem;color:#ff9a9a;min-height:1.25rem}
 #chPops{display:flex;flex-direction:column;gap:.5rem;align-items:flex-end;pointer-events:none}
-.cpop{pointer-events:auto;position:relative;display:flex;gap:.75rem;align-items:center;width:min(26rem,calc(100vw - 2rem));box-sizing:border-box;padding:.75rem 1rem;border-radius:2rem;cursor:pointer;animation:cpIn .22s ease-out;transition:opacity .25s,transform .25s}
+.cpop{pointer-events:auto;position:relative;display:flex;gap:.75rem;align-items:center;width:min(26rem,calc(100vw - 2rem));box-sizing:border-box;padding:.75rem 1rem;border-radius:2rem;cursor:pointer;animation:cpIn .18s ease-out;transition:opacity .25s,transform .25s}
 .cpop.out{opacity:0;transform:translateX(1rem)}
 .cpop .av{flex:none;width:3rem;height:3rem;border-radius:50%;overflow:hidden}.cpop .av img{width:100%;height:100%;display:block}
 .cpop .tx{flex:1;min-width:0}.cpop .nm{font-weight:800;font-size:1rem}
@@ -358,59 +356,67 @@ input[type=range]:disabled{opacity:.45}
 #sKeys .kreset{margin-top:1rem}
 
 /* =====================================================================
-   CHUYỂN ĐỘNG — nhanh (≤ .22s), mềm: chủ yếu opacity + glow + scale nhẹ, không kéo dài
+   CHUYỂN ĐỘNG — phản hồi TỨC THÌ (vào .09s), nhả êm (.16s)
+   Quy tắc: chỉ animate transform + opacity (chạy trên GPU, không phải đợi luồng chính đang bận vẽ 3D).
+   Glow = lớp ::before có sẵn bóng tĩnh, chỉ đổi opacity — KHÔNG animate filter / box-shadow / backdrop.
    ===================================================================== */
-:root{--ease:cubic-bezier(.22,.9,.3,1);--ease-out:cubic-bezier(.4,0,.8,.6)}
-.rb,.tg,.pb,.pl,.chip,#hTop .ib,.pill .mc button,.pill .cv,.tk u,.cpop .x,.yI .x,#chGo,#sKeys .kb,.mapc,.ni,#mList div,.yI,.tk{
-  transition:transform .14s var(--ease),opacity .14s ease,background-color .14s ease,border-color .14s ease,filter .18s var(--ease),box-shadow .18s var(--ease)}
+:root{--ease:cubic-bezier(.2,.8,.2,1);--in:.09s;--out:.16s}
+.rb,.tg,.pb,.pl,.chip,#hTop .ib .ic,.pill .mc button,.pill .mc svg,.pill .cv,.tk u,.cpop .x,.yI .x,#chGo,#sKeys .kb,.mapc,.ni,#mList div,.yI,.tk{
+  transition:transform var(--out) var(--ease),opacity var(--out) ease,background-color var(--out) ease,border-color var(--out) ease}
+.rb:hover,.tg:hover,.pb:hover,.pl:hover,.chip:hover,.pill .mc button:hover,.pill .cv:hover,.ni:hover,.mapc:hover,#mList div:hover,.yI:hover,
+.rb:active,.tg:active,.pb:active,.pl:active,.chip:active,.pill .mc button:active,.pill .cv:active{transition-duration:var(--in)}
+/* nút tròn / viên thuốc: bóng sáng mờ hiện ra bằng opacity */
+.rb,.tg,.pb,.pl,.chip{position:relative}
+.rb::before,.tg::before,.pb::before,.pl::before,.chip::before{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:0 0 .875rem rgba(255,255,255,.38);opacity:0;pointer-events:none;transition:opacity var(--out) ease}
+.rb:hover::before,.tg:hover::before,.pl:hover::before,.chip:hover::before{opacity:1;transition-duration:var(--in)}
+.pb::before{box-shadow:0 0 1rem rgba(255,213,129,.6)}.pb:hover::before{opacity:1;transition-duration:var(--in)}
+.pl.on::before,.chip.on::before{box-shadow:0 0 .875rem rgba(255,213,129,.55);opacity:1}
 .rb:active,.tg:active{transform:scale(.88)}
-.rb:hover,.tg:hover{box-shadow:0 0 .75rem rgba(255,255,255,.22)}
-.pb:hover{filter:brightness(1.08);box-shadow:0 0 1rem rgba(255,213,129,.5)}
-.pb:active{transform:scale(.96);filter:brightness(.97)}
-.pl:hover,.chip:hover{box-shadow:0 0 .75rem rgba(255,255,255,.2)}
+.pb:hover{filter:none}.pb:active{transform:scale(.96)}
 .pl:active,.chip:active{transform:scale(.95)}
-.pl.on,.chip.on{box-shadow:0 0 .75rem rgba(255,213,129,.45)}
-/* icon thanh trên cùng: mờ nhẹ → sáng + toả sáng khi rê, co lại khi bấm */
-#hTop .ib{opacity:.9}
-#hTop .ib:hover{opacity:1;transform:none}
-#hTop .ib:active{transform:none}
-#hTop .ib .ic{filter:drop-shadow(var(--sh)) drop-shadow(0 0 0 rgba(255,255,255,0));transition:transform .14s var(--ease),filter .2s var(--ease)}
-#hTop .ib:hover .ic{transform:translateY(-.125rem) scale(1.1);filter:drop-shadow(var(--sh)) drop-shadow(0 0 .625rem rgba(255,255,255,.6))}
-#hTop .ib:active .ic{transform:scale(.9);filter:drop-shadow(var(--sh)) drop-shadow(0 0 .375rem rgba(255,255,255,.9));transition-duration:.06s}
+/* icon thanh trên: mờ nhẹ → sáng, vầng sáng nở ra, icon nổi lên 2px; bấm = lún xuống ngay */
+#hTop .ib{opacity:.92;transition:opacity var(--out) ease}
+#hTop .ib:hover{opacity:1;transition-duration:var(--in)}
+#hTop .ib .ic{position:relative;z-index:1;will-change:transform}
+#hTop .ib::before,.pill .mc button::before{content:"";position:absolute;left:50%;top:50%;width:3.5rem;height:3.5rem;margin:-1.75rem 0 0 -1.75rem;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,.36),rgba(255,255,255,.12) 55%,rgba(255,255,255,0));opacity:0;transform:scale(.6);pointer-events:none;transition:opacity var(--out) ease,transform var(--out) var(--ease)}
+#hTop .ib:hover::before,.pill .mc button:hover::before{opacity:1;transform:scale(1);transition-duration:var(--in)}
+#hTop .ib:hover .ic{transform:translateY(-.125rem) scale(1.08);transition-duration:var(--in)}
+#hTop .ib:active .ic{transform:scale(.9);transition-duration:.05s}
+#hTop .ib:active::before,.pill .mc button:active::before{opacity:1;transform:scale(1.15)}
 #hTop .ib:focus-visible{outline-offset:-.125rem}
 /* nhạc */
-.pill .mc button{opacity:.88}
+.pill .mc button{position:relative;opacity:.9}
 .pill .mc button:hover{opacity:1;background:none}
-.pill .mc button:active{transform:scale(.82)}
-.pill .mc svg{transition:filter .18s var(--ease)}
-.pill .mc button:hover svg{filter:drop-shadow(0 0 .5rem rgba(255,255,255,.75))}
-.pill .cv:hover{transform:scale(1.06);filter:drop-shadow(0 0 .75rem rgba(255,255,255,.4))}
-.pill .cv:active{transform:scale(.95)}
+.pill .mc svg{position:relative;z-index:1;will-change:transform}
+.pill .mc button:hover svg{transform:scale(1.1)}
+.pill .mc button:active svg{transform:scale(.84);transition-duration:.05s}
+.pill .mc button:active{transform:none}
+.pill .cv::before{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:0 0 1rem rgba(255,255,255,.5);opacity:0;pointer-events:none;transition:opacity var(--out) ease}
+.pill .cv:hover::before{opacity:1;transition-duration:var(--in)}
+.pill .cv:hover{transform:scale(1.05)}.pill .cv:active{transform:scale(.94)}
 .pill .tg{opacity:.85}.pill .tg:hover{opacity:1}
+#hProf .tg svg{transition:transform var(--out) var(--ease)}
 /* chấm đỏ: bật ra */
-.dot,.bdg{animation:dotPop .28s var(--ease)}
-@keyframes dotPop{from{transform:scale(0);opacity:0}60%{transform:scale(1.25)}to{transform:scale(1);opacity:1}}
+.dot,.bdg{animation:dotPop .22s var(--ease)}
+@keyframes dotPop{from{transform:scale(0);opacity:0}60%{transform:scale(1.2)}to{transform:scale(1);opacity:1}}
 /* danh sách: nền sáng dần, không nhảy */
 .ni:hover{background:rgba(255,255,255,.2)}.ni.unread:hover{background:rgba(255,213,129,.28)}
 .mapc:active,.ni[data-go]:active,#mList div:active,.yI:active{transform:scale(.985)}
-/* panel mở / đóng: mờ + trượt nhẹ (đóng cũng mượt nhờ display discrete; trình duyệt cũ thì tự bật/tắt ngay) */
-#hNote,#hTasks,#hChat,#hYt,#mDrawer,#hCall{
-  opacity:0;transition:opacity .16s ease,transform .2s var(--ease),display .2s allow-discrete}
-#hNote,#hTasks,#hChat,#hYt,#mDrawer{transform:translateY(.5rem) scale(.98)}
-#hNote,#hTasks{transform-origin:100% 0}
-#hChat,#hYt,#mDrawer{transform-origin:0 100%}
-#hNote.on,#hTasks.on,#hChat.on,#hYt.on,#hMusic.open #mDrawer,#hCall.on{opacity:1}
+/* panel mở / đóng: chỉ opacity + trượt 6px. Mở .14s, đóng .1s (đóng nhanh hơn để cảm giác tức thì). Trình duyệt cũ: bật/tắt ngay. */
+#hNote,#hTasks,#hChat,#hYt,#mDrawer,#hCall{opacity:0;transition:opacity .1s ease,transform .1s ease,display .1s allow-discrete}
+#hNote,#hTasks,#hChat,#hYt,#mDrawer{transform:translateY(.375rem)}
+#hNote.on,#hTasks.on,#hChat.on,#hYt.on,#hMusic.open #mDrawer,#hCall.on{opacity:1;transition:opacity .14s ease,transform .18s var(--ease),display .14s allow-discrete}
 #hNote.on,#hTasks.on,#hChat.on,#hYt.on,#hMusic.open #mDrawer{transform:none}
-.modal{opacity:0;transition:opacity .16s ease,display .2s allow-discrete,overlay .2s allow-discrete}
-.modal.on{opacity:1}
-.modal .mbox{transform:translateY(.75rem) scale(.97);transition:transform .22s var(--ease)}
-.modal.on .mbox{transform:none}
-#toast{transition:opacity .18s ease}
+.modal{opacity:0;transition:opacity .1s ease,display .1s allow-discrete,overlay .1s allow-discrete}
+.modal.on{opacity:1;transition:opacity .14s ease,display .14s allow-discrete,overlay .14s allow-discrete}
+.modal .mbox{transform:translateY(.5rem);transition:transform .1s ease}
+.modal.on .mbox{transform:none;transition:transform .18s var(--ease)}
+#toast{transition:opacity .14s ease}
 @starting-style{
-  #hNote.on,#hTasks.on,#hChat.on,#hYt.on,#hMusic.open #mDrawer{opacity:0;transform:translateY(.5rem) scale(.98)}
+  #hNote.on,#hTasks.on,#hChat.on,#hYt.on,#hMusic.open #mDrawer{opacity:0;transform:translateY(.375rem)}
   #hCall.on{opacity:0}
   .modal.on{opacity:0}
-  .modal.on .mbox{transform:translateY(.75rem) scale(.97)}
+  .modal.on .mbox{transform:translateY(.5rem)}
 }
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{transition-duration:.01s!important;animation-duration:.01s!important;animation-iteration-count:1!important}
