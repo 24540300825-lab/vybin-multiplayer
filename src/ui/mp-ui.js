@@ -82,9 +82,9 @@ export function mountMpUi({sess, chat, voice}) {
   const PH = {idle: '', asking: 'Đang xin quyền…', waiting: `Chờ ${NAME[other]} vào cuộc gọi`, connecting: 'Đang kết nối…', connected: 'Đang gọi', weak: 'Mạng yếu', recovering: 'Đang nối lại…', lost: 'Mất kết nối — đang thử lại', ended: 'Cuộc gọi đã kết thúc'};
   const call = document.createElement('div'); call.id = 'hCall'; call.className = 'hud glass';
   call.innerHTML = `<div class="cH"><span class="cDot" id="cDot"></span><b id="cSt">—</b><i id="cTm"></i><span class="cSp"></span>
-      <button class="pl" id="cDg" title="Chẩn đoán">📊</button><button class="pl" id="cSet" title="Thiết bị & chất lượng">⚙</button><button class="pl" id="cMin" title="Thu nhỏ">–</button><button class="pl" id="cX" title="Đóng khung video (cuộc gọi vẫn tiếp tục)">✕</button></div>
+      <button class="pl" id="cSz" title="Đổi cỡ khung: nhỏ / vừa / lớn">⤢</button><button class="pl" id="cFs" title="Toàn màn hình (Esc để thoát)">⛶</button><button class="pl" id="cDg" title="Chẩn đoán">📊</button><button class="pl" id="cSet" title="Thiết bị & chất lượng">⚙</button><button class="pl" id="cMin" title="Thu nhỏ">–</button><button class="pl" id="cX" title="Đóng khung video (cuộc gọi vẫn tiếp tục)">✕</button></div>
     <div class="cV"><video id="cRv" autoplay playsinline muted></video><div class="cNo" id="cNo"><div class="av">${NAME[other][0]}</div><span id="cNoT"></span></div><video id="cLv" autoplay playsinline muted></video></div>
-    <div id="cErr"></div>
+    <div id="cErr"></div><div class="cRz" id="cRz" title="Kéo để phóng to / thu nhỏ"></div>
     <div class="cC"><button class="ib" id="cMic"><span>🎙️</span><i>Mic</i></button><button class="ib" id="cCam"><span>📹</span><i>Camera</i></button><button class="ib end" id="cEnd"><span>📞</span><i>Kết thúc</i></button></div>
     <div class="cP" id="cSetP"><label>Micro <select id="cSelM"></select></label><label>Camera <select id="cSelC"></select></label>
       <div class="chips" id="cQ">${['auto:Tự động', 'high:Cao', 'mid:Vừa', 'low:Thấp'].map(x => `<span class="chip" data-q="${x.split(':')[0]}">${x.split(':')[1]}</span>`).join('')}</div></div>
@@ -92,6 +92,41 @@ export function mountMpUi({sess, chat, voice}) {
   document.body.appendChild(call);
   const placeCall = () => { const pr = document.getElementById('hPeer'); if (pr) call.style.setProperty('--callTop', Math.round(pr.getBoundingClientRect().bottom + 8) + 'px'); };
   placeCall(); addEventListener('resize', placeCall); setTimeout(placeCall, 900);
+  // ---- cỡ + vị trí khung gọi: kéo góc dưới-phải để đổi cỡ, kéo thanh trên để di chuyển, ⤢ đổi nhanh nhỏ/vừa/lớn, ⛶ toàn màn hình ----
+  const LKEY = 'vyCallLayout', SIZES = [300, 480, 760];
+  let lay = {w: 300, x: null, y: null};
+  try { Object.assign(lay, JSON.parse(localStorage.getItem(LKEY) || '{}')); } catch (e) {}
+  const saveLay = () => { try { localStorage.setItem(LKEY, JSON.stringify(lay)); } catch (e) {} };
+  const isNarrow = () => innerWidth <= 900;
+  function applyLay() {
+    const maxW = Math.max(220, innerWidth - 20);
+    const w = Math.max(220, Math.min(lay.w || 300, maxW, 1400));
+    call.style.setProperty('--callW', w + 'px');
+    if (lay.x != null && lay.y != null && !isNarrow()) {
+      const x = Math.max(0, Math.min(lay.x, innerWidth - 120)), y = Math.max(0, Math.min(lay.y, innerHeight - 60));
+      call.style.left = x + 'px'; call.style.top = y + 'px'; call.style.bottom = 'auto';
+    } else { call.style.left = ''; call.style.top = ''; call.style.bottom = ''; }
+  }
+  applyLay(); addEventListener('resize', applyLay);
+  const setFull = v => { call.classList.toggle('full', v); document.body.classList.toggle('callFull', v); $('cFs').textContent = v ? '🗗' : '⛶'; };
+  $('cSz').onclick = () => { const i = SIZES.findIndex(w => w >= (lay.w || 300) - 5); lay.w = SIZES[(i + 1) % SIZES.length]; setFull(false); applyLay(); saveLay(); };
+  $('cFs').onclick = () => setFull(!call.classList.contains('full'));
+  $('cRv').ondblclick = () => setFull(!call.classList.contains('full'));
+  addEventListener('keydown', e => { if (e.key === 'Escape' && call.classList.contains('full')) setFull(false); });
+  const drag = (el, onMove, onEnd) => {
+    el.addEventListener('pointerdown', e => {
+      if (e.button !== 0 || call.classList.contains('full')) return;
+      if (e.target.closest('button')) return;
+      e.preventDefault(); const r = call.getBoundingClientRect(); const st = {sx: e.clientX, sy: e.clientY, l: r.left, t: r.top, w: r.width};
+      el.setPointerCapture(e.pointerId);
+      const mv = ev => onMove(st, ev.clientX - st.sx, ev.clientY - st.sy);
+      const up = () => { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); onEnd && onEnd(); saveLay(); };
+      el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+    });
+  };
+  drag($('cRz'), (st, dx) => { lay.w = Math.round(st.w + dx); if (lay.x == null) { lay.x = st.l; lay.y = st.t; } applyLay(); });
+  drag(call.querySelector('.cH'), (st, dx, dy) => { lay.x = Math.round(st.l + dx); lay.y = Math.round(st.t + dy); applyLay(); });
+  call.querySelector('.cH').addEventListener('dblclick', e => { if (e.target.closest('button')) return; lay.x = lay.y = null; applyLay(); saveLay(); });
   const rv = $('cRv'), lv = $('cLv'), play = v => { const p = v.play && v.play(); p && p.catch && p.catch(() => {}); };
   let shown = false, collapsed = false, setOpenP = null, lastS = voice.state(), tmT = null, autoShown = false;
   const mmss = t => { const n = Math.max(0, Math.floor(t / 1000)), h = Math.floor(n / 3600); return (h ? h + ':' : '') + String(Math.floor(n % 3600 / 60)).padStart(h ? 2 : 1, '0') + ':' + String(n % 60).padStart(2, '0'); };
@@ -146,7 +181,7 @@ export function mountMpUi({sess, chat, voice}) {
   $('iVoiceX').onclick = endCall; $('cEnd').onclick = endCall;
   $('cMic').onclick = () => voice.toggleMute(); $('cCam').onclick = () => voice.toggleCamera();
   $('cX').onclick = () => showCall(false);
-  $('cMin').onclick = () => { collapsed = !collapsed; call.classList.toggle('min', collapsed); voice.setPanelOpen(viewing()); bindVideo(); tick(); };
+  $('cMin').onclick = () => { setFull(false); collapsed = !collapsed; call.classList.toggle('min', collapsed); voice.setPanelOpen(viewing()); bindVideo(); tick(); };
   $('cSet').onclick = async () => { const p = $('cSetP'); p.classList.toggle('on'); if (p.classList.contains('on')) fillDevices(); };
   $('cDg').onclick = () => { $('cDgP').classList.toggle('on'); dg(); };
   document.querySelectorAll('#cQ .chip').forEach(c => c.onclick = () => voice.setQuality(c.dataset.q));
