@@ -6,6 +6,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&family=Nunito:wght@800;900&display=swap">
 <link rel="preload" as="image" href="assets/ui/loading.v1.webp" type="image/webp" fetchpriority="high">
+<script>try{var f=localStorage.getItem("vyFx"),w=(navigator.hardwareConcurrency||8)<=2||(navigator.deviceMemory||8)<=2||matchMedia("(prefers-reduced-motion: reduce)").matches;document.documentElement.dataset.fx=f==="lite"||f==="high"?f:(w?"lite":"high")}catch(e){}</script>
 <link rel="stylesheet" href="style.css?v=1">
 <link rel="stylesheet" href="ui.css?v=1">
 </head><body>
@@ -78,6 +79,7 @@ try{if(sessionStorage.getItem('vyFade')){sessionStorage.removeItem('vyFade');l.c
 <div class="modal" id="hSet" role="dialog" aria-modal="true" aria-label="Cài đặt"><div class="mbox" id="sBox">
  <div class="ph"><h2>Cài đặt</h2><span class="sp"></span><button class="rb" id="sX" title="Đóng" aria-label="Đóng" data-ic="x"></button></div>
  <details class="sec" open><summary>Đồ họa</summary><div class="chips" id="sGfx"></div></details>
+ <details class="sec" open><summary>Giao diện (hiệu ứng)</summary><div class="chips" id="sFx"></div><p class="help" id="sFxH"></p></details>
  <details class="sec" open><summary>Ánh sáng &amp; thời tiết</summary>
   <label>Giờ thật (đồng hồ + ánh sáng theo giờ ngoài đời) <input type="checkbox" id="sReal"></label><label>Múi giờ <select id="sTz"></select></label><label>Giờ <span class="rg"><input type="range" id="sTime" min="0" max="24" step="0.05"><b id="sTimeV"></b></span></label>
   <label>Tự chạy ngày đêm <input type="checkbox" id="sAuto"></label><div class="chips" id="sWea"></div></details>

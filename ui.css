@@ -184,7 +184,7 @@ button{font-family:inherit}
 .vrow .ic{font-size:1.5rem;flex:none}.vrow input[type=range]{flex:1;min-width:0}
 #mYtB{flex:none}
 /* khung YouTube (music-ui.js) */
-#hYt{display:none;width:34.75rem;max-width:100%;max-height:calc(100vh - 16rem);overflow:auto;padding:1rem;flex-direction:column;gap:.5rem;font-size:.875rem;border-radius:2rem}
+#hYt{display:none;width:34.75rem;max-width:100%;max-height:calc(100vh - 24rem);overflow:auto;padding:1rem;flex-direction:column;gap:.5rem;font-size:.875rem;border-radius:2rem}
 #hYt.on{display:flex}
 #hYt .yH{display:flex;align-items:center;gap:.5rem}
 #hYt .yH b{font:400 1.25rem/1.2 var(--f-d);display:flex;align-items:center;gap:.5rem}
@@ -195,12 +195,32 @@ button{font-family:inherit}
 #hYt .yNow{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#hYt .yNow:empty{display:none}
 #hYt .yA{display:flex;gap:.5rem;align-items:center}
 #hYt .yA input,#hYt .yA select{flex:1;min-width:0}
-#hYt .yL{max-height:11rem;overflow:auto;border-radius:1.25rem;background:rgba(0,0,0,.3)}
+#hYt .yL{flex:none;max-height:11rem;overflow:auto;border-radius:1.25rem;background:rgba(0,0,0,.3)}
 .yI{display:flex;gap:.5rem;align-items:center;padding:.5rem .75rem;cursor:pointer}.yI:hover{background:var(--fill)}.yI.cur{background:rgba(255,213,129,.2);color:var(--ac)}
 .yI .n{width:1.5rem;text-align:center;opacity:.7;flex:none}.yI .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .yI .x{background:none;border:0;color:inherit;opacity:.5;cursor:pointer;display:grid;place-items:center;font-size:1rem}.yI .x:hover{opacity:1}
 .yE{padding:1rem;opacity:.7;text-align:center}
 #hYt .yF{display:flex;gap:.5rem;align-items:center;font-size:.75rem;opacity:.75}#hYt .yF span{flex:1}
+/* tìm nhạc trong game */
+#hYt .yTabs{display:flex;gap:.5rem;flex:none}
+#hYt .yTabs button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border:0;border-radius:999px;padding:.5rem 1rem;background:var(--fill);color:#fff;font:700 1rem/1.25 var(--f-b);cursor:pointer;transition:background-color .12s ease,color .12s ease}
+#hYt .yTabs button:hover{background:var(--fill2)}
+#hYt .yTabs button.on{background:var(--ac);color:var(--ac-ink)}
+#hYt .yTab{flex:none;display:flex;flex-direction:column;gap:.5rem;min-height:0}
+#hYt .yA input[type=search]{-webkit-appearance:none;appearance:none}
+#hYt .yCh{display:flex;flex-wrap:wrap;gap:.5rem}
+#hYt .yCh .chip{padding:.25rem .75rem;font-size:.875rem}
+#hYt .yR{flex:none;max-height:16rem;overflow:auto;border-radius:1.25rem;background:rgba(0,0,0,.3);overscroll-behavior:contain}
+#hYt .yR:empty{display:none}
+.yS{display:flex;align-items:center;gap:.75rem;padding:.5rem .75rem;transition:background-color .12s ease}
+.yS:hover{background:var(--fill)}
+.yS img{flex:none;width:6rem;height:3.375rem;border-radius:.75rem;object-fit:cover;background:rgba(255,255,255,.1)}
+.yS .m{flex:1;min-width:0;display:flex;flex-direction:column;gap:.125rem}
+.yS .m b{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.yS .m small{opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.yS .rb.ok{background:var(--ac);color:var(--ac-ink)}
+.yE .lspin{display:inline-block;vertical-align:-.2rem;margin-right:.5rem}
+.yI .t small{opacity:.6;margin-left:.5rem}
 
 /* ---------- đồng hồ (Figma: capsule 430×126, giờ Audex 64) ---------- */
 #hClock{display:flex;align-items:center;gap:1.25rem;box-sizing:border-box;height:8rem;padding:1.25rem 2.5rem;border-radius:2rem}
@@ -449,6 +469,56 @@ input[type=range]:disabled{opacity:.45}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{transition-duration:.01s!important;animation-duration:.01s!important;animation-iteration-count:1!important}
 }
+
+/* =====================================================================
+   CHẾ ĐỘ HIỆU ỨNG (Cài đặt → Giao diện; src/ui/fx.js đặt html[data-fx])
+   lite = NHẸ: tức thì, bỏ blur nền kính, bỏ animation · high = ĐỒ HỌA CAO: Smart Animate (chuyển trạng thái có chuyển động)
+   ===================================================================== */
+/* ---- NHẸ ---- */
+html[data-fx=lite]{--cap:linear-gradient(to right,rgba(24,18,12,.52),rgba(24,18,12,.36));--cap-h:linear-gradient(to right,rgba(24,18,12,.52),rgba(24,18,12,.36))}
+html[data-fx=lite] .cap,html[data-fx=lite] .panel,html[data-fx=lite] .mbox,html[data-fx=lite] #toast,html[data-fx=lite] #lui{-webkit-backdrop-filter:none;backdrop-filter:none}
+html[data-fx=lite] *,html[data-fx=lite] *::before,html[data-fx=lite] *::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+html[data-fx=lite] .lspin{animation:lspin .8s linear infinite!important}
+html[data-fx=lite] #lbg{opacity:1;transform:none}
+/* ---- ĐỒ HỌA CAO (Smart Animate) ---- */
+@keyframes fxRise{from{opacity:0;transform:translateY(.5rem)}to{opacity:1;transform:none}}
+@keyframes fxTalk{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.5);opacity:0}}
+/* panel / hộp thoại bung ra từ góc, có độ nảy nhẹ; đóng thì thu lại nhanh */
+html[data-fx=high] #hNote,html[data-fx=high] #hTasks{transform:translateY(.5rem) scale(.92)}
+html[data-fx=high] #hChat,html[data-fx=high] #hYt,html[data-fx=high] #mDrawer{transform:translateY(.75rem) scale(.94)}
+html[data-fx=high] #hNote.on,html[data-fx=high] #hTasks.on,html[data-fx=high] #hChat.on,html[data-fx=high] #hYt.on,html[data-fx=high] #hMusic.open #mDrawer{transform:none;transition:opacity .16s ease,transform .34s cubic-bezier(.34,1.35,.64,1),display .16s allow-discrete}
+html[data-fx=high] .modal .mbox{transform:translateY(.75rem) scale(.94)}
+html[data-fx=high] .modal.on .mbox{transform:none;transition:transform .34s cubic-bezier(.34,1.35,.64,1)}
+@starting-style{
+  html[data-fx=high] #hNote.on,html[data-fx=high] #hTasks.on{opacity:0;transform:translateY(.5rem) scale(.92)}
+  html[data-fx=high] #hChat.on,html[data-fx=high] #hYt.on,html[data-fx=high] #hMusic.open #mDrawer{opacity:0;transform:translateY(.75rem) scale(.94)}
+  html[data-fx=high] .modal.on .mbox{transform:translateY(.75rem) scale(.94)}
+}
+/* thẻ hồ sơ thu gọn ↔ mở rộng: avatar co giãn, chỉ số cuộn lại, thẻ đối phương trượt theo */
+html[data-fx=high] #hProf .av{transition:width .28s var(--ease),height .28s var(--ease)}
+html[data-fx=high] #hProf .pbody{transition:margin-left .28s var(--ease),min-width .28s var(--ease),padding .28s var(--ease)}
+html[data-fx=high] #hProf .stats{display:flex;overflow:hidden;max-height:6rem;transition:max-height .28s var(--ease),opacity .2s ease}
+html[data-fx=high] #hProf.min .stats{max-height:0;opacity:0}
+html[data-fx=high] #hPeer{transition:margin-left .28s var(--ease),opacity .25s ease}
+html[data-fx=high] .stat .trk i{transition:width .6s var(--ease)}
+/* avatar đối phương: xám → màu mượt; đang nói chuyện thì có vòng sóng lan ra */
+html[data-fx=high] #hPeer .av img{transition:filter .4s ease}
+html[data-fx=high] #hPeer .av{position:relative}
+html[data-fx=high] #hPeer.talk .av{box-shadow:none}
+html[data-fx=high] #hPeer.talk .av::after{content:"";position:absolute;inset:-.125rem;border-radius:50%;border:.1875rem solid #7cf08a;animation:fxTalk 1.3s ease-out infinite;pointer-events:none}
+html[data-fx=high] #hPeer.talk .av::before{content:"";position:absolute;inset:-.1875rem;border-radius:50%;border:.1875rem solid #7cf08a;pointer-events:none}
+/* thông báo nhanh trượt lên */
+html[data-fx=high] #toast{transform:translate(-50%,.75rem) scale(.96);transition:opacity .18s ease,transform .32s cubic-bezier(.34,1.4,.64,1)}
+html[data-fx=high] #toast[style*="opacity: 1"]{transform:translate(-50%,0) scale(1)}
+/* danh sách / tab: hiện lần lượt */
+html[data-fx=high] .ni,html[data-fx=high] .tk,html[data-fx=high] #yR.new .yS,html[data-fx=high] .yTab:not([hidden]){animation:fxRise .26s var(--ease) both}
+html[data-fx=high] .ni:nth-child(2),html[data-fx=high] .tk:nth-child(2),html[data-fx=high] #yR.new .yS:nth-child(2){animation-delay:.03s}
+html[data-fx=high] .ni:nth-child(3),html[data-fx=high] .tk:nth-child(3),html[data-fx=high] #yR.new .yS:nth-child(3){animation-delay:.06s}
+html[data-fx=high] .ni:nth-child(4),html[data-fx=high] .tk:nth-child(4),html[data-fx=high] #yR.new .yS:nth-child(4){animation-delay:.09s}
+html[data-fx=high] .ni:nth-child(5),html[data-fx=high] .tk:nth-child(5),html[data-fx=high] #yR.new .yS:nth-child(5){animation-delay:.12s}
+html[data-fx=high] .ni:nth-child(n+6),html[data-fx=high] .tk:nth-child(n+6),html[data-fx=high] #yR.new .yS:nth-child(n+6){animation-delay:.15s}
+/* thẻ loading thu vào khi vào game */
+html[data-fx=high] #load.black #lui{transform:translateY(.75rem) scale(.97)}
 
 /* =====================================================================
    RESPONSIVE — chế độ GỌN (màn nhỏ / điện thoại): co giãn lớn hơn, thu gọn thẻ & thanh

@@ -32,6 +32,7 @@ class Query {
   select() { return this; } eq(k, v) { this.f.push(r => r[k] === v); return this; } gt(k, v) { this.f.push(r => r[k] > v); return this; }
   order(k, {ascending = true} = {}) { this.o = [k, ascending]; return this; } limit(n) { this.l = n; return this; }
   insert(row) { this.ins = row; return this; }
+  maybeSingle() { this.one = true; return this; } single() { this.one = true; return this; }
   then(res, rej) { return Promise.resolve(this._run()).then(res, rej); }
   _run() {
     const d = load();
@@ -41,6 +42,10 @@ class Query {
       const body = String(r.body || '').trim(); if (!body || body.length > 500) return err('check constraint');
       const row = {id: r.id || uuid(), room_code: r.room_code, user_id: uid(), slot: s, body, created_at: new Date().toISOString()};
       d.messages.push(row); save(d); bc.postMessage({t: 'insert', row}); fire('insert', row); return {data: row, error: null};
+    }
+    if (this.t === 'rooms') {   // bảng rooms (RLS: chỉ thành viên đọc được)
+      const rs = Object.entries(d.rooms).filter(([c]) => member(d, c)).map(([code, r]) => ({code, map_id: r.map_id})).filter(r => this.f.every(f => f(r)));
+      return {data: this.one ? (rs[0] || null) : rs, error: null};
     }
     const rows = d.messages.filter(m => member(d, m.room_code) && this.f.every(f => f(m)));
     if (this.o) rows.sort((a, b) => (a[this.o[0]] < b[this.o[0]] ? -1 : 1) * (this.o[1] ? 1 : -1));

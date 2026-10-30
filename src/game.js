@@ -251,7 +251,20 @@ export function init(ctx){
     else if(d.st==='closing'){/* đang đóng */}}
   function updDoors(){for(const d of doorList){
     if(d.st==='opening'&&d.a.time>=d.peak){d.a.time=d.peak;d.a.paused=true;d.st='open'}
-    else if(d.st==='closing'&&(d.a.time>=d.end-0.02||!d.a.isRunning())){d.a.stop();d.st='closed'}}}
+    else if(d.st==='closing'&&(d.a.time>=d.end-0.02||!d.a.isRunning())){d.a.stop();d.st='closed'}
+    // lệnh từ máy kia đến lúc cửa đang chạy dở → đợi cửa đứng yên rồi mới chuyển tiếp cho đúng trạng thái đích
+    if(d.want!==undefined&&(d.st==='open'||d.st==='closed')){if(doorOpenish(d)!==d.want)toggleDoor(d);else d.want=undefined}}}
+  // ĐỒNG BỘ CỬA (trước đây chỉ gửi "đảo trạng thái": rớt/đến lệch 1 gói là 2 máy thấy cửa ngược nhau mãi). Giờ gửi TRẠNG THÁI ĐÍCH + số phiên bản của từng cửa;
+  // snapshot cũng mang bảng trạng thái cửa, nên mất gói thì lần snapshot sau tự khớp lại. Phiên bản cao hơn thắng; bằng nhau mà khác trạng thái → BIN thắng (cố định, không dao động).
+  const doorOpenish=d=>d.st==='open'||d.st==='opening';
+  const doorsSorted=[...doorList].sort((a,b)=>a.node.name<b.node.name?-1:a.node.name>b.node.name?1:0);
+  doorList.forEach(d=>{d.v=0});
+  function doorApply(d,want,v,senderIsBin){
+    if(v<d.v)return;
+    if(v===d.v&&(doorOpenish(d)===want||!senderIsBin))return;     // cùng phiên bản: khớp rồi thì thôi; khác nhau thì chỉ nhận của BIN
+    d.v=v;
+    if(doorOpenish(d)===want){d.want=undefined;return}
+    d.want=want;if(d.st==='open'||d.st==='closed')toggleDoor(d)}
   function playChair(tag,side){const a=chairActs['ACT_CHAIR_'+tag+'_'+side];if(!a){console.warn('missing chair clip',tag,side);return}
     Object.values(chairActs).forEach(x=>{if(x!==a)x.stop()});a.reset();a.setLoop(THREE.LoopOnce,1);a.clampWhenFinished=true;a.timeScale=1;a.play();}
 
@@ -628,12 +641,24 @@ export function init(ctx){
     if(DEF.remote&&net)correct(dt);
   }
   // ----- nhân vật remote: nắn dần về snapshot của chủ nhân vật (chủ là authority) -----
+  // Bản sao KHÔNG được xuyên tường/đồ đạc: trước đây nó đoán vị trí = snapshot + vận tốc×tuổi (tới 0.8s ≈ 1–3m) rồi lướt thẳng tới đó, bỏ qua va chạm,
+  // nên khi người kia dừng sát tường/bồn cầu mà gói tin trễ/rớt, nhân vật kia hiện ra "đi xuyên" rồi giật về. Giờ: đoạn ngoại suy bị cắt ở ô bị chặn đầu tiên,
+  // và mỗi bước lướt cũng phải qua kiểm tra va chạm (kẹt >0.5s mới bỏ qua, phòng khi hai bên lệch đường đi).
+  function clipSeg(lv,x0,z0,x1,z1){const d=Math.hypot(x1-x0,z1-z0);if(d<0.02)return [x1,z1];const n=Math.ceil(d/0.05);let lx=x0,lz=z0;
+    for(let k=1;k<=n;k++){const t=k/n,x=x0+(x1-x0)*t,z=z0+(z1-z0)*t,c=cell(x,z);if(!free(lv,c[0],c[1]))return [lx,lz];lx=x;lz=z}return [x1,z1]}
+  let corBlk=0;
   function correct(dt){const s=net,age=Math.min(0.8,(performance.now()-s.t)/1000);
-    const tx=s.x+s.vx*age,tz=s.z+s.vz*age,dx=tx-P.pos.x,dz=tz-P.pos.z,d=Math.hypot(dx,dz);
+    let tx=s.x+s.vx*age,tz=s.z+s.vz*age;
+    if(P.mode==='free'&&(s.vx||s.vz)&&!stairAt(s.x,s.z)&&!stairAt(tx,tz)){const c=clipSeg(s.l,s.x,s.z,tx,tz);tx=c[0];tz=c[1]}
+    const dx=tx-P.pos.x,dz=tz-P.pos.z,d=Math.hypot(dx,dz);
     if(d>9||(d>3&&s.l!==P.level)){P.pos.set(tx,s.y,tz);P.level=s.l;P.yaw=s.w;plan=[];return}      // chỉ 'dịch chuyển' khi lệch rất xa / khác tầng; còn lại lướt nhanh về đúng chỗ
     if(busy)return;
     if(P.mode==='free'){
-      const k=1-Math.exp(-dt*(d>3?16:d>0.6?8:3.5));P.pos.x+=dx*k;P.pos.z+=dz*k;
+      const k=1-Math.exp(-dt*(d>3?16:d>0.6?8:3.5)),nx=P.pos.x+dx*k,nz=P.pos.z+dz*k,ox=P.pos.x,oz=P.pos.z;
+      if(stairAt(nx,nz)||stairAt(ox,oz)||walkable(ox,oz,nx,nz)){P.pos.x=nx;P.pos.z=nz;corBlk=0}
+      else if(walkable(ox,oz,nx,oz)){P.pos.x=nx;corBlk=0}
+      else if(walkable(ox,oz,ox,nz)){P.pos.z=nz;corBlk=0}
+      else if((corBlk+=dt)>0.5){P.pos.x=tx;P.pos.z=tz;corBlk=0}      // kẹt lâu: hai bên lệch đường đi → nhận vị trí chủ nhân vật
       // tầng của bản sao tự suy ra từ lúc rời cầu thang; chỉ nhận tầng từ snapshot khi lệch KÉO DÀI (snapshot cũ 0.1–0.2s đã làm nhân vật tụt/nhảy tầng)
       if(!stairAt(P.pos.x,P.pos.z)&&!plan[0]){
         if(s.l===P.level)lvMis=0;
@@ -694,7 +719,7 @@ export function init(ctx){
     const hits=ray.intersectObjects(envMeshes,false);
     for(const h of hits){
       if(h.object.userData.glass)continue;
-      {const dr=doorOf(h.object);if(dr){doHalo(dr.node);toggleDoor(dr);if(api.emit)api.emit('door',dr.node.name);return}}
+      {const dr=doorOf(h.object);if(dr){doHalo(dr.node);toggleDoor(dr);dr.v++;dr.want=undefined;if(api.emit)api.emit('door',[dr.node.name,doorOpenish(dr)?1:0,dr.v]);return}}
       if(isUnder(h.object,'Bed')){doHalo('Bed');cmdSleep();return}
       if(isUnder(h.object,CHAIR.name)){doHalo(CHAIR.name);cmdSit();return}
       const n=h.face?h.face.normal.clone().transformDirection(h.object.matrixWorld):new THREE.Vector3(0,1,0);
@@ -1282,19 +1307,29 @@ export function init(ctx){
       if(window.__shot){const f=window.__shot;window.__shot=null;f()}
       adaptRes(rawDt);}
   }
-  function loop(){requestAnimationFrame(loop);rawDt=R.getDelta();Perf.frame(rawDt*1000);tick(Math.min(rawDt,0.05));Perf.draw(performance.now());}
+  function loop(){requestAnimationFrame(loop);rawDt=R.getDelta();Perf.frame(rawDt*1000);
+    // BẮT KỊP THỜI GIAN THẬT: máy yếu/khung hình tụt <20fps trước đây bị ép dt<=0.05s => thế giới chạy CHẬM so với đồng hồ thật, trong khi máy kia vẫn chạy đúng tốc độ
+    // (nhân vật remote bị dự đoán đi quá xa rồi giật về). Giờ chia nhỏ thành nhiều bước <=0.05s (tối đa 0.25s thực/khung; tab vừa bật lại sau khi ẩn thì không nhảy vọt).
+    let acc=Math.min(rawDt,0.25);while(acc>0.0501){tick(0.05,false);acc-=0.05}
+    tick(acc);Perf.draw(performance.now());}
   if(!TEST)loop();
   // ===== API cho lớp mạng =====
   api.snapshot=()=>{const p=local.P,mv=p.sp>0.05||!!local.busy||local.plan.length>0,mov=p.sp>0.05&&p.mode==='free'&&!local.busy;
-    return{x:r3(p.pos.x),y:r3(p.pos.y),z:r3(p.pos.z),w:r3(p.yaw),l:p.level,m:p.mode,b:local.busy?local.busy.kind:0,vx:mov?r3(Math.sin(p.yaw)*p.sp):0,vz:mov?r3(Math.cos(p.yaw)*p.sp):0,mv:mv?1:0}};
+    return{x:r3(p.pos.x),y:r3(p.pos.y),z:r3(p.pos.z),w:r3(p.yaw),l:p.level,m:p.mode,b:local.busy?local.busy.kind:0,vx:mov?r3(Math.sin(p.yaw)*p.sp):0,vz:mov?r3(Math.cos(p.yaw)*p.sp):0,mv:mv?1:0,mp:MAPID}};
   api.addRemote=(slot,glb)=>{if(remote)return;remote=makeChar(glb,{...DEFS[slot],remote:true});api.remote=remote;rinp.mag=0};
+  api.setRemoteVisible=v=>{if(remote&&remote.char.visible!==v)remote.char.visible=v};
   api.removeRemote=()=>{if(!remote)return;remote.dispose();remote=null;api.remote=null;if(window.__halo)endHalo()};
   api.setRemoteInput=m=>{rinp.x=m.x;rinp.z=m.z;rinp.run=!!m.r;rinp.mag=m.m?1:0;rinpT=clockG};
   api.applyState=m=>{if(remote)remote.setNet({x:m.x,y:m.y,z:m.z,w:m.w,l:m.l,m:m.m,b:m.b,vx:m.vx||0,vz:m.vz||0,t:performance.now()})};
   api.applyCmd=(t,a)=>{if(!remote)return;switch(t){
     case 'move':remote.cmdMove(a[0],a[1],a[2],!!a[3]);break;case 'sleep':remote.cmdSleep();break;case 'sit':remote.cmdSit(a||undefined);break;
     case 'wake':remote.cmdWake();break;case 'off':remote.cmdOffChair();break;case 'blink':remote.blink();break;
-    case 'int':rinp.interact=true;break;case 'door':{const d=doorList.find(x=>x.node.name===a);if(d)toggleDoor(d);break}}};
+    case 'int':rinp.interact=true;break;case 'door':{if(Array.isArray(a)){const d=doorList.find(x=>x.node.name===a[0]);if(d)doorApply(d,!!a[1],a[2]|0,!localIsBin())}else{const d=doorList.find(x=>x.node.name===a);if(d)toggleDoor(d)}break}}};
+  const localIsBin=()=>local&&local.id==='bin';
+  // bảng cửa gửi kèm snapshot: "<0|1><phiên bản base36>" cho từng cửa, theo thứ tự tên
+  api.doorSig=()=>doorsSorted.map(d=>(doorOpenish(d)?1:0)+(d.v||0).toString(36)).join(',');
+  api.applyDoors=(sig,fromBin)=>{if(!sig)return;const a=String(sig).split(',');if(a.length!==doorsSorted.length)return;
+    a.forEach((t,i)=>{const d=doorsSorted[i];doorApply(d,t[0]==='1',parseInt(t.slice(1),36)||0,fromBin)})};
   api.envOut=null;
   window.__envChanged=()=>{if(api.envOut)api.envOut({time:TP.time,weather:TP.weather,auto:TP.auto?1:0})};
   api.applyEnv=m=>{if(m.time!=null&&!window.__realTime)TP.time=m.time;if(m.weather)TP.weather=m.weather;window.__tpSync&&window.__tpSync();applyToon(false)};

@@ -6,6 +6,7 @@ import {mountYtUi} from './ui/music-ui.js';
 import {ic, paintIcons} from './ui/icons.js';
 import {Notify} from './ui/notify.js';
 import {mountShortcuts} from './ui/shortcuts.js';
+import {Fx} from './ui/fx.js';
 // ===== HUD / UI mới (kiểu game) =====
 (function buildHUD(){
   const $=id=>document.getElementById(id),V=()=>window.VY;
@@ -34,6 +35,9 @@ import {mountShortcuts} from './ui/shortcuts.js';
   function syncOld(){try{window.__tpSync&&window.__tpSync()}catch(e){}}
   function setGfx(n){Object.assign(window.TPX,GFX[n]);save('vyGfx',n);syncOld();window.__applyToon()}
   chips($('sGfx'),Object.keys(GFX).map(k=>[k,k]),gfxCur,setGfx);
+  {const FXH={lite:'Nhẹ: mọi thứ đổi tức thì, tắt làm mờ nền kính và animation — hợp máy yếu / muốn phản hồi nhanh nhất.',high:'Đồ họa cao (Smart Animate): chữ, biểu tượng, avatar, thẻ và panel chuyển trạng thái có chuyển động mượt (chỉ dùng hiệu ứng nhẹ cho GPU).'};
+   const showFx=()=>{$('sFxH').textContent=FXH[Fx.mode]};
+   chips($('sFx'),[['lite','⚡ Nhẹ (tức thì)'],['high','✨ Đồ họa cao (Smart Animate)']],Fx.mode,k=>{Fx.set(k);showFx()});showFx()}
   if(gfxCur!==load('vyGfxApplied',null)){}
   setGfx(gfxCur);
   chips($('sWea'),Object.keys(WI).map(k=>[k,WI[k]+' '+WV[k]]),window.TPX.weather,k=>{window.TPX.weather=k;syncOld();window.__applyToon();window.__envChanged&&window.__envChanged()});
@@ -102,22 +106,28 @@ import {mountShortcuts} from './ui/shortcuts.js';
   // --- nhạc: 2 nguồn — Lofi (tạo trong game) và YouTube (phát nhúng + thư viện playlist)
   const T=Lofi.tracks;let playing=false,src=load('vyMusicSrc','lofi')==='yt'?'yt':'lofi';
   let ytUi=null;
-  const YTM=createYTMusic({toast,onChange:()=>{ytUi&&ytUi.render();showT()}});
+  const YTM=createYTMusic({toast,onChange:()=>{ytUi&&ytUi.render();showT()},auth:async()=>{const s=window.VYNET&&window.VYNET.sess;return s?{token:await s.token(),room:s.room}:null}});
   const showT=()=>{
     if(src==='yt'){const it=YTM.curItem;$('mTt').textContent=YTM.title||'YouTube';$('mSt').textContent='YouTube · '+YTM.lib.pls[YTM.lib.pl].name;$('mPlay').innerHTML=ic(YTM.playing?'pause':'play');$('mCv').classList.add('yt');[...$('mList').children].forEach(d=>d.classList.remove('cur'));return}
     const t=T[Lofi.idx];$('mTt').textContent=t.name;$('mSt').textContent=t.sub+' · '+t.bpm+' BPM';$('mPlay').innerHTML=ic(playing?'pause':'play');$('mCv').classList.remove('yt');[...$('mList').children].forEach((d,i)=>d.classList.toggle('cur',i===Lofi.idx))};
   const stopLofi=async()=>{if(Lofi.on){await Lofi.toggle();playing=false}};
   const useSrc=async s=>{if(s===src)return;src=s;save('vyMusicSrc',s);if(s==='yt')await stopLofi();else YTM.pause();showT()};
-  T.forEach((t,i)=>{const d=document.createElement('div');d.textContent=(i+1)+'. '+t.name+' — '+t.sub;d.onclick=async()=>{await useSrc('lofi');Lofi.setTrack(i);if(!playing)await play();showT()};$('mList').appendChild(d)});
-  async function play(){if(src==='yt'){const on=await YTM.toggle();SFX.play(on?'musicPlay':'musicPause');showT();return}playing=await Lofi.toggle();SFX.play(playing?'musicPlay':'musicPause');showT()}
+  T.forEach((t,i)=>{const d=document.createElement('div');d.textContent=(i+1)+'. '+t.name+' — '+t.sub;d.onclick=async()=>{await useSrc('lofi');Lofi.setTrack(i);if(!playing)await play();saveLofi();showT()};$('mList').appendChild(d)});
+  const saveLofi=()=>save('vyLofi',{on:playing?1:0,idx:Lofi.idx});
+  async function play(){if(src==='yt'){const on=await YTM.toggle();SFX.play(on?'musicPlay':'musicPause');showT();return}playing=await Lofi.toggle();SFX.play(playing?'musicPlay':'musicPause');saveLofi();showT()}
   ['mPlay','mNext','mPrev'].forEach(i=>$(i).dataset.nosfx='1');
   $('mPlay').onclick=play;
-  $('mNext').onclick=()=>{if(src==='yt')YTM.next();else{Lofi.setTrack(Lofi.idx+1);showT()}};
-  $('mPrev').onclick=()=>{if(src==='yt')YTM.prev();else{Lofi.setTrack(Lofi.idx-1);showT()}};
+  $('mNext').onclick=()=>{if(src==='yt')YTM.next();else{Lofi.setTrack(Lofi.idx+1);saveLofi();showT()}};
+  $('mPrev').onclick=()=>{if(src==='yt')YTM.prev();else{Lofi.setTrack(Lofi.idx-1);saveLofi();showT()}};
   $('mLs').onclick=()=>{const o=$('hMusic').classList.toggle('open');$('mLs').setAttribute('aria-expanded',String(o))};
   ytUi=mountYtUi(YTM,{onPick:async i=>{await useSrc('yt');await YTM.playAt(i)},onToggleOpen:o=>$('hMusic').classList.toggle('ytopen',o)});
   const yb=$('mYtB');yb.onclick=()=>{ytUi.open();if(ytUi.isOpen&&src!=='yt'&&YTM.lib.pls[YTM.lib.pl].items.length)useSrc('yt')};
   $('mCv').onclick=()=>yb.click();
   const mv=$('mVol'),sv=$('sVolS');mv.value=sv.value=0.5;const setVol=v=>{Lofi.vol(v);YTM.vol(v)};YTM.vol(0.5);mv.oninput=()=>{sv.value=mv.value;setVol(+mv.value)};sv.oninput=()=>{mv.value=sv.value;setVol(+sv.value)};
+  // ---- đổi map / F5 = tải lại trang → nghe tiếp đúng bài, đúng chỗ (không phát lại từ đầu) ----
+  if(src==='yt'){YTM.restore().then(ok=>{if(!ok&&YTM.lib.pls[YTM.lib.pl].items.length)showT()}).catch(()=>{})}
+  else{const L=load('vyLofi',null);if(L&&L.idx>=0&&L.idx<T.length){Lofi.setTrack(L.idx);
+    if(L.on){const go=async()=>{['pointerdown','keydown','touchstart'].forEach(ev=>removeEventListener(ev,go,true));if(!playing&&src==='lofi'){playing=await Lofi.toggle();showT()}};
+      ['pointerdown','keydown','touchstart'].forEach(ev=>addEventListener(ev,go,true));toast('Bấm vào đâu đó để nhạc chạy tiếp')}}}
   showT();
 })();

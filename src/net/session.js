@@ -213,6 +213,12 @@ export class Session {
     if (rx.s.length) gap = Math.max(gap, now - rx.s[rx.s.length - 1].t > 1500 && this.peer ? now - rx.s[rx.s.length - 1].t : 0);
     return {txPerSec: +(this._tx.w.length / 10).toFixed(1), rxPerSec: +(rx.w.length / 10).toFixed(1), maxGapMs: Math.round(gap), sendFail: this._tx.fail, total: this._tx.n};
   }
+  // token đăng nhập mới nhất (cho /api/yt-search, /api/turn…)
+  async token() { try { const {data: {session}} = await this.sb.auth.getSession(); return (session && session.access_token) || this._token; } catch (e) { return this._token; } }
+  // map hiện tại của phòng theo CSDL (nguồn sự thật) — dùng để gỡ tình trạng 2 người đứng ở 2 map khác nhau khi gói 'map' bị rớt
+  async roomMap() {
+    try { const {data} = await this.sb.from('rooms').select('map_id').eq('code', this.room).maybeSingle(); return data && data.map_id || null; } catch (e) { return null; }
+  }
   async setMap(map) {
     const {error} = await this.sb.rpc('set_room_map', {p_room: this.room, p_map: map});
     if (error) throw new Error(error.message || String(error));

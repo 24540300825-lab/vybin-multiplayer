@@ -48,6 +48,10 @@ Hồ sơ (mũi tên trên thẻ Bin), thanh hành động (mũi tên bên phải
 
 ## Chuyển động
 Cuối `ui.css`, mục "CHUYỂN ĐỘNG": mọi chuyển ≤ .22s, đường cong `--ease`. Nút: sáng/mờ + toả sáng (glow) khi rê, co nhẹ khi bấm. Panel / hộp thoại: mờ + trượt nhẹ khi mở và khi đóng (`@starting-style` + `display allow-discrete`; trình duyệt cũ thì bật/tắt ngay). Tôn trọng `prefers-reduced-motion`.
+### Hai chế độ hiệu ứng (Cài đặt → Giao diện)
+- `html[data-fx=lite]` — **Nhẹ**: mọi thứ đổi tức thì; tắt `backdrop-filter` (blur kính) và toàn bộ transition/animation. Dành cho máy yếu. Tự chọn khi máy ≤2 nhân CPU/≤2GB RAM hoặc hệ điều hành bật "giảm chuyển động".
+- `html[data-fx=high]` — **Đồ họa cao (Smart Animate)**: chuyển *trạng thái → trạng thái* có chuyển động: chữ đổi (tên bài, trạng thái, giờ…) trượt+mờ vào, biểu tượng (phát↔tạm dừng, mic…) "bật" ra, avatar đối phương mờ dần khi online↔offline, thẻ hồ sơ thu/mở (avatar co giãn, chỉ số cuộn lại, thẻ đối phương trượt theo), panel/hộp thoại bung ra có độ nảy, thông báo nhanh trượt lên, danh sách hiện lần lượt, vòng sóng quanh avatar khi đang nói chuyện.
+- Chọn ở `localStorage 'vyFx'` (`lite|high`); `src/ui/fx.js` đặt thuộc tính và gắn các bộ quan sát đổi nội dung (WATCH). Thêm phần tử cần animate chữ/icon/ảnh: thêm 1 dòng vào `WATCH`. Quy tắc cũ vẫn giữ: chỉ animate `transform`/`opacity` (trừ vài chỗ thu/mở thẻ hiếm khi xảy ra).
 
 ## Màn loading
 - Nền: `assets/ui/loading.v1.webp` (1920×1080, ~130 KB; đổi ảnh → đổi tên file `.v2` vì /assets cache 1 năm). Ảnh hiện dần khi tải xong, zoom nhẹ 1.04→1.

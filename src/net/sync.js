@@ -9,13 +9,14 @@ import {OTHER} from './session.js';
 const r3 = v => Math.round(v * 1000) / 1000;
 
 export function bindSync(sess, api, loadChar) {
-  let remoteLoading = false, queue = [], snapT = 0, lastInT = 0, seq = 0;
+  let remoteLoading = false, queue = [], snapT = 0, lastInT = 0, seq = 0, goneT = 0, lastDr = '';
 
   async function ensureRemote(slot) {
     if (api.remote && api.remote.id === slot) return;
     if (remoteLoading) return; remoteLoading = true;
     try {
       const glb = await loadChar(slot);
+      if (!sess.peer || sess.peer.slot !== slot) return;      // đối phương đã đi trong lúc tải nhân vật → không dựng bản sao "ma"
       api.addRemote(slot, glb);
       queue.splice(0).forEach(fn => fn());
       sess.send({k: 'hello'});           // xin trạng thái hiện tại của đối phương
@@ -46,7 +47,10 @@ export function bindSync(sess, api, loadChar) {
     snapT -= dt;
     if (snapT > 0) return;
     const st = api.snapshot(); if (!st) return;
-    sess.send({k: 's', n: ++seq, ...st, ix: curIn.x, iz: curIn.z, ir: curIn.r, im: curIn.m});
+    const msg = {k: 's', n: ++seq, ...st, ix: curIn.x, iz: curIn.z, ir: curIn.r, im: curIn.m};
+    // bảng trạng thái cửa: gửi khi đổi, khi đứng yên, và định kỳ (mất gói cũng tự khớp lại)
+    if (api.doorSig) { const dr = api.doorSig(); if (dr !== lastDr || !st.mv || seq % 8 === 0) { msg.dr = dr; lastDr = dr; } }
+    sess.send(msg);
     snapT = (st.mv ? 1 / CONFIG.snapshotHz : 1 / CONFIG.idleHz);
   };
 
@@ -55,15 +59,18 @@ export function bindSync(sess, api, loadChar) {
     switch (m.k) {
       case 'i': whenRemote(() => api.setRemoteInput(m)); break;
       case 'c': whenRemote(() => api.applyCmd(m.t, m.a)); break;
-      case 's': whenRemote(() => { api.applyState(m); if (m.ix !== undefined) api.setRemoteInput({x: m.ix, z: m.iz, r: m.ir, m: m.im}); }); break;
-      case 'hello': { const st = api.snapshot(); if (st) sess.send({k: 's', n: ++seq, ...st, f: 1}); api.syncEnvOut && api.syncEnvOut(); break; }
+      case 's': if (m.dr && api.applyDoors) api.applyDoors(m.dr, sess.peer ? sess.peer.slot === 'bin' : m.slot === 'bin'); whenRemote(() => { api.applyState(m); if (m.ix !== undefined) api.setRemoteInput({x: m.ix, z: m.iz, r: m.ir, m: m.im}); }); break;
+      case 'hello': { const st = api.snapshot(); if (st) sess.send({k: 's', n: ++seq, ...st, f: 1, dr: api.doorSig ? api.doorSig() : undefined}); api.syncEnvOut && api.syncEnvOut(); break; }
       case 'env': api.applyEnv && api.applyEnv(m); break;
       default: break;   // 'sig','mic','map' do module khác xử lý
     }
   });
   sess.on('peer', ({present, slot}) => {
+    // Presence của Realtime hay "chớp" (mất rồi có lại trong vài giây khi mạng rung): đừng xoá-dựng lại nhân vật ngay, vì bản dựng lại mọc ở vị trí gốc
+    // tới khi có snapshot kế (tới 2.5s) => thấy đối phương "dịch chuyển/nhân đôi". Đợi 2.5s xem có quay lại không.
+    clearTimeout(goneT);
     if (present) ensureRemote(slot);
-    else { api.removeRemote(); queue = []; }
+    else goneT = setTimeout(() => { if (!sess.peer) { api.removeRemote(); queue = []; } }, 2500);
     api.peerChanged && api.peerChanged(present, slot);
   });
   sess.on('reconnected', () => { sess.send({k: 'hello'}); snapT = 0; });

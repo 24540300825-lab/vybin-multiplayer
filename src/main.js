@@ -80,6 +80,19 @@ async function boot() {
     api.envOut = o => sess.send({k: 'env', ...o});
     sess.on('msg', m => { if (m.k === 'map' && isMap(m.map) && m.map !== mapId) { toast('Đối phương chuyển sang: ' + MAP_LIST[m.map].name); prefetchMap(m.map); goToMap(m.map); } });
     sess.on('peer', ({present}) => { if (!present) return; });
+    // Hai người phải ở CÙNG map. Gói 'map' có thể rớt (Realtime không đảm bảo) → mỗi snapshot đều kèm map của người gửi; thấy khác nhau >3s thì hỏi CSDL
+    // (nguồn sự thật) và theo đó. Trong lúc khác map, ẩn nhân vật kia (toạ độ của map khác sẽ làm họ "đứng giữa không trung/xuyên tường").
+    let mmSince = 0, mmBusy = false;
+    sess.on('msg', m => {
+      if (m.k !== 's' || !m.mp || !isMap(m.mp)) return;
+      if (m.mp === mapId) { mmSince = 0; api.setRemoteVisible && api.setRemoteVisible(true); return; }
+      api.setRemoteVisible && api.setRemoteVisible(false);
+      const now = Date.now(); mmSince ||= now;
+      if (now - mmSince < 3000 || mmBusy) return;
+      mmBusy = true;
+      sess.roomMap().then(dbm => { if (isMap(dbm) && dbm !== mapId) { toast('Phòng đang ở: ' + MAP_LIST[dbm].name + ' — đang chuyển theo'); prefetchMap(dbm); goToMap(dbm); } })
+        .finally(() => setTimeout(() => { mmBusy = false; }, 6000));
+    });
     sess.on('version', v => toast(v.mismatch ? '⚠️ Hai máy đang chạy bản game khác nhau — bấm Ctrl+F5 (tải lại) để chơi đồng bộ' : 'Đối phương đang chạy bản game khác — nếu thấy lạ, bấm Ctrl+F5'));
     const chat = new Chat(sess), voice = new Voice(sess);
     const ui = mountMpUi({sess, chat, voice});
