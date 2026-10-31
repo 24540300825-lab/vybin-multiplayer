@@ -46,7 +46,7 @@ async function boot() {
         pref = await pickChar({taken, note}); note = '';
         if (!forced) saveChar(pref);
       }
-      try { const r = await sess.connect(pref); slot = r.slot; mapId = r.map; break; }
+      try { const r = await sess.connect(pref); slot = r.slot; mapId = (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap'); if (!isMap(mapId)) mapId = r.map; break; }   // map là của RIÊNG từng người
       catch (e) {
         if (e.code === 'taken') { note = (pref === 'bin' ? 'Bin' : 'Vy') + ' đang có người khác dùng — hãy chọn nhân vật còn lại.'; pref = null; continue; }
         fatal(e); return;
@@ -77,13 +77,12 @@ async function boot() {
   try { await Promise.race([api.warm(), new Promise(r => setTimeout(r, 4000))]); } catch (e) { console.warn('warm', e); }
   if (CONFIG.perf) window.VY.Perf.toggle(true);
 
-  // ---------- 3) chuyển map (có fade + loading, đồng bộ cả phòng) ----------
+  // ---------- 3) chuyển map (có fade + loading; ĐỘC LẬP từng người, không kéo người kia theo) ----------
   window.__prefetchMap = prefetchMap;
   window.__switchMap = async m => {
     if (!isMap(m) || m === mapId) return;
     prefetchMap(m);
-    if (sess) { try { await sess.setMap(m); } catch (e) { console.warn('setMap', e); } }
-    goToMap(m);
+    goToMap(m);        // chỉ mình đổi map; người kia ở lại map của họ
   };
 
   // ---------- 4) mạng ----------
@@ -96,20 +95,12 @@ async function boot() {
     const loadChar = async s => { const g = await Assets.load('char-' + s); Assets.retain('char-' + s); return g; };
     bindSync(sess, api, loadChar);
     api.envOut = o => sess.send({k: 'env', ...o});
-    sess.on('msg', m => { if (m.k === 'map' && isMap(m.map) && m.map !== mapId) { toast('Đối phương chuyển sang: ' + MAP_LIST[m.map].name); prefetchMap(m.map); goToMap(m.map); } });
     sess.on('peer', ({present}) => { if (!present) return; });
-    // Hai người phải ở CÙNG map. Gói 'map' có thể rớt (Realtime không đảm bảo) → mỗi snapshot đều kèm map của người gửi; thấy khác nhau >3s thì hỏi CSDL
-    // (nguồn sự thật) và theo đó. Trong lúc khác map, ẩn nhân vật kia (toạ độ của map khác sẽ làm họ "đứng giữa không trung/xuyên tường").
-    let mmSince = 0, mmBusy = false;
+    // Mỗi người có thể ở map KHÁC nhau. Mỗi snapshot kèm map của người gửi: khác map thì ẩn nhân vật kia (toạ độ map khác sẽ làm họ "đứng giữa không trung"),
+    // cùng map thì hiện. (sync.js bỏ qua mọi lệnh/vị trí của đối phương khi khác map.)
     sess.on('msg', m => {
-      if (m.k !== 's' || !m.mp || !isMap(m.mp)) return;
-      if (m.mp === mapId) { mmSince = 0; api.setRemoteVisible && api.setRemoteVisible(true); return; }
-      api.setRemoteVisible && api.setRemoteVisible(false);
-      const now = Date.now(); mmSince ||= now;
-      if (now - mmSince < 3000 || mmBusy) return;
-      mmBusy = true;
-      sess.roomMap().then(dbm => { if (isMap(dbm) && dbm !== mapId) { toast('Phòng đang ở: ' + MAP_LIST[dbm].name + ' — đang chuyển theo'); prefetchMap(dbm); goToMap(dbm); } })
-        .finally(() => setTimeout(() => { mmBusy = false; }, 6000));
+      if (m.k !== 's' || !m.mp || !isMap(m.mp) || !api.setRemoteVisible) return;
+      api.setRemoteVisible(m.mp === mapId);
     });
     sess.on('version', v => toast(v.mismatch ? '⚠️ Hai máy đang chạy bản game khác nhau — bấm Ctrl+F5 (tải lại) để chơi đồng bộ' : 'Đối phương đang chạy bản game khác — nếu thấy lạ, bấm Ctrl+F5'));
     const chat = new Chat(sess), voice = new Voice(sess);

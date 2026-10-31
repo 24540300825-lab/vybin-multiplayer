@@ -61,7 +61,12 @@ export function bindSync(sess, api, loadChar) {
   };
 
   // ----- net -> local -----
+  // Hai người có thể đang ở 2 map khác nhau: bỏ qua vị trí/lệnh/cửa của đối phương cho tới khi họ cùng map với mình.
+  let peerMp = '';
+  const sameMap = () => !peerMp || peerMp === window.MAPID;
   sess.on('msg', m => {
+    if (m.k === 's' && m.mp) peerMp = m.mp;
+    if ((m.k === 'i' || m.k === 'c' || m.k === 's') && !sameMap()) return;
     switch (m.k) {
       case 'i': whenRemote(() => api.setRemoteInput(m)); break;
       case 'c': whenRemote(() => api.applyCmd(m.t, m.a)); break;
@@ -75,6 +80,7 @@ export function bindSync(sess, api, loadChar) {
     // Presence của Realtime hay "chớp" (mất rồi có lại trong vài giây khi mạng rung): đừng xoá-dựng lại nhân vật ngay, vì bản dựng lại mọc ở vị trí gốc
     // tới khi có snapshot kế (tới 2.5s) => thấy đối phương "dịch chuyển/nhân đôi". Đợi 2.5s xem có quay lại không.
     clearTimeout(goneT);
+    if (!present) peerMp = '';
     if (present) ensureRemote(slot);
     else goneT = setTimeout(() => { if (!sess.peer) { api.removeRemote(); queue = []; } }, 2500);
     api.peerChanged && api.peerChanged(present, slot);
