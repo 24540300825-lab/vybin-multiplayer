@@ -153,10 +153,6 @@ export function mountMpUi({sess, chat, voice}) {
     $('cCam').firstChild.innerHTML = ic(s.camOn ? 'video' : 'videoOff');
     const errs = []; if (s.micErr) errs.push('🎙️ ' + s.micErr); if (s.camErr) errs.push('📹 ' + s.camErr);
     if (!s.sigOk && s.active && s.phase !== 'lost') errs.push('📡 Tín hiệu tạm mất — cuộc gọi vẫn tiếp tục, đang nối lại tín hiệu…');
-    // kẹt "đang nối" quá 12s mà server chưa cấp TURN (chỉ có STUN) => nói rõ nguyên nhân thay vì để người dùng đoán
-    const stuck = s.active && !s.connectedAt && ['connecting', 'recovering', 'lost'].includes(ph);
-    if (stuck) cui._since = cui._since || Date.now(); else cui._since = 0;
-    if (stuck && s.turn === false && Date.now() - cui._since > 12000) errs.push('🌐 Hai máy đang ở 2 mạng khác nhau và mạng chặn gọi trực tiếp. Game chưa có máy chủ chuyển tiếp (TURN) nên chưa nối được. Thử cùng một wifi, hoặc báo người làm game cấu hình TURN.');
     if (s.vPause) errs.push('⏸️ Mạng yếu — tạm dừng hình để giữ tiếng');
     $('cErr').innerHTML = errs.map(e => `<div>${esc(e)}</div>`).join('');
     document.querySelectorAll('#cQ .chip').forEach(c => c.classList.toggle('on', c.dataset.q === s.quality));
@@ -180,7 +176,7 @@ export function mountMpUi({sess, chat, voice}) {
   voice.on('needGesture', () => toast('Chạm vào trang để nghe cuộc gọi'));
   voice.on('peerEnded', () => { autoShown = false; });
   addEventListener('visibilitychange', () => { bindVideo(); tick(); });
-  tmT = setInterval(() => { if (!document.hidden) { tick(); if (lastS && lastS.active && !lastS.connectedAt && cui._since) cui(lastS); } }, 1000);
+  tmT = setInterval(() => { if (!document.hidden) tick(); }, 1000);
   $('iVoice').onclick = async () => { const s = voice.state(); if (!s.active) await voice.join({mic: true}); else voice.toggleMute(); };
   $('iVid').onclick = async () => { const s = voice.state(); if (!s.active) { await voice.setCamera(true); return; } if (shown && !collapsed) showCall(false); else { collapsed = false; call.classList.remove('min'); showCall(true); } };
   const endCall = () => { voice.leave(); autoShown = false; showCall(false); };
