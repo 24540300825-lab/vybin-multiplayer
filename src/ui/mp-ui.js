@@ -43,12 +43,12 @@ export function mountMpUi({sess, chat, voice}) {
     const on = !!sess.peer;
     pc.classList.toggle('off', !on); pc.classList.toggle('talk', on && voice.peerSpeaking);
     if (sess.netStats) { const q = sess.netStats(); pc.title = `Mạng game: gửi ${q.txPerSec}/s · nhận ${q.rxPerSec}/s · im lặng dài nhất ${q.maxGapMs} ms`; }
-    $('peSt').textContent = on ? ('Online' + (sess.rtt != null ? ' · ' + sess.rtt + ' ms' : '')) : 'Chưa vào / Đã thoát';
+    $('peSt').textContent = on ? ('Online' + (sess.rtt != null ? ' · ' + sess.rtt + ' ms' : '') + (sess.p2pOn ? ' · P2P' : '')) : 'Chưa vào / Đã thoát';
     const src = AV(other, !on); if ($('peAv').getAttribute('src') !== src) $('peAv').src = src;
     $('peMic').innerHTML = !on ? '' : voice.peerVoice ? ic(voice.peerMuted ? 'micOff' : 'mic') : '';
   }
   sess.on('peer', ({present, slot}) => { peer(); const t = present ? NAME[slot] + ' đã vào phòng' : NAME[other] + ' đã rời phòng'; toast(t); Notify.add({type: 'peer', title: t}); });
-  sess.on('rtt', peer); peer();
+  sess.on('rtt', peer); sess.on('p2p', peer); peer();
   sess.on('status', ({state, text}) => {
     let b = $('mpNet'); if (!b) { b = document.createElement('div'); b.id = 'mpNet'; document.body.appendChild(b); }
     b.textContent = text || ''; b.classList.toggle('on', state === 'offline' || state === 'connecting');

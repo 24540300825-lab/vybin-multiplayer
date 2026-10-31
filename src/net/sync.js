@@ -1,7 +1,8 @@
 // Cầu nối game <-> mạng. Mô hình: mỗi người sở hữu nhân vật của mình (authority = chủ nhân vật).
 //  - Lệnh (move/sleep/sit/...) + trạng thái phím được gửi ngay khi đổi; bản sao điều khiển nhân vật remote bằng CHÍNH state-machine của game
 //    (nên animation/leo giường/leo ghế y hệt, không phải đồng bộ từng clip).
-//  - Snapshot vị trí 6Hz khi di chuyển, 1Hz khi đứng yên: remote nắn dần về snapshot (chống lệch), snap nếu lệch lớn.
+//  - Snapshot vị trí 20Hz (đường thẳng P2P) / 10Hz (qua Supabase) khi di chuyển, thưa khi đứng yên; gửi NGAY khi vừa dừng/vừa đi: remote nắn dần về snapshot
+//    (đã bù nửa RTT khi ngoại suy), snap nếu lệch lớn.
 //  - Không ghi DB cho tần suất cao.
 import {CONFIG} from '../config.js';
 import {OTHER} from './session.js';
@@ -9,7 +10,7 @@ import {OTHER} from './session.js';
 const r3 = v => Math.round(v * 1000) / 1000;
 
 export function bindSync(sess, api, loadChar) {
-  let remoteLoading = false, queue = [], snapT = 0, lastInT = 0, seq = 0, goneT = 0, lastDr = '';
+  let remoteLoading = false, queue = [], snapT = 0, lastInT = 0, seq = 0, goneT = 0, lastDr = '', needNow = false, stopPend = 0, wasMv = 0;
 
   async function ensureRemote(slot) {
     if (api.remote && api.remote.id === slot) return;
@@ -41,17 +42,26 @@ export function bindSync(sess, api, loadChar) {
     if (!(edge || turned || keep)) return;
     lastMv = mv; lastRun = run; lastAng = ang; lastInT = now;
     sess.send({k: 'i', x: curIn.x, z: curIn.z, r: run, m: mv});
-    if (mv) snapT = Math.min(snapT, 0.1);
+    // Vừa đi / vừa dừng: gửi vị trí chính xác ngay (dừng: đợi tới khi nhân vật thật sự đứng yên rồi gửi 1 gói chốt) để bên kia không lướt quá đà rồi kéo ngược.
+    if (mv) snapT = Math.min(snapT, 0.03); else stopPend = 0.6;
+    if (edge) needNow = true;
   };
   api.onTick = dt => {
     snapT -= dt;
-    if (snapT > 0) return;
+    if (stopPend > 0) {                       // đang chờ nhân vật dừng hẳn để gửi gói chốt
+      stopPend -= dt;
+      const q = api.snapshot();
+      if (q && !q.mv) { stopPend = 0; snapT = 0; } else if (stopPend <= 0) snapT = 0;
+    }
+    if (snapT > 0 && !needNow) return;
+    needNow = false;
     const st = api.snapshot(); if (!st) return;
+    wasMv = st.mv;
     const msg = {k: 's', n: ++seq, ...st, ix: curIn.x, iz: curIn.z, ir: curIn.r, im: curIn.m};
     // bảng trạng thái cửa: gửi khi đổi, khi đứng yên, và định kỳ (mất gói cũng tự khớp lại)
     if (api.doorSig) { const dr = api.doorSig(); if (dr !== lastDr || !st.mv || seq % 8 === 0) { msg.dr = dr; lastDr = dr; } }
     sess.send(msg);
-    snapT = (st.mv ? 1 / CONFIG.snapshotHz : 1 / CONFIG.idleHz);
+    snapT = (st.mv ? 1 / (sess.p2pOn ? CONFIG.p2pHz : CONFIG.snapshotHz) : 1 / CONFIG.idleHz);
   };
 
   // ----- net -> local -----
@@ -59,7 +69,7 @@ export function bindSync(sess, api, loadChar) {
     switch (m.k) {
       case 'i': whenRemote(() => api.setRemoteInput(m)); break;
       case 'c': whenRemote(() => api.applyCmd(m.t, m.a)); break;
-      case 's': if (m.dr && api.applyDoors) api.applyDoors(m.dr, sess.peer ? sess.peer.slot === 'bin' : m.slot === 'bin'); whenRemote(() => { api.applyState(m); if (m.ix !== undefined) api.setRemoteInput({x: m.ix, z: m.iz, r: m.ir, m: m.im}); }); break;
+      case 's': if (m.dr && api.applyDoors) api.applyDoors(m.dr, sess.peer ? sess.peer.slot === 'bin' : m.slot === 'bin'); whenRemote(() => { api.applyState(m, Math.min(0.25, (sess.rtt || 0) / 2000)); if (m.ix !== undefined) api.setRemoteInput({x: m.ix, z: m.iz, r: m.ir, m: m.im}); }); break;
       case 'hello': { const st = api.snapshot(); if (st) sess.send({k: 's', n: ++seq, ...st, f: 1, dr: api.doorSig ? api.doorSig() : undefined}); api.syncEnvOut && api.syncEnvOut(); break; }
       case 'env': api.applyEnv && api.applyEnv(m); break;
       default: break;   // 'sig','mic','map' do module khác xử lý
@@ -74,6 +84,7 @@ export function bindSync(sess, api, loadChar) {
     api.peerChanged && api.peerChanged(present, slot);
   });
   sess.on('reconnected', () => { sess.send({k: 'hello'}); snapT = 0; });
+  sess.on('p2p', () => { snapT = 0; needNow = true; });      // đổi đường truyền: gửi vị trí mới ngay
   sess.on('reclaimed', () => { snapT = 0; });
   if (sess.peer) ensureRemote(sess.peer.slot);
 }

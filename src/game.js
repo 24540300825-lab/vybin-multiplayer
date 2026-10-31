@@ -669,7 +669,7 @@ export function init(ctx){
     if(d>9||(d>3&&s.l!==P.level)){P.pos.set(tx,s.y,tz);P.level=s.l;P.yaw=s.w;plan=[];return}      // chỉ 'dịch chuyển' khi lệch rất xa / khác tầng; còn lại lướt nhanh về đúng chỗ
     if(busy)return;
     if(P.mode==='free'){
-      const k=1-Math.exp(-dt*(d>3?16:d>0.6?8:3.5)),nx=P.pos.x+dx*k,nz=P.pos.z+dz*k,ox=P.pos.x,oz=P.pos.z;
+      const k=1-Math.exp(-dt*(d>3?16:d>0.6?8:(s.mv?3.5:9))),nx=P.pos.x+dx*k,nz=P.pos.z+dz*k,ox=P.pos.x,oz=P.pos.z;
       if(stairAt(nx,nz)||stairAt(ox,oz)||walkable(ox,oz,nx,nz)){P.pos.x=nx;P.pos.z=nz;corBlk=0}
       else if(walkable(ox,oz,nx,oz)){P.pos.x=nx;corBlk=0}
       else if(walkable(ox,oz,ox,nz)){P.pos.z=nz;corBlk=0}
@@ -1405,7 +1405,7 @@ export function init(ctx){
   api.setRemoteVisible=v=>{if(remote&&remote.char.visible!==v)remote.char.visible=v};
   api.removeRemote=()=>{if(!remote)return;remote.dispose();remote=null;api.remote=null;if(window.__halo)endHalo()};
   api.setRemoteInput=m=>{rinp.x=m.x;rinp.z=m.z;rinp.run=!!m.r;rinp.mag=m.m?1:0;rinpT=clockG};
-  api.applyState=m=>{if(remote)remote.setNet({x:m.x,y:m.y,z:m.z,w:m.w,l:m.l,m:m.m,b:m.b,vx:m.vx||0,vz:m.vz||0,t:performance.now()})};
+  api.applyState=(m,lat)=>{if(remote)remote.setNet({x:m.x,y:m.y,z:m.z,w:m.w,l:m.l,m:m.m,b:m.b,mv:m.mv,vx:m.vx||0,vz:m.vz||0,t:performance.now()-(lat||0)*1000})};
   api.applyCmd=(t,a)=>{if(!remote)return;switch(t){
     case 'move':remote.cmdMove(a[0],a[1],a[2],!!a[3]);break;case 'sleep':remote.cmdSleep();break;case 'sit':remote.cmdSit(a||undefined);break;
     case 'wake':remote.cmdWake();break;case 'off':remote.cmdOffChair();break;case 'blink':remote.blink();break;

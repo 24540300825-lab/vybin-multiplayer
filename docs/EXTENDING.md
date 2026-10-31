@@ -74,3 +74,11 @@ Toàn bộ hiệu ứng âm thanh nằm trong `src/sfx.js`, tổng hợp bằng 
 ## Cuộc gọi đến / đi
 
 `src/ui/call-ring.js` lắng nghe `Voice`: có người gọi (`state.incoming`) → popup + chuông lặp; bấm Nghe = `voice.join()`, Từ chối = `voice.decline()`; bên gọi (`state.outgoing`) nghe tiếng chờ, tự dập máy sau 45 giây nếu người kia đang trong phòng mà không nghe. Âm thanh của người gọi bị tắt (muted) cho tới khi bên nhận bấm Nghe.
+
+## Đồng bộ mạng (vị trí, lệnh)
+- **Đường chính: P2P** (`src/net/p2p.js`) – 2 máy nối thẳng bằng WebRTC DataChannel, vị trí gửi 20 lần/giây. Kênh `fast` (không đảm bảo thứ tự, bỏ gói cũ) cho vị trí/phím/ping; kênh `rel` (đảm bảo) cho lệnh ngồi/ngủ/di chuyển.
+- **Dự phòng: Supabase Broadcast** (10 lần/giây) – tự dùng khi P2P chưa nối được hoặc im lặng >3 giây; tự nối lại P2P. Không cần cấu hình gì thêm.
+- Thanh trạng thái hiện `Online · xx ms · P2P` khi đang đi đường thẳng. Tắt thử P2P: thêm `?nop2p` vào link.
+- Khi dừng/đi, máy gửi ngay 1 gói vị trí "chốt"; máy nhận bù nửa RTT khi dự đoán → không lướt quá đà rồi kéo ngược.
+- Test giả lập mạng: `?mock=/dev/mock-supabase.js&mocklat=90&mockjit=60` (trễ 90ms + rung 0–60ms, giữ thứ tự gói).
+- Hạn chế: nếu cả hai mạng chặn P2P (NAT đối xứng, không có TURN) thì vẫn chạy bằng đường Supabase như trước.
