@@ -241,13 +241,33 @@ export class Voice {
     this._on(document, 'visibilitychange', () => this.setViewing(!document.hidden && this._panelOpen !== false));
     this._statsT = setInterval(() => this._pollStats(), 2000);
     this._iceT = setInterval(() => { if (this.active) this._refreshIce().catch(() => {}); }, 45 * 60e3);   // làm mới thông tin TURN ngắn hạn
+    this._cwT = setInterval(() => this._connTick(), 2000);
   }
-  _stopWatch() { this._unsub.splice(0).forEach(f => { try { f(); } catch (e) {} }); clearInterval(this._statsT); this._statsT = null; clearInterval(this._iceT); this._iceT = null; clearTimeout(this._wd); this._wd = null; }
+  // TỰ THỬ LẠI khi CHƯA nối được lần đầu. Trước đây: nếu ICE chỉ "đang thử" (không báo hỏng) hoặc gói offer/answer/ICE bị rớt thì cuộc gọi kẹt "đang kết nối" mãi (không có pc → cũng không có bộ canh).
+  // Việc nối UDP giữa 2 NAT lúc được lúc không (mỗi lần dựng lại là cổng/ánh xạ mới) nên thử lại sớm, nhiều lần, làm tăng hẳn tỉ lệ nối được.
+  // Mốc kể từ lúc CẢ HAI cùng trong cuộc gọi: 8s đổi ICE (restart) · 16s dựng lại hẳn · rồi cứ 12s dựng lại một lần, tới khi nối được.
+  _connTick() {
+    const bad = !this.active || !this.peerVoice || !this.s.peer || (this.conn !== 'idle' && this.conn !== 'connecting');
+    if (bad) { this._cwSince = 0; this._cwK = 0; return; }
+    const now = Date.now(); this._cwSince ||= now;
+    const age = now - this._cwSince, k = age < 8000 ? 0 : age < 16000 ? 1 : 2 + Math.floor((age - 16000) / 12000);
+    if (k <= (this._cwK || 0)) return;
+    this._cwK = k;
+    const pc = this.pc;
+    this.diag.retries = (this.diag.retries || 0) + 1;
+    if (k === 1) {
+      if (this.init) { if (pc) { try { this._refreshIce().catch(() => {}); pc.restartIce(); } catch (e) {} } else this._enq(() => this._rebuild()); }
+      else this._announce({req: pc ? 2 : 1});
+    } else {
+      if (this.init) this._enq(() => this._rebuild()); else this._announce({req: 1});
+    }
+  }
+  _stopWatch() { this._unsub.splice(0).forEach(f => { try { f(); } catch (e) {} }); clearInterval(this._statsT); this._statsT = null; clearInterval(this._cwT); this._cwT = null; clearInterval(this._iceT); this._iceT = null; clearTimeout(this._wd); this._wd = null; }
   setPanelOpen(v) { this._panelOpen = !!v; this.setViewing(!document.hidden && !!v); }
 
   // ---------- WebRTC ----------
   _newPc() {
-    const pc = this.pc = new RTCPeerConnection({iceServers: this.iceServers || CONFIG.ice, bundlePolicy: 'max-bundle'});
+    const pc = this.pc = new RTCPeerConnection({iceServers: this.iceServers || CONFIG.ice, bundlePolicy: 'max-bundle', iceCandidatePoolSize: 2});
     if (this.conn === 'idle' || this.conn === 'connected') this.conn = 'connecting';
     this._pendingIce = []; this._making = false;
     if (this.init) { this.txA = pc.addTransceiver('audio', {direction: 'sendrecv'}); this.txV = pc.addTransceiver('video', {direction: 'sendrecv'}); } else { this.txA = this.txV = null; }

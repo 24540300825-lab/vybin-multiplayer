@@ -10,7 +10,7 @@ export const CONFIG = {
   privateChannels: c.privateChannels !== false,
   snapshotHz: c.snapshotHz || 10,           // tần số gửi vị trí khi đang di chuyển
   idleHz: c.idleHz || 0.4,                  // khi đứng yên
-  ice: c.ice || [{urls: 'stun:stun.l.google.com:19302'}, {urls: 'stun:stun1.l.google.com:19302'}],
+  ice: c.ice || [{urls: 'stun:stun.l.google.com:19302'}, {urls: 'stun:stun1.l.google.com:19302'}, {urls: 'stun:stun.cloudflare.com:3478'}],
   turn: c.turn || null,                    // {urls:[...], username, credential}
   mock: q.get('mock') || c.mock || '',     // dev: đường dẫn module Supabase giả lập
   solo: q.has('solo'),
