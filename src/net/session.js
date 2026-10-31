@@ -2,7 +2,6 @@
 // Không ghi DB cho dữ liệu tần suất cao (vị trí/animation) — chỉ dùng Broadcast.
 import {CONFIG} from '../config.js';
 import {APP_VERSION, PROTO} from '../version.js';
-import {P2P} from './p2p.js';
 
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
 export const OTHER = {bin: 'vy', vy: 'bin'};
@@ -67,7 +66,6 @@ export class Session {
     await this._claim();
     // 3) kênh realtime
     await this._subscribe();
-    if (CONFIG.p2p && !this.p2p) { try { this.p2p = new P2P(this); } catch (e) { console.warn('[session] p2p', e); } }   // đường nối thẳng 2 máy (tuỳ chọn, tự quay về Supabase nếu hỏng)
     this._stopTick = makeTicker(20000, () => this._tick());
     this._listen(document, 'visibilitychange', () => { if (document.hidden) this._hiddenAt = Date.now(); else this._revive('visible'); });
     this._listen(window, 'online', () => this._revive('online', true));
@@ -102,7 +100,7 @@ export class Session {
   }
 
   _listen(target, ev, fn) { target.addEventListener(ev, fn); this._listeners.push([target, ev, fn]); }
-  _shutdown() { this._dead = true; try { this.p2p && this.p2p.close(); } catch (e) {} this.p2p = null; this.p2pOn = false; clearInterval(this._hb); clearInterval(this._pingT); if (this._stopTick) { this._stopTick(); this._stopTick = null; } this._listeners.forEach(([t, e, f]) => t.removeEventListener(e, f)); this._listeners = []; }
+  _shutdown() { this._dead = true; clearInterval(this._hb); clearInterval(this._pingT); if (this._stopTick) { this._stopTick(); this._stopTick = null; } this._listeners.forEach(([t, e, f]) => t.removeEventListener(e, f)); this._listeners = []; }
 
   // nhịp 20s (chạy cả khi tab ẩn): giữ slot, giữ socket không bị nghỉ, và tự nối lại nếu kênh chết quá 20s
   _tick() {
@@ -217,7 +215,6 @@ export class Session {
   send(m) {
     if (!this.ch || this.state !== 'online') { this._tx.fail++; return false; }
     this._tx.n++; this._tx.w.push(performance.now());
-    if (this.p2p && this.p2p.route(m)) return true;     // đường thẳng 2 máy nếu đang thông; không thì đi vòng qua Supabase như cũ
     this.ch.send({type: 'broadcast', event: 'g', payload: m});
     return true;
   }

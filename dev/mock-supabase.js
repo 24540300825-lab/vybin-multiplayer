@@ -3,11 +3,7 @@
 // Mỗi tab = 1 "người dùng" (uid lưu trong sessionStorage). Dùng: index.html?mock=/dev/mock-supabase.js
 const DB_KEY = 'vybin-mock-db', bc = new BroadcastChannel('vybin-mock');
 const LAT = +(new URLSearchParams(location.search).get('mocklat') || 0);
-const JIT = +(new URLSearchParams(location.search).get('mockjit') || 0);
 const later = fn => (LAT ? setTimeout(fn, LAT) : queueMicrotask(fn));
-// gói broadcast: trễ LAT + ngẫu nhiên 0..JIT ms nhưng GIỮ THỨ TỰ (như WebSocket/TCP thật: gói sau không tới trước gói trước)
-let lastDue = 0;
-const lagged = fn => { if (!LAT && !JIT) return queueMicrotask(fn); const due = Math.max(lastDue, performance.now() + LAT + Math.random() * JIT); lastDue = due; setTimeout(fn, Math.max(0, due - performance.now())); };
 const load = () => { try { return JSON.parse(localStorage.getItem(DB_KEY)) || {rooms: {}, slots: {}, messages: []}; } catch (e) { return {rooms: {}, slots: {}, messages: []}; } };
 const save = d => localStorage.setItem(DB_KEY, JSON.stringify(d));
 const uuid = () => crypto.randomUUID();
@@ -95,7 +91,7 @@ class Channel {
 bc.onmessage = ({data: m}) => {
   for (const c of chans) {
     if (c.name !== m.ch && m.t !== 'insert') continue;
-    if (m.t === 'b' && m.from !== c.id) c.b.filter(x => x.ev === m.event).forEach(x => lagged(() => x.cb({payload: m.payload})));
+    if (m.t === 'b' && m.from !== c.id) c.b.filter(x => x.ev === m.event).forEach(x => later(() => x.cb({payload: m.payload})));
     else if (m.t === 'pres' && m.from !== c.id) { c.pres[m.key] = {payload: m.payload, from: m.from}; c._sync(); }
     else if (m.t === 'leave') { delete c.pres[m.key]; c._sync(); }
     else if (m.t === 'preq' && m.from !== c.id) c._ann();

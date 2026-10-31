@@ -8,9 +8,7 @@ export const CONFIG = {
   supabaseJs: c.supabaseJs || 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm',
   room: (q.get('room') || c.room || 'main').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || 'main',
   privateChannels: c.privateChannels !== false,
-  snapshotHz: c.snapshotHz || 10,          // tần số gửi vị trí khi đi qua Supabase (có giới hạn tin/giây)
-  p2pHz: c.p2pHz || 20,                    // tần số gửi vị trí khi có đường nối thẳng 2 máy
-  p2p: c.p2p !== false && !q.has('nop2p'), // tắt thử: ?nop2p
+  snapshotHz: c.snapshotHz || 8,           // tần số gửi vị trí khi đang di chuyển
   idleHz: c.idleHz || 0.4,                  // khi đứng yên
   ice: c.ice || [{urls: 'stun:stun.l.google.com:19302'}, {urls: 'stun:stun1.l.google.com:19302'}],
   turn: c.turn || null,                    // {urls:[...], username, credential}
