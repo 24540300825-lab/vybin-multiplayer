@@ -48,7 +48,7 @@ export class P2P {
     if (this.up()) return 'ok';
     const pc = this.pc, c = this.cand, g = this.sig;
     if (!pc) return 'chưa dựng';
-    return `${pc.iceConnectionState}/${pc.iceGatheringState} h${c.h} s${c.s} r${c.r}${this.turnOk ? '' : ' (chưa có TURN)'} · offer${g.off} ans${g.ans} ice${g.ice}${this.init ? '' : ' (vy)'}`;
+    return `${pc.iceConnectionState}/${pc.iceGatheringState} h${c.h} s${c.s} r${c.r} · offer${g.off} ans${g.ans} ice${g.ice}${this.init ? '' : ' (vy)'}`;
   }
   _setUp(on) {
     on = !!on; if (on === this._up) return; this._up = on;
@@ -81,26 +81,11 @@ export class P2P {
     }
   }
 
-  // STUN công cộng + TURN ngắn hạn do backend cấp (/api/turn, dùng chung nguồn với cuộc gọi). Chưa cấu hình TURN ⇒ chỉ STUN.
-  async _ice() {
-    const now = Date.now();
-    if (this._servers && now - this._iceAt < 40 * 60e3) return this._servers;
-    const servers = [...CONFIG.ice]; if (CONFIG.turn && CONFIG.turn.urls) servers.push(CONFIG.turn);
-    this.turnOk = false;
-    try {
-      const {data: {session}} = await this.s.sb.auth.getSession();
-      const ac = new AbortController(), to = setTimeout(() => ac.abort(), 4000);
-      try {
-        const r = await fetch('/api/turn?room=' + encodeURIComponent(this.s.room), {headers: {Authorization: 'Bearer ' + (session && session.access_token)}, signal: ac.signal, cache: 'no-store'});
-        if (r.ok) { const j = await r.json(); if (j.iceServers && j.iceServers.length) { servers.push(...j.iceServers); this.turnOk = true; } }
-      } finally { clearTimeout(to); }
-    } catch (e) { /* chỉ STUN */ }
-    this._servers = servers; this._iceAt = now; return servers;
-  }
-  _newPc(gen, servers) {
+  _newPc(gen) {
     this._teardown(); this.pend = this.pend.filter(x => x.g === gen);     // giữ ICE đã tới sớm của chính phiên này
     this.gen = gen; this._madeAt = performance.now();
-    const pc = this.pc = new RTCPeerConnection({iceServers: servers || CONFIG.ice});
+    const ice = CONFIG.turn ? [...CONFIG.ice, CONFIG.turn] : CONFIG.ice;
+    const pc = this.pc = new RTCPeerConnection({iceServers: ice});
     this.fast = pc.createDataChannel('f', {negotiated: true, id: 0, ordered: false, maxRetransmits: 0});
     this.rel = pc.createDataChannel('r', {negotiated: true, id: 1, ordered: true});
     for (const ch of [this.fast, this.rel]) {
@@ -127,8 +112,7 @@ export class P2P {
   async _make() {
     if (this._dead || !this.init || typeof RTCPeerConnection === 'undefined') return;
     try {
-      const servers = await this._ice(); if (this._dead) return;
-      const pc = this._newPc(rid(), servers);
+      const pc = this._newPc(rid());
       const off = await pc.createOffer(); await pc.setLocalDescription(off);
       if (pc !== this.pc) return;
       this.sig.off++; this.s.send({k: 'p2p', t: 'offer', g: this.gen, sdp: pc.localDescription.sdp});
@@ -148,8 +132,7 @@ export class P2P {
         if (this.init) return;
         this.sig.off++;
         if (this.up() && m.g === this.gen) return;
-        const servers = await this._ice(); if (this._dead) return;
-        const pc = this._newPc(m.g, servers);
+        const pc = this._newPc(m.g);
         await pc.setRemoteDescription({type: 'offer', sdp: m.sdp});
         const ans = await pc.createAnswer(); await pc.setLocalDescription(ans);
         if (pc !== this.pc) return;
