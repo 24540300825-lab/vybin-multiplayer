@@ -662,7 +662,9 @@ export function init(ctx){
   function clipSeg(lv,x0,z0,x1,z1){const d=Math.hypot(x1-x0,z1-z0);if(d<0.02)return [x1,z1];const n=Math.ceil(d/0.05);let lx=x0,lz=z0;
     for(let k=1;k<=n;k++){const t=k/n,x=x0+(x1-x0)*t,z=z0+(z1-z0)*t,c=cell(x,z);if(!free(lv,c[0],c[1]))return [lx,lz];lx=x;lz=z}return [x1,z1]}
   let corBlk=0;
-  function correct(dt){const s=net,age=Math.min(0.8,(performance.now()-s.t)/1000);
+  // Gói vị trí tới TRƯỚC lệnh (đi/ngồi/ngủ…) là cũ so với lộ trình đang chạy: đừng kéo bản sao về đó (gây "đóng băng rồi nhảy"); đợi gói gửi sau lệnh.
+  let cmdT=0;function netCmd(){cmdT=performance.now()}
+  function correct(dt){const s=net;if((plan[0]||busy)&&s.rt<cmdT)return;const age=Math.min(0.8,(performance.now()-s.t)/1000);
     let tx=s.x+s.vx*age,tz=s.z+s.vz*age;
     if(P.mode==='free'&&(s.vx||s.vz)&&!stairAt(s.x,s.z)&&!stairAt(tx,tz)){const c=clipSeg(s.l,s.x,s.z,tx,tz);tx=c[0];tz=c[1]}
     const dx=tx-P.pos.x,dz=tz-P.pos.z,d=Math.hypot(dx,dz);
@@ -700,7 +702,7 @@ export function init(ctx){
     updateLayers(dt);mixer.update(dt);updateEyes(dt);blinkTick();sfxTick();
   }
   play('REST',{fade:0});
-  return{id:DEF.id,DEF,char,P,K,acts,runMode,logic,finish,setNet,dispose,cmdMove,cmdSleep,cmdSit,cmdWake,cmdOffChair,blink:()=>{em('blink');blink(clock)},
+  return{id:DEF.id,DEF,char,P,K,acts,runMode,logic,finish,setNet,netCmd,dispose,cmdMove,cmdSleep,cmdSit,cmdWake,cmdOffChair,blink:()=>{em('blink');blink(clock)},
     get plan(){return plan},get cur(){return cur},get busy(){return busy}};
   }
   const DEFS={vy:DEF_VY,bin:DEF_BIN};
@@ -1405,8 +1407,8 @@ export function init(ctx){
   api.setRemoteVisible=v=>{if(remote&&remote.char.visible!==v)remote.char.visible=v};
   api.removeRemote=()=>{if(!remote)return;remote.dispose();remote=null;api.remote=null;if(window.__halo)endHalo()};
   api.setRemoteInput=m=>{rinp.x=m.x;rinp.z=m.z;rinp.run=!!m.r;rinp.mag=m.m?1:0;rinpT=clockG};
-  api.applyState=(m,lat)=>{if(remote)remote.setNet({x:m.x,y:m.y,z:m.z,w:m.w,l:m.l,m:m.m,b:m.b,mv:m.mv,vx:m.vx||0,vz:m.vz||0,t:performance.now()-(lat||0)*1000})};
-  api.applyCmd=(t,a)=>{if(!remote)return;switch(t){
+  api.applyState=(m,lat)=>{if(remote)remote.setNet({x:m.x,y:m.y,z:m.z,w:m.w,l:m.l,m:m.m,b:m.b,mv:m.mv,vx:m.vx||0,vz:m.vz||0,rt:performance.now(),t:performance.now()-(lat||0)*1000})};
+  api.applyCmd=(t,a)=>{if(!remote)return;remote.netCmd();switch(t){
     case 'move':remote.cmdMove(a[0],a[1],a[2],!!a[3]);break;case 'sleep':remote.cmdSleep();break;case 'sit':remote.cmdSit(a||undefined);break;
     case 'wake':remote.cmdWake();break;case 'off':remote.cmdOffChair();break;case 'blink':remote.blink();break;
     case 'int':rinp.interact=true;break;case 'door':{if(Array.isArray(a)){const d=doorList.find(x=>x.node.name===a[0]);if(d)doorApply(d,!!a[1],a[2]|0,!localIsBin())}else{const d=doorList.find(x=>x.node.name===a);if(d)toggleDoor(d)}break}}};

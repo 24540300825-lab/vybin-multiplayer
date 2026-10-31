@@ -9,7 +9,7 @@ import {OTHER} from './session.js';
 const r3 = v => Math.round(v * 1000) / 1000;
 
 export function bindSync(sess, api, loadChar) {
-  let remoteLoading = false, queue = [], snapT = 0, lastInT = 0, seq = 0, goneT = 0, lastDr = '', needNow = false, stopPend = 0;
+  let remoteLoading = false, queue = [], snapT = 0, lastInT = 0, seq = 0, goneT = 0, lastDr = '', needNow = false, wasMv = 0;
 
   async function ensureRemote(slot) {
     if (api.remote && api.remote.id === slot) return;
@@ -26,7 +26,8 @@ export function bindSync(sess, api, loadChar) {
   const whenRemote = fn => (api.remote ? fn() : queue.push(fn));
 
   // ----- local -> net -----
-  api.emit = (t, a) => sess.send({k: 'c', t, a});
+  // Lệnh (click-đi, ngồi, ngủ…) gửi xong thì gửi LUÔN 1 gói vị trí mới (~60ms sau, khi lộ trình đã dựng) — trước đây gói vị trí lúc đứng yên chỉ 2.5s/lần nên máy kia bị kéo về vị trí cũ rồi "nhảy".
+  api.emit = (t, a) => { const r = sess.send({k: 'c', t, a}); snapT = Math.min(snapT, 0.06); return r; };
   // Ngân sách tin nhắn: Supabase Realtime giới hạn số tin/giây mỗi kết nối. Trước đây mỗi lần đổi hướng phím gửi ~20 tin/s + snapshot 6/s => vượt trần,
   // tin bị rơi/trễ => nhân vật kia "đứng im rồi giật". Giờ: chỉ gửi 'i' khi đổi trạng thái đi/dừng/chạy hoặc đổi hướng đáng kể (<=6/s);
   // hướng phím hiện tại luôn kèm theo trong snapshot (8/s) nên mất 1 tin cũng không làm nhân vật bị kẹt. Tổng khi di chuyển <= ~14 tin/s.
@@ -41,20 +42,17 @@ export function bindSync(sess, api, loadChar) {
     if (!(edge || turned || keep)) return;
     lastMv = mv; lastRun = run; lastAng = ang; lastInT = now;
     sess.send({k: 'i', x: curIn.x, z: curIn.z, r: run, m: mv});
-    // Vừa đi / vừa dừng: gửi vị trí chính xác NGAY (dừng: đợi tới khi nhân vật thật sự đứng yên rồi gửi 1 gói chốt) để máy kia không lướt quá đà rồi bị kéo ngược.
-    if (mv) snapT = Math.min(snapT, 0.03); else stopPend = 0.6;
-    if (edge) needNow = true;
+    // Vừa đi (phím): gửi vị trí chính xác NGAY. (Dừng: gói chốt được gửi ở onTick khi nhân vật thật sự đứng yên.)
+    if (mv) snapT = Math.min(snapT, 0.03);
+    if (edge && mv) needNow = true;
   };
   api.onTick = dt => {
     snapT -= dt;
-    if (stopPend > 0) {                       // đang chờ nhân vật dừng hẳn để gửi gói chốt
-      stopPend -= dt;
-      const q = api.snapshot();
-      if (q && !q.mv) { stopPend = 0; snapT = 0; } else if (stopPend <= 0) snapT = 0;
-    }
+    const st = api.snapshot(); if (!st) return;
+    if (wasMv && !st.mv) snapT = 0;           // vừa dừng hẳn (phím hoặc click-đi): gửi gói chốt ngay để máy kia không lướt quá đà rồi bị kéo ngược
+    wasMv = st.mv;
     if (snapT > 0 && !needNow) return;
     needNow = false;
-    const st = api.snapshot(); if (!st) return;
     const msg = {k: 's', n: ++seq, ...st, ix: curIn.x, iz: curIn.z, ir: curIn.r, im: curIn.m};
     // bảng trạng thái cửa: gửi khi đổi, khi đứng yên, và định kỳ (mất gói cũng tự khớp lại)
     if (api.doorSig) { const dr = api.doorSig(); if (dr !== lastDr || !st.mv || seq % 8 === 0) { msg.dr = dr; lastDr = dr; } }
