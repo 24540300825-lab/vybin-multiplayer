@@ -64,7 +64,8 @@ export class Voice {
     sess.on('msg', m => { if (m.k === 'sig') this._enq(() => this._onSig(m)); else if (m.k === 'voice') this._enq(() => this._onVoice(m)); });
     sess.on('peer', ({present}) => this._enq(() => present ? this._hello() : this._peerGone()));
     sess.on('reconnected', () => this._enq(() => this._hello()));
-    sess.on('status', () => this._upd());                       // trạng thái tín hiệu thay đổi => cập nhật UI, KHÔNG đụng media
+    sess.on('status', () => this._upd());
+    setTimeout(() => { if (this.s.peer) this._loadIce().catch(() => {}); }, 1500);                       // trạng thái tín hiệu thay đổi => cập nhật UI, KHÔNG đụng media
   }
   on(ev, fn) { (this.h[ev] ||= []).push(fn); }
   emit(ev, a) { (this.h[ev] || []).forEach(f => { try { f(a); } catch (e) { console.error(e); } }); }
@@ -123,6 +124,7 @@ export class Voice {
 
   // đối phương (mới) xuất hiện / kênh tín hiệu nối lại: báo trạng thái; KHÔNG dựng lại nếu media đang tốt
   async _hello() {
+    this._loadIce().catch(() => {});      // lấy sẵn TURN ngay khi thấy đối phương => lúc bấm gọi không phải chờ
     if (this.active || this.pc) this._announce({req: !this.init && !this._mediaHealthy() && this.active ? 1 : 0});
     if (this.init && this._wantPc && this.s.peer && !this.pc) await this._rebuild();
     else if (this.pc && this.conn === 'lost') { this._wdStep = 1; this._schedule(300); }     // đối phương vừa quay lại: thử dựng lại ngay
