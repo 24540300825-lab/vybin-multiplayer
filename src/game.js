@@ -1288,7 +1288,7 @@ ${FRAG_COLOR}
     const rt=new THREE.WebGLRenderTarget(Math.max(1,Math.floor(innerWidth*pr)),Math.max(1,Math.floor(innerHeight*pr)),{type,samples:0});
     composer=new EffectComposer(renderer,rt);composer.setPixelRatio(pr);composer.setSize(innerWidth,innerHeight);
     composer.addPass(new RenderPass(scene,camera));composer.addPass(new ShaderPass(SANITIZE));
-    bloomP=new UnrealBloomPass(new THREE.Vector2(innerWidth*pr/2,innerHeight*pr/2),0.35,0.6,0.82);composer.addPass(bloomP);
+    bloomP=new UnrealBloomPass(new THREE.Vector2(innerWidth*pr/4,innerHeight*pr/4),0.35,0.6,0.82);composer.addPass(bloomP);
     const gp=new ShaderPass(GradeShader);GU=gp.uniforms;composer.addPass(gp);
     composer.addPass(new OutputPass());
     fxaaP=new ShaderPass(FXAAShader);fxaaP.material.uniforms['resolution'].value.set(1/(innerWidth*pr),1/(innerHeight*pr));composer.addPass(fxaaP);
@@ -1453,12 +1453,14 @@ ${FRAG_COLOR}
   // dynamic resolution scaling kiểu game: giữ ~60fps bằng cách tăng/giảm pixel ratio
   let pendPR=null;
   function setPR(p){curPR=p;renderer.setPixelRatio(p);renderer.setSize(innerWidth,innerHeight);const pr=Math.min(p,1.25);composer.setPixelRatio(pr);composer.setSize(innerWidth,innerHeight);fxaaP.material.uniforms['resolution'].value.set(1/(innerWidth*pr),1/(innerHeight*pr))}
+  // Tự co độ phân giải render để giữ ≥30 fps. 'Tự động': mục tiêu ~45fps; các preset cố định (Điện ảnh/Đẹp…): giữ trần độ phân giải của preset nhưng vẫn tự hạ khi máy tụt dưới ~30fps (rồi nâng lại khi thoải mái).
   function adaptRes(dtr){if(TEST)return;ftEma+=(Math.min(dtr,0.1)-ftEma)*0.08;if(--adaptCool>0)return;
-    const q=TP.quality;if(q!=='auto'){const t={low:0.75,medium:1,high:maxPR}[q];if(Math.abs(curPR-t)>0.01){pendPR=Math.min(t,maxPR);}adaptCool=60;return}
-    if(ftEma>0.0235){badWin++;goodWin=0}else if(ftEma<0.0185){goodWin++;badWin=0}else{badWin=0;goodWin=0}
-    if(badWin>=20&&curPR>0.6){pendPR=Math.max(0.6,+(curPR-0.15).toFixed(2));badWin=0;adaptCool=90}
-    else if(badWin>=60&&curPR<=0.6&&TP.post){TP.post=false;applyToon(false);toast('Máy chậm: tắt post-fx để mượt hơn');badWin=0}
-    else if(goodWin>=240&&curPR<maxPR){pendPR=Math.min(maxPR,+(curPR+0.1).toFixed(2));goodWin=0;adaptCool=180}}
+    const q=TP.quality,auto=q==='auto',cap=auto?maxPR:Math.min(maxPR,{low:0.75,medium:1,high:maxPR}[q]||maxPR),bad=auto?0.0235:0.033,good=auto?0.0185:0.026,floor=auto?0.6:0.7;
+    if(ftEma>bad){badWin++;goodWin=0}else if(ftEma<good){goodWin++;badWin=0}else{badWin=0;goodWin=0}
+    if(curPR>cap+0.01){pendPR=cap;adaptCool=60;return}
+    if(badWin>=20&&curPR>floor){pendPR=Math.max(floor,+(curPR-0.15).toFixed(2));badWin=0;adaptCool=90}
+    else if(auto&&badWin>=60&&curPR<=floor&&TP.post){TP.post=false;applyToon(false);toast('Máy chậm: tắt post-fx để mượt hơn');badWin=0}
+    else if(goodWin>=240&&curPR<cap){pendPR=Math.min(cap,+(curPR+0.1).toFixed(2));goodWin=0;adaptCool=180}}
   const TEST=/[?&]test/.test(location.search);
   function tick(dt,doRender=true){
     clockG+=dt;renderer.shadowMap.needsUpdate=((tickN&1)===0)||doRender===false;

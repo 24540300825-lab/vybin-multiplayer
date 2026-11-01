@@ -9,14 +9,14 @@ import {makeDepthMat} from './foliage.js';
 // ---- mức chất lượng: mật độ, tầm nhìn, bóng, số lớp sương, hạt mưa -----------------------------------------
 export const LEVELS = {
   low:    {dens: 0.40, dist: 0.62, shadowR: 9,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.45},
-  medium: {dens: 0.72, dist: 0.85, shadowR: 12, grassShadowR: 5,  haze: 2, rain: 4200, far: 0.75},
-  high:   {dens: 1.00, dist: 1.00, shadowR: 15, grassShadowR: 8,  haze: 2, rain: 6000, far: 1.00},
+  medium: {dens: 0.66, dist: 0.85, shadowR: 10, grassShadowR: 5,  haze: 2, rain: 4200, far: 0.75},
+  high:   {dens: 0.85, dist: 1.00, shadowR: 12, grassShadowR: 8,  haze: 2, rain: 6000, far: 1.00},
 };
 // theo loại: tầm nhìn tối đa (m), đường cong mật độ theo khoảng cách (d0 = bắt đầu thưa, d1 = còn tối thiểu), có đổ bóng không
 const CLASS = {
-  grass:  {maxD: 60,  d0: 30, d1: 56,  min: 0.04, shadow: true,  cell: 6,  lod: 0},
-  flower: {maxD: 55,  d0: 26, d1: 50,  min: 0.03, shadow: false, cell: 7,  lod: 30},
-  bush:   {maxD: 110, d0: 45, d1: 105, min: 0.12, shadow: true,  cell: 8,  lod: 48},
+  grass:  {maxD: 50,  d0: 22, d1: 46,  min: 0.04, shadow: true,  cell: 9,  lod: 0},
+  flower: {maxD: 46,  d0: 22, d1: 42,  min: 0.03, shadow: false, cell: 10, lod: 30},
+  bush:   {maxD: 110, d0: 45, d1: 105, min: 0.12, shadow: true,  cell: 11, lod: 48},
   tree:   {maxD: 230, d0: 70, d1: 220, min: 0.35, shadow: true,  cell: 12, lod: 70},
   rock:   {maxD: 130, d0: 55, d1: 120, min: 0.25, shadow: true,  cell: 10, lod: 55},
 };
