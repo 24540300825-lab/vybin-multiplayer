@@ -177,7 +177,6 @@ export function setupExterior(c) {
       if (ms.some(m => m && m.map === roofMat.map)) { const d = uvDensity(o, roofMat); if (d > 0) { dMain += d; nMain++; } }
     });
     dMain = nMain ? dMain / nMain : 0;
-    console.log('[ext] porch main', nMain, dMain.toFixed(3), 'hoods', hoods.length);
     hoods.forEach(o => {
       const old = [].concat(o.material), isC = m => /^Stylized Concrete/.test((m && m.name) || '');
       if (!old.some(isC)) return;
@@ -193,7 +192,6 @@ export function setupExterior(c) {
           for (let t = gr.start; t < Math.min(n, gr.start + gr.count); t++) { const i = idx ? idx.getX(t) : t; if (seen.has(i)) continue; seen.add(i); uv.setXY(i, uv.getX(i) * k, uv.getY(i) * k); }
         }
         uv.needsUpdate = true;
-        console.log('[ext] porch roof uv scale', k.toFixed(3), 'main', dMain.toFixed(3), 'hood', dh.toFixed(3));
       }
     });
   }
@@ -242,13 +240,11 @@ export function setupExterior(c) {
     // ma trận thế giới của mọi bản thể (dùng bản của mesh đầu để đặt vị trí; các primitive cùng nút có chung ma trận)
     const ref = set[0]; ref.updateWorldMatrix(true, false);
     const W = ref.matrixWorld; let mats = [];
-    const hb = MC.houseBox;
     const dt = MC.dropTrees;
     for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (dt && cls === 'tree') { V3.setFromMatrixPosition(mm); if (dt.some(q => Math.hypot(V3.x - q[0], V3.z - q[1]) < 1.6)) continue; } 
       mats.push(mm); }
     if (!mats.length) { set.forEach(m => m.removeFromParent()); continue; }
     nIn += mats.length;
-    if (window.__dbgExt) console.log('[ext] item', cls, set.length, ref.name, (Array.isArray(ref.material)?ref.material[0]:ref.material).name, ref.count, '->', mats.length, 'tris', (ref.geometry.index ? ref.geometry.index.count : ref.geometry.attributes.position.count) / 3);
     templates[cls].push({set, mats});
     // vật cản: thân cây / đá
     if (cls === 'tree' || cls === 'rock') addColliders(cls, set, mats);
@@ -379,5 +375,33 @@ export function setupExterior(c) {
     }
     for (const h of hazes) { h.position.x = target.x; h.position.z = target.z; if (fogColor) h.material.uniforms.uCol.value.copy(fogColor);  }
   }
-  return {tintMats, colliders, update, setLevel, getLevel: () => level, cells, hazes, group, depthMat};
+  return {tintMats, colliders, update, setLevel, getLevel: () => level, cells, hazes, group, depthMat, walkHeight: buildWalkHeight(scene, MC)};
+}
+
+// ---- độ cao mặt đi được (hiên / bục thềm / bậc) -------------------------------------------------------------
+// Bắn tia thẳng xuống 1 lần lúc dựng map trong MC.porch=[x0,x1,z0,z1] (+ MC.porchMax = trần cao tối đa), lưu lưới thưa; trả (x,z)=>y nội suy.
+// Ngoài vùng này (hoặc không có MC.porch) trả null → game dùng mặt đất phẳng floorY. Thêm bục/bậc mới: chỉ cần mở rộng MC.porch.
+function buildWalkHeight(scene, MC) {
+  if (!MC.porch) return () => null;
+  const [x0, x1, z0, z1] = MC.porch, C = 0.2, base = MC.floorY || 0, top = base + (MC.porchMax || 0.6);
+  const W = Math.ceil((x1 - x0) / C) + 1, H = Math.ceil((z1 - z0) / C) + 1, g = new Float32Array(W * H).fill(base);
+  const meshes = [];
+  scene.updateMatrixWorld(true);
+  scene.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh || !o.visible || o.isSkinnedMesh || /Foliage|Shader|Wind|LazyRig|^GEO_|^Sphere|^mesh_|^$/.test(o.name)) return;
+    const b = new THREE.Box3().setFromObject(o);
+    if (b.max.x > x0 && b.min.x < x1 && b.max.z > z0 && b.min.z < z1 && b.max.y > base && b.min.y < top) meshes.push(o);
+  });
+  const rc = new THREE.Raycaster(), org = new THREE.Vector3(), dn = new THREE.Vector3(0, -1, 0);
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    rc.set(org.set(x0 + i * C, top, z0 + j * C), dn);
+    const h = rc.intersectObjects(meshes, false)[0];
+    if (h) g[j * W + i] = Math.max(base, Math.min(top, h.point.y));
+  }
+  return (x, z) => {
+    if (x < x0 || x > x1 || z < z0 || z > z1) return null;
+    const fx = (x - x0) / C, fz = (z - z0) / C, i = Math.min(W - 2, fx | 0), j = Math.min(H - 2, fz | 0), u = fx - i, v = fz - j;
+    const a = g[j * W + i], b = g[j * W + i + 1], c = g[(j + 1) * W + i], d = g[(j + 1) * W + i + 1];
+    return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+  };
 }

@@ -34,6 +34,8 @@ Lỗi trong 1 tính năng chỉ làm **tính năng đó** tắt, game vẫn ch�
 Mẹo cầu thang: đặt các bậc có tên đúng mẫu, mỗi cầu thang 1 nhóm mesh; game tự đo độ cao bậc bằng tia ray nên không cần số liệu tay.
 
 ### 2c. Map ngoài trời (`MC.outdoor`, ví dụ `exterior`)
+- **Mặt đi được (hiên/bục/bậc):** `MC.porch=[x0,x1,z0,z1]` + `porchMax` — lúc dựng map bắn tia xuống lấy độ cao thật (`EXT.walkHeight`), `heightAt` trong game.js dùng nó; ngoài vùng này là mặt đất phẳng `floorY`. Thêm bục mới = mở rộng vùng `porch`.
+- **Vật liệu/mesh mới:** phân loại ở `CLASS`/`classOf`, màu & độ bão hoà ở `styleMat` (exterior.js); cờ shader đặt ở `material.userData` (`fol2`, `grass`, `bush`, `desat`, `ground`…) — xem `toonMat` trong game.js.
 - Chuẩn bị GLB: `python3 tools/prep_exterior.py EXTERIOR.glb assets/map-exterior.glb` (sửa clip trỏ node lỗi), rồi `python3 tools/build_manifest.py`.
 - Cỏ là card có UV trỏ vào atlas alpha → file `assets/grass-mask.png` (cắt hình bằng alphaMap); màu gốc cỏ lấy theo nền tại chỗ.
 - `MC`: `outdoor, floorY, walk0` (giới hạn đi), `camBox, grid, spawn, fence, block, blockSmall, doorTo/doorLabel` (cửa chuyển map). Mức đồ hoạ: `LEVELS` trong `src/exterior.js`.

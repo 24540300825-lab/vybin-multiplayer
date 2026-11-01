@@ -183,6 +183,7 @@ ${FRAG_COLOR}
   const stairY=(S,z)=>Math.min(S.top,Math.max(0,S.a+S.b*(S.z1-z)));
   const heightAt=(x,z,lv)=>{const S=stairAt(x,z);if(S)return stairY(S,z);
     if(!lv)for(const T of stairs)if(x>T.x0&&x<T.x1&&z>=T.z1&&z<T.z1+0.34)return stairY(T,T.z1)*(1-(z-T.z1)/0.34);   // chân chạm bậc đầu êm trước khi vào cầu thang
+    if(!lv&&EXT){const y=EXT.walkHeight(x,z);if(y!=null)return y}
     return lv?A.L1:A.L0};
   A.stairs=stairs;
   const pickStair=(x0,z0,x1,z1,up)=>{let best=stairs[0],bd=1e9;for(const S of stairs){const a=up?S.botZ:S.topZ,b=up?S.topZ:S.botZ,d=Math.hypot(x0-S.cx,z0-a)+Math.hypot(S.cx-x1,b-z1);if(d<bd){bd=d;best=S}}return best};

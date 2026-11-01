@@ -8,7 +8,8 @@ export const MAP_CONFIGS = {
     walk0:[-23.8,33.8,-24.2,13.55],l1:[0,0,0,0],cl1:[0,0,0,0],camBox:[-31,41,-32,21],
     grid:{x0:-26,z0:-26.5,c:0.125,W:496,H:340},
     spawn:{vy:[4.3,2.4,0],bin:[5.7,2.4,0]},      // vừa bước ra khỏi cửa chính (hiên trước nhà), quay mặt ra vườn/cổng
-    dropTrees:[[9.0,11.9]],houseBox:[-10.5,20.5,-10.5,0.95],                  // vùng thân nhà: cây/bụi/cỏ scatter lọt vào trong sẽ bị bỏ
+    porch:[-10.5,20.5,0.9,4.2],porchMax:0.6,   // hiên + bục thềm trước nhà: nhân vật bước lên theo mặt thật
+    dropTrees:[[9.0,11.9]],
     fence:[-24.41,34.41,-24.76,14.31,5],                      // mặt ngoài hàng rào x0,x1,z0,z1 + x tâm cổng (để rải cây ra ngoài, chừa lối trước cổng)
     block:/^(Facade_|Foundation_)/,blockSmall:/^(rock-|tree-)/,
     garden:false,hideFlat:false,out:/^__none__$/,gtex:'Plane',lift:0,farR:150,
