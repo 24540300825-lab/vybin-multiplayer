@@ -121,6 +121,10 @@ export function setupExterior(c) {
     toonMat(r); matCache.set(key, r); return r;
   }
 
+  // đá dẫn đường: màu gốc trong file vàng đậm (1, .86, .29) → giảm bão hoà về kem trắng
+  const pathDone = new Set();
+  env.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) if (m && /^M_PathStone/.test(m.name || '') && !pathDone.has(m)) { pathDone.add(m); m.color.setRGB(0.86, 0.84, 0.74); } });
+
   // ---- 2) gom InstancedMesh lớn ra khỏi env → chia ô ----
   const lst = [];
   env.traverse(o => { if (o.isInstancedMesh && o.count > 24 && !/^\.SF_/.test(o.name)) lst.push(o); });
