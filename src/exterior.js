@@ -223,6 +223,7 @@ export function setupExterior(c) {
     const tris = (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
     const hasWood = parts.some(p => /wood/i.test(p.material.name || ''));
     if (hasWood) return 'tree';
+    if (/bush/i.test(m.name || '')) return 'bush';       // bụi dại (blackberry…) là hàng rào cây thật, không phải hoa → giữ đủ tầm nhìn/mật độ như bush
     return tris > 1500 ? 'bush' : 'flower';
   };
   // một "nút" có thể là Group nhiều InstancedMesh (nhiều primitive: thân + tán) → gom theo cha để phân loại tree/bush
@@ -241,13 +242,15 @@ export function setupExterior(c) {
     const ref = set[0]; ref.updateWorldMatrix(true, false);
     const W = ref.matrixWorld; let mats = [];
     const hb = MC.houseBox;
-    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (hb) { V3.setFromMatrixPosition(mm); if (V3.x > hb[0] && V3.x < hb[1] && V3.z > hb[2]) {
+    const dt = MC.dropTrees;
+    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (dt && cls === 'tree') { V3.setFromMatrixPosition(mm); if (dt.some(q => Math.hypot(V3.x - q[0], V3.z - q[1]) < 1.6)) continue; } if (hb) { V3.setFromMatrixPosition(mm); if (V3.x > hb[0] && V3.x < hb[1] && V3.z > hb[2]) {
         // bush: chỉ bỏ phần nằm TRONG nhà (z<0.2), giữ hàng rào cây sát mặt tiền; cây to: bỏ luôn mọi cây mọc sát/xuyên tường nhà (z<4.6)
         const zc = cls === 'bush' || cls === 'flower' || cls === 'grass' ? 0.2 : (cls === 'tree' ? 4.6 : hb[3]);
         if (V3.z < zc) continue; } }
       mats.push(mm); }
     if (!mats.length) { set.forEach(m => m.removeFromParent()); continue; }
     nIn += mats.length;
+    if (window.__dbgExt) console.log('[ext] item', cls, set.length, ref.name, (Array.isArray(ref.material)?ref.material[0]:ref.material).name, ref.count, '->', mats.length, 'tris', (ref.geometry.index ? ref.geometry.index.count : ref.geometry.attributes.position.count) / 3);
     templates[cls].push({set, mats});
     // vật cản: thân cây / đá
     if (cls === 'tree' || cls === 'rock') addColliders(cls, set, mats);

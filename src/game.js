@@ -861,21 +861,30 @@ ${FRAG_COLOR}
       // mây khối 2 mức
       if(uOut>0.5){
         // mây khối stylized: fbm + dải sáng theo hướng nắng, mép bạc
-        vec2 q=d.xz/(max(h,0.0)+0.32)*1.15+vec2(uT*0.0035,uT*0.0012);
+        vec2 q=d.xz/(max(h,0.0)+0.32)*1.9+vec2(uT*0.0035,uT*0.0012);
         q+=vec2(vn(q*0.7+3.0),vn(q*0.7+9.0))*0.55;
         float f1=vn(q*vec2(1.0,1.7))*0.5+vn(q*vec2(2.1,3.5))*0.28+vn(q*vec2(4.4,7.3))*0.14+vn(q*vec2(8.7,13.0))*0.08;
         vec2 sl=normalize(sunDir.xz+vec2(0.001))*0.07;
         vec2 q2=q+sl;
         float f2=vn(q2*vec2(1.0,1.7))*0.5+vn(q2*vec2(2.1,3.5))*0.28+vn(q2*vec2(4.4,7.3))*0.14+vn(q2*vec2(8.7,13.0))*0.08;
-        float cov=cth-0.02;
-        float body=smoothstep(cov,cov+0.045,f1)*smoothstep(0.015,0.14,h);
-        float lt=smoothstep(-0.05,0.07,f2-f1+0.02);
-        float edge=1.0-smoothstep(cov+0.045,cov+0.11,f1);
+        float cov=cth-0.07;
+        float body=smoothstep(cov,cov+0.016,f1)*smoothstep(0.015,0.14,h);
+        float lt=smoothstep(-0.012,0.014,f2-f1+0.006);
+        float edge=1.0-smoothstep(cov+0.016,cov+0.07,f1);
         vec3 sunC=mix(vec3(1.0),vec3(1.0,0.82,0.62),smoothstep(0.5,-0.05,sunDir.y));
-        vec3 cc=mix(cClSh,cCl*sunC,lt);
+        float thick=smoothstep(cov+0.05,cov+0.16,f1);
+        vec3 cdark=cClSh*vec3(0.6,0.58,0.82);
+        vec3 cc=mix(mix(cClSh,cdark,thick),cCl*sunC,lt*(1.0-0.55*thick));
         cc+=vec3(1.0,0.86,0.66)*0.30*pow(max(sd,0.0),4.0)*uSunV*edge;
         cc=mix(cc,cc*vec3(0.78,0.84,1.0),smoothstep(0.0,0.5,0.5-sunDir.y)*0.5);
         c=mix(c,cc,body*0.96);
+        // mây ti mỏng kéo sợi + tia sáng toả từ mặt trời (god rays) xuyên qua mây
+        float ci=vn(vec2(d.x/(h+0.35)*0.45+uT*0.0016,d.z/(h+0.35)*3.2))*vn(vec2(d.z/(h+0.35)*0.9+5.0,d.x/(h+0.35)*2.1));
+        c=mix(c,mix(cHor,vec3(1.0),0.55)*sunC,smoothstep(0.2,0.42,ci)*0.4*smoothstep(0.12,0.4,h)*(1.0-body));
+        vec3 sdn=normalize(sunDir),sax=normalize(cross(vec3(0.0,1.0,0.0),sdn)),say=cross(sdn,sax);
+        float ra=atan(dot(d,say),dot(d,sax));
+        float rays=(0.5+0.5*sin(ra*13.0+vn(vec2(ra*5.0,uT*0.03))*5.0))*(0.6+0.4*vn(vec2(ra*21.0,3.0)));
+        c+=vec3(1.0,0.8,0.55)*rays*pow(max(sd,0.0),3.0)*0.2*uSunV*up*smoothstep(-0.05,0.08,sunDir.y)*(1.0-body*0.7);
         float hz=smoothstep(0.0,0.05,h)*(1.0-smoothstep(0.05,0.3,h));
         c=mix(c,cHor,hz*body*0.25);
       }
