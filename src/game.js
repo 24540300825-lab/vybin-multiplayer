@@ -110,8 +110,11 @@ ${FRAG_COLOR}
          vec3 amb=mix(uAmbG,uAmbS,wn.y*0.5+0.5);
          vec3 tone=mix(uSh*amb,uMid*uSunC,I*vis);
          tone=mix(tone,uHi*uSunC,Ih*vis);
-         #ifdef GRASSB
-         tone=mix(uSh*uAmbS,uMid*uSunC,0.62);   // cỏ: tông PHẲNG kiểu emission (không sáng/tối theo hướng nắng, không nhận bóng) nhưng vẫn ăn theo màu nắng/môi trường theo giờ & thời tiết
+         #if (defined(GRASSB)||defined(BUSHF))&&(NUM_DIR_LIGHTS>0)
+         // cỏ + bụi: chiếu sáng Y HỆT mặt thảm phía dưới (pháp tuyến hướng lên, cùng ánh nắng/ambient) → luôn cùng tông với thảm ở mọi giờ & thời tiết; không tự đổ bóng lên chính nó
+         {vec3 upV=normalize((viewMatrix*vec4(0.0,1.0,0.0,0.0)).xyz);float aU=acos(clamp(dot(upV,Ld),-1.0,1.0));
+          float Iu=aU<maxA?1.0:((sm>0.0001&&aU<maxA+sm)?1.0-(aU-maxA)/sm:0.0),Ihu=aU<hiA?1.0:((sm>0.0001&&aU<hiA+sm)?1.0-(aU-hiA)/sm:0.0);
+          tone=mix(uSh*uAmbS,uMid*uSunC,Iu);tone=mix(tone,uHi*uSunC,Ihu);}
          #endif
          float inH=smoothstep(-0.2,0.2,vWP.x)*(1.0-smoothstep(9.8,10.2,vWP.x))*smoothstep(-8.2,-7.8,vWP.z)*(1.0-smoothstep(0.4,0.8,vWP.z))*step(vWP.y,6.2)*step(-0.3,vWP.y)*uInHK;
          #if defined(FOL2)||defined(GRASSB)
@@ -120,10 +123,10 @@ ${FRAG_COLOR}
          if(uCloudSh>0.01){float csn=vn3(vec3(vWP.x*0.05+uWindT*0.5,0.0,vWP.z*0.05+uWindT*0.2));tone*=1.0-0.28*smoothstep(0.5,0.62,csn)*uCloudSh*(1.0-inH);}
          #endif
          vec3 col=diffuseColor.rgb*tone;
-         #if defined(FOL2)||defined(GRASSB)
+         #if defined(FOL2)&&!defined(BUSHF)   // phần "phát sáng" chỉ cho cây/hoa; cỏ & bụi tính sáng như thảm
          col+=diffuseColor.rgb*uFolEmi*mix(amb,uSunC,0.5*vis)*1.15;   // phần "phát sáng" của lá cũng ăn theo tông môi trường (sáng/tối/hoàng hôn/mưa)
          #endif
-         #if defined(FOL2)||defined(GRASSB)
+         #if defined(FOL2)&&!defined(BUSHF)
          col*=1.0-0.06*uWet*(1.0-inH); col=mix(col,col*vec3(0.9,1.1,0.9),uWet*0.6);   // lá ướt: không tối/xám bẩn, hơi tươi hơn
          #else
          col*=1.0-0.2*uWet*(1.0-inH);

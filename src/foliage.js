@@ -95,7 +95,11 @@ export const FRAG_COLOR = `
 #ifdef BUSHF
  // bụi: thay dải gradient của texture bằng "tự đổ bóng" mềm — gốc/bên trong tối, ngọn sáng ấm, thêm mảng sáng/tối theo cụm lá (nhiễu theo toạ độ thế giới)
  { float nh = clamp( vLeafH, 0.0, 1.0 );
-   float ao = mix( 0.56, 1.06, smoothstep( 0.0, 0.8, nh ) );
+   // cùng bảng màu với cỏ & thảm (uGrassA/B × uGTint) → luôn đồng bộ; giữ độ sáng tối của texture (chi tiết lá) và giữ nguyên chấm quả đỏ
+   vec3 src = diffuseColor.rgb; float lum = dot( src, vec3( 0.299, 0.587, 0.114 ) );
+   vec3 pal = varyCol( mix( uGrassA, uGrassB, 0.22 ) * uGTint * uFolTint * 0.92, vHash, uFolVar * 0.6 ) * clamp( lum / 0.35, 0.65, 1.3 );
+   diffuseColor.rgb = mix( pal, src, smoothstep( 0.08, 0.25, src.r - max( src.g, src.b ) ) );
+   float ao = mix( 0.62, 1.0, smoothstep( 0.0, 0.8, nh ) );
    float cl = smoothstep( 0.3, 0.7, vn3( vWP * 1.6 ) );
    diffuseColor.rgb *= ao * mix( 0.84, 1.1, cl );
    diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3( 1.08, 1.04, 0.84 ), smoothstep( 0.55, 1.0, nh ) * 0.5 ); }

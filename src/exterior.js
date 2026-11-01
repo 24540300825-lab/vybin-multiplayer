@@ -98,11 +98,11 @@ export function setupExterior(c) {
     _gm.colorSpace = THREE.NoColorSpace; _gm.flipY = false; _gm.anisotropy = 4; _gm.wrapS = _gm.wrapT = THREE.ClampToEdgeWrapping;
     return _gm;
   };
-  function styleMat(m, geo) {
+  function styleMat(m, geo, cls) {
     const nm = m.name || '';
     const grass = isGrassMat(nm), fol = !grass && isFoliageMat(nm);
     if (!grass && !fol) return m;
-    const key = m.uuid + '|' + geo.uuid;
+    const key = m.uuid + '|' + geo.uuid + '|' + cls;
     let r = matCache.get(key); if (r) return r;
     // vài vật liệu hoa trong file là KHR_materials_unlit (MeshBasic) → dựng lại thành Standard cùng màu để nhận ánh sáng/bóng như lá
     r = m.isMeshStandardMaterial ? m.clone() : new THREE.MeshStandardMaterial({color: m.color.clone(), map: m.map}); r.name = nm; r.side = THREE.DoubleSide;
@@ -117,12 +117,13 @@ export function setupExterior(c) {
       else r.userData.occ = true;                           // bụi/cây cao: mờ dần khi chắn giữa camera và người
       // lá chưa có màu/texture (trắng): tô xanh lá theo palette của các lá có màu trong file
       if (!r.map && r.color.r > 0.95 && r.color.g > 0.95 && r.color.b > 0.95) {
-        if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.color.setRGB(0.5, 0.62, 0.3); r.userData.bush = true; }     // bụi: màu xanh phẳng + shading 'tự đổ bóng' trong shader (BUSHF, foliage.js) — không dùng gradient texture (gây dải màu lạ)
+        if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.color.setRGB(0.3, 0.4, 0.2); r.userData.bush = true; }     // bụi: màu xanh phẳng + shading 'tự đổ bóng' trong shader (BUSHF, foliage.js) — không dùng gradient texture (gây dải màu lạ)
         else r.color.setRGB(0.30, 0.42, 0.04);
       }
     }
+    if (fol && cls === 'bush' && gi.h >= 0.9) r.userData.bush = true;     // mọi bụi (kể cả bụi có texture): tô theo bảng màu cỏ/thảm + chiếu sáng như thảm (BUSHF)
     if (fol && r.map) r.color.multiply(new THREE.Color(0.94, 1.0, 1.1));     // bớt vàng: kéo cây/bụi về xanh lá cùng tông nền
-    r.userData.desat = grass ? 0.95 : (r.userData.bush ? 0.7 : (r.userData.squash ? 0.8 : 0.88));     // hoa/bụi/cây bớt rực → tông điện ảnh
+    r.userData.desat = grass ? 0.95 : (r.userData.bush ? 0.95 : (r.userData.squash ? 0.8 : 0.88));     // hoa/bụi/cây bớt rực → tông điện ảnh
     r.metalness = 0; r.roughness = 1;
     toonMat(r); matCache.set(key, r); return r;
   }
@@ -259,7 +260,7 @@ export function setupExterior(c) {
     for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
     let cx = 0, cz = 0; arr.forEach(mm => { V3.setFromMatrixPosition(mm); cx += V3.x; cz += V3.z; }); cx /= arr.length; cz /= arr.length;
     for (const src of set) {
-      const mat = styleMat(Array.isArray(src.material) ? src.material[0] : src.material, src.geometry);
+      const mat = styleMat(Array.isArray(src.material) ? src.material[0] : src.material, src.geometry, cls);
       const im = new THREE.InstancedMesh(src.geometry, mat, arr.length);
       arr.forEach((mm, i) => im.setMatrixAt(i, mm));
       im.instanceMatrix.needsUpdate = true; im.matrixAutoUpdate = false; im.castShadow = false; im.receiveShadow = cls === 'tree' || cls === 'rock';     // cỏ chỉ ĐỔ bóng xuống thảm, không nhận bóng của chính cỏ → đồng màu, hoà vào thảm
