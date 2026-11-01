@@ -92,6 +92,14 @@ export const FRAG_COLOR = `
  { diffuseColor.rgb *= mix( uBaseShade, 1.0, smoothstep( 0.0, 0.85, vLeafH ) );
    diffuseColor.rgb = varyCol( diffuseColor.rgb * uFolTint, vHash, uFolVar ); }
 #endif
+#ifdef BUSHF
+ // bụi: thay dải gradient của texture bằng "tự đổ bóng" mềm — gốc/bên trong tối, ngọn sáng ấm, thêm mảng sáng/tối theo cụm lá (nhiễu theo toạ độ thế giới)
+ { float nh = clamp( vLeafH, 0.0, 1.0 );
+   float ao = mix( 0.56, 1.06, smoothstep( 0.0, 0.8, nh ) );
+   float cl = smoothstep( 0.3, 0.7, vn3( vWP * 1.6 ) );
+   diffuseColor.rgb *= ao * mix( 0.84, 1.1, cl );
+   diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3( 1.08, 1.04, 0.84 ), smoothstep( 0.55, 1.0, nh ) * 0.5 ); }
+#endif
 #ifdef GRASSB
  { vec3 gt = texture2D( uGMap, vec2( 55.0 + vRoot.x * uGK, 55.0 - vRoot.y * uGK ) ).rgb * uGTint;
    float glm = dot( gt, vec3( 0.299, 0.587, 0.114 ) );

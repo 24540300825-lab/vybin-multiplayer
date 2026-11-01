@@ -117,7 +117,7 @@ export function setupExterior(c) {
       else r.userData.occ = true;                           // bụi/cây cao: mờ dần khi chắn giữa camera và người
       // lá chưa có màu/texture (trắng): tô xanh lá theo palette của các lá có màu trong file
       if (!r.map && r.color.r > 0.95 && r.color.g > 0.95 && r.color.b > 0.95) {
-        if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.map = FOLMAP; r.color.setRGB(1.7, 1.9, 1.4); r.userData.bush = true; }     // bụi: UV trỏ vào gradient xanh của foliage-a → mỗi mảng lá lệch tông nhẹ (như texture mode ở Blender)
+        if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.color.setRGB(0.5, 0.62, 0.3); r.userData.bush = true; }     // bụi: màu xanh phẳng + shading 'tự đổ bóng' trong shader (BUSHF, foliage.js) — không dùng gradient texture (gây dải màu lạ)
         else r.color.setRGB(0.30, 0.42, 0.04);
       }
     }
