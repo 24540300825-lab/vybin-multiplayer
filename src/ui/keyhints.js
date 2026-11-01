@@ -1,24 +1,20 @@
-// Dòng hướng dẫn phím luôn hiện (text) ở đáy màn hình — cùng một bộ lệnh cho phím lẫn chuột, tự cập nhật theo phím người chơi đã gán & chế độ đang chạy/đi bộ.
-import {keyName, ACTIONS} from './shortcuts.js';
+// Cột nút chức năng nhân vật ở MÉP PHẢI màn hình (kiểu danh sách nhân vật của Genshin): mỗi nút = 1 lệnh, bấm chuột hoặc nhấn phím đều chạy cùng một lệnh.
+// Hiện phím đã gán (đổi được trong Cài đặt) và nhãn; nút Chạy sáng lên khi đang ở chế độ chạy.
+import {keyName} from './shortcuts.js';
 
 export function mountKeyHints(keys) {
-  if (!matchMedia('(pointer:fine)').matches) return;        // cảm ứng: không có bàn phím
-  const el = document.createElement('div'); el.id = 'kHint'; el.className = 'hud'; el.setAttribute('aria-hidden', 'true');
+  const el = document.createElement('div'); el.id = 'kSide'; el.className = 'hud';
   document.body.appendChild(el);
-  const item = (k, t) => `<span class="ki"><kbd>${k}</kbd>${t}</span>`;
+  const LIST = [['run', 'Chạy'], ['walk', 'Đi bộ'], ['sit', 'Ngồi'], ['type', 'Làm việc'], ['off', 'Rời ghế'], ['sleep', 'Ngủ'], ['wake', 'Dậy']];
   let last = '';
   const render = () => {
     const run = !!(window.__runMode && window.__runMode.v);
-    const k = id => keys[id] ? keyName(keys[id]) : null;
-    const parts = [item('WASD', 'Di chuyển'), item('Click', 'Đi tới điểm')];
-    if (k('run')) parts.push(item(k('run'), run ? 'Đang chạy · đi bộ' : 'Chạy'));
-    if (k('walk') && run) parts.push(item(k('walk'), 'Đi bộ'));
-    parts.push(item('E', 'Tương tác'));
-    [['sit', 'Ngồi'], ['type', 'Làm việc'], ['off', 'Rời ghế'], ['sleep', 'Ngủ'], ['wake', 'Dậy']].forEach(([id, t]) => { if (k(id)) parts.push(item(k(id), t)); });
-    parts.push(item('T', 'Chat'));
-    const h = parts.join('');
+    const h = LIST.filter(([id]) => keys[id] && !(id === 'walk' && !run)).map(([id, t]) =>
+      `<button type="button" class="ks${id === 'run' && run ? ' on' : ''}" data-a="${id}" title="${t}"><kbd>${keyName(keys[id])}</kbd><span>${id === 'run' && run ? 'Đang chạy' : t}</span></button>`).join('');
     if (h !== last) { last = h; el.innerHTML = h; }
   };
+  el.addEventListener('pointerdown', e => e.stopPropagation());
+  el.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b) window.dispatchEvent(new CustomEvent('vy:act', {detail: b.dataset.a})); });
   render();
   addEventListener('vy:mode', render); addEventListener('vy:act', () => setTimeout(render, 30));
   setInterval(render, 800);
