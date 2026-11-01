@@ -385,6 +385,11 @@ function buildWalkHeight(scene, MC) {
   if (!MC.porch) return () => null;
   const [x0, x1, z0, z1] = MC.porch, C = 0.2, base = MC.floorY || 0, top = base + (MC.porchMax || 0.6);
   const W = Math.ceil((x1 - x0) / C) + 1, H = Math.ceil((z1 - z0) / C) + 1, g = new Float32Array(W * H).fill(base);
+  // lần vào sau: lấy lưới đã đo từ localStorage (khoá theo phiên bản file map + vùng) → khỏi bắn tia lại
+  const f = FILES['map-' + window.MAPID], ck = 'vyWH:' + (f ? f.v : '') + ':' + MC.porch.join(',') + ':' + top;
+  let cached = null;
+  try { const t = localStorage.getItem(ck); if (t) { const a = JSON.parse(t); if (a.length === W * H) cached = a; } } catch (e) {}
+  if (cached) g.set(cached); else {
   const meshes = [];
   scene.updateMatrixWorld(true);
   scene.traverse(o => {
@@ -397,6 +402,9 @@ function buildWalkHeight(scene, MC) {
     rc.set(org.set(x0 + i * C, top, z0 + j * C), dn);
     const h = rc.intersectObjects(meshes, false)[0];
     if (h) g[j * W + i] = Math.max(base, Math.min(top, h.point.y));
+  }
+  try { for (let k = 0; k < localStorage.length; k++) { const key = localStorage.key(k); if (key && key.startsWith('vyWH:') && key !== ck) localStorage.removeItem(key); }
+        localStorage.setItem(ck, JSON.stringify(Array.from(g, v => Math.round(v * 1000) / 1000))); } catch (e) {}
   }
   return (x, z) => {
     if (x < x0 || x > x1 || z < z0 || z > z1) return null;

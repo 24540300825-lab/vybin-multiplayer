@@ -83,6 +83,7 @@ def main():
     ap.add_argument('--rot', type=float, default=0.0005)
     ap.add_argument('--pos', type=float, default=0.0002)
     ap.add_argument('--w', type=float, default=0.001)
+    ap.add_argument('--qrot', action='store_true', help='lưu góc xoay dạng int16 chuẩn hoá (KHR_mesh_quantization) — nhỏ một nửa')
     a = ap.parse_args()
     j, binc = load(a.src)
     A, BV = j['accessors'], j['bufferViews']
@@ -105,12 +106,17 @@ def main():
             tol = a.rot if path == 'rotation' else a.w if path == 'weights' else a.pos
             keep = rdp(t, v, tol, path == 'rotation')
             tin += len(t); tout += len(keep)
-            if len(keep) == len(t): continue
+            qr = a.qrot and path == 'rotation'
+            if len(keep) == len(t) and not qr: continue
             nt = t[keep].astype(np.float32)
             nv = v[keep].astype(np.float32)
             if path == 'weights': nv = nv.reshape(-1, 1)
             # accessor mới cho output
-            A.append({'componentType': 5126, 'count': int(len(nv)), 'type': A[oa]['type']})
+            if qr:
+                nv = np.round(np.clip(norm_rows(nv.astype(np.float64)), -1, 1) * 32767).astype(np.int16)
+                A.append({'componentType': 5122, 'normalized': True, 'count': int(len(nv)), 'type': 'VEC4'})
+            else:
+                A.append({'componentType': 5126, 'count': int(len(nv)), 'type': A[oa]['type']})
             s['output'] = len(A) - 1; new_data[len(A) - 1] = nv
             h = hashlib.md5(nt.tobytes()).hexdigest()
             if h not in inputs:
@@ -137,6 +143,8 @@ def main():
     bv_used = set(acc['bufferView'] for i, acc in enumerate(A) if i in used and 'bufferView' in acc and i not in new_data)
     for im in j.get('images', []):
         if 'bufferView' in im: bv_used.add(im['bufferView'])
+    for i, acc in enumerate(A):     # accessor thưa (morph target): bufferView nằm trong sparse
+        if i in used and 'sparse' in acc: bv_used.update((acc['sparse']['indices']['bufferView'], acc['sparse']['values']['bufferView']))
     for ext in (j.get('extensions') or {}).values():
         pass
     out = bytearray(); bvmap = {}; nBV = []
@@ -151,12 +159,14 @@ def main():
         if i not in used: continue
         if i in new_data:
             while len(out) % 4: out.append(0)
-            data = new_data[i].astype(np.float32).tobytes()
+            nd = new_data[i]; data = (nd if nd.dtype == np.int16 else nd.astype(np.float32)).tobytes()
             nBV.append({'buffer': 0, 'byteOffset': len(out), 'byteLength': len(data)})
             out += data
             acc['bufferView'] = len(nBV) - 1; acc.pop('byteOffset', None)
         elif 'bufferView' in acc:
             acc['bufferView'] = bvmap[acc['bufferView']]
+        if i not in new_data and 'sparse' in acc:
+            for k in ('indices', 'values'): acc['sparse'][k]['bufferView'] = bvmap[acc['sparse'][k]['bufferView']]
     for im in j.get('images', []):
         if 'bufferView' in im: im['bufferView'] = bvmap[im['bufferView']]
     def remap(o):
@@ -171,10 +181,15 @@ def main():
     for k in list(j.keys()):
         if k not in ('accessors', 'bufferViews', 'buffers'): remap(j[k])
     j['accessors'] = nA; j['bufferViews'] = nBV
+    if a.qrot:
+        for k in ('extensionsUsed', 'extensionsRequired'):
+            j.setdefault(k, [])
+            if 'KHR_mesh_quantization' not in j[k]: j[k].append('KHR_mesh_quantization')
     j['buffers'] = [{'byteLength': len(out)}]
     save(a.dst, j, bytes(out))
     import os
     print(f'khoá animation: {tin} → {tout}  ({100 * tout / max(tin, 1):.1f}%)   file: {os.path.getsize(a.src) // 1024} KB → {os.path.getsize(a.dst) // 1024} KB')
 
 
-main()
+if __name__ == "__main__":
+    main()

@@ -2,13 +2,13 @@
 export const FILES = {
  "char-bin": {
   "file": "char-bin.glb",
-  "v": "f4426a16",
-  "size": 5409060
+  "v": "4811830b",
+  "size": 4706400
  },
  "char-vy": {
   "file": "char-vy.glb",
-  "v": "ee2a0ead",
-  "size": 6287708
+  "v": "eccb4b2a",
+  "size": 4774760
  },
  "grass-mask": {
   "file": "grass-mask.png",
@@ -17,13 +17,13 @@ export const FILES = {
  },
  "map-exterior": {
   "file": "map-exterior.glb",
-  "v": "0e9de476",
-  "size": 6817120
+  "v": "f1238e01",
+  "size": 5700440
  },
  "map-house": {
   "file": "map-house.glb",
-  "v": "d422e6e0",
-  "size": 5727068
+  "v": "ceffea6e",
+  "size": 4647636
  },
  "map-studio": {
   "file": "map-studio.glb",

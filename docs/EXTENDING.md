@@ -33,6 +33,11 @@ Lỗi trong 1 tính năng chỉ làm **tính năng đó** tắt, game vẫn ch�
 6. Thử `?solo&as=bin#map=xxx`, rồi chơi thử 2 người.
 Mẹo cầu thang: đặt các bậc có tên đúng mẫu, mỗi cầu thang 1 nhóm mesh; game tự đo độ cao bậc bằng tia ray nên không cần số liệu tay.
 
+### Tối ưu asset trước khi đưa vào `assets/`
+- Nhân vật: `python3 tools/optimize_anim.py in.glb out.glb --rot 0.001 --pos 0.0003 --qrot` (bỏ khoá animation thừa + góc xoay int16; sai lệch < 1°).
+- Map: `python3 tools/quantize_normals.py in.glb q.glb && python3 tools/optimize_anim.py q.glb out.glb` (normal int8; `src/assets.js` tự đổi lại Float32 sau khi parse).
+- Sau đó luôn chạy `python3 tools/build_manifest.py` để đổi mã cache.
+
 ### 2c. Map ngoài trời (`MC.outdoor`, ví dụ `exterior`)
 - **Mặt đi được (hiên/bục/bậc):** `MC.porch=[x0,x1,z0,z1]` + `porchMax` — lúc dựng map bắn tia xuống lấy độ cao thật (`EXT.walkHeight`), `heightAt` trong game.js dùng nó; ngoài vùng này là mặt đất phẳng `floorY`. Thêm bục mới = mở rộng vùng `porch`.
 - **Vật liệu/mesh mới:** phân loại ở `CLASS`/`classOf`, màu & độ bão hoà ở `styleMat` (exterior.js); cờ shader đặt ở `material.userData` (`fol2`, `grass`, `bush`, `desat`, `ground`…) — xem `toonMat` trong game.js.

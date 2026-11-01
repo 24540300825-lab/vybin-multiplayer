@@ -39,6 +39,20 @@ async function fetchBuf(url, onBytes) {
   return out.buffer;
 }
 
+// file đã qua tools/quantize_normals.py lưu NORMAL dạng int8 (xen kẽ, stride 4) cho nhẹ lúc tải → đổi lại Float32 thường ngay sau parse,
+// để mọi chỗ dùng geometry (mergeGeometries, raycast, shader, tính toán CPU) hoạt động y như trước.
+function toFloatNormals(g) {
+  const seen = new Set();
+  g.scene.traverse(o => {
+    const geo = o.geometry; if (!geo || seen.has(geo)) return; seen.add(geo);
+    const n = geo.attributes.normal;
+    if (!n || (!n.isInterleavedBufferAttribute && !n.normalized && n.array instanceof Float32Array)) return;
+    const f = new Float32Array(n.count * 3);
+    for (let i = 0; i < n.count; i++) { f[i * 3] = n.getX(i); f[i * 3 + 1] = n.getY(i); f[i * 3 + 2] = n.getZ(i); }
+    geo.setAttribute('normal', new THREE.BufferAttribute(f, 3));
+  });
+}
+
 // load: trả về gltf (cache trong bộ nhớ). onProgress(frac 0..1)
 export function load(id, onProgress) {
   const a = REG.get(id); if (!a) return Promise.reject(new Error('unknown asset ' + id));
@@ -49,6 +63,7 @@ export function load(id, onProgress) {
     const buf = await fetchBuf(a.url, (g, t) => onProgress && onProgress(Math.min(0.99, g / (t || a.size)) * 0.85));
     onProgress && onProgress(0.9);
     const g = await parse(buf);
+    toFloatNormals(g);
     a.value = g; a.state = 'loaded'; onProgress && onProgress(1);
     return g;
   })().catch(e => { a.state = 'error'; a.promise = null; throw e; });

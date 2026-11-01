@@ -27,7 +27,7 @@ async function boot() {
   gate = mountGate();
   const hide = () => { $('load').classList.add('out'); setTimeout(() => $('load').style.display = 'none', 750); };   // dùng cho màn lỗi/cổng: mờ đi ngay
   // vào game: ảnh loading tối dần về đen (.5s) → đen mờ dần để lộ game (.6s)
-  const reveal = () => { const l = $('load'); l.classList.add('black'); setTimeout(() => { l.classList.add('out'); setTimeout(() => l.style.display = 'none', 700); }, 520); };
+  const reveal = () => { const l = $('load'); l.classList.add('black'); setTimeout(() => { l.classList.add('out'); setTimeout(() => l.style.display = 'none', 450); }, 280); };
 
   // ---------- 1) nhân vật + phiên ----------
   // Lần đầu: màn CHỌN NHÂN VẬT (BIN / VY). Máy nhớ lựa chọn (localStorage 'vyChar') → các lần sau tự vào đúng nhân vật, không hỏi lại.
@@ -84,7 +84,9 @@ async function boot() {
   eng.init({env: files[mapKey], tree: files['tree'] || null, localGlb: files['char-' + slot], localSlot: slot, mapId});
   const api = eng.api;
   LB(88, 'Biên dịch shader...');
-  try { await Promise.race([api.warm(), new Promise(r => setTimeout(r, 2200))]); } catch (e) { console.warn('warm', e); }
+  let warmed = false; try { warmed = localStorage.getItem('vyWarm') === mapId; } catch (e) {}   // lần sau: trình duyệt đã cache shader → chờ ngắn hơn
+  try { await Promise.race([api.warm(), new Promise(r => setTimeout(r, warmed ? 900 : 2200))]); } catch (e) { console.warn('warm', e); }
+  try { localStorage.setItem('vyWarm', mapId); } catch (e) {}
   if (CONFIG.perf) window.VY.Perf.toggle(true);
 
   // ---------- 3) chuyển map (có fade + loading; ĐỘC LẬP từng người, không kéo người kia theo) ----------
@@ -134,7 +136,7 @@ async function boot() {
     window.VYFEATURES = host;
     FEATURES.forEach(load => load().then(m => host.register(m.default)).catch(e => console.warn('[features] không nạp được', e)));
   } catch (e) { console.warn('[features]', e); }
-  LB(100, 'Xong!'); setTimeout(reveal, 250);
+  LB(100, 'Xong!'); setTimeout(reveal, 60);
   // tải nền sẵn map mà cửa/cổng của map này dẫn tới (HTTP cache) → lúc bấm chuyển map chỉ còn dựng cảnh, vào nhanh
   setTimeout(() => { const t = (MAP_CONFIGS[mapId] || {}).doorTo; if (t) prefetchMap(t); }, 1200);
 }
