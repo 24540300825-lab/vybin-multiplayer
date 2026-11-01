@@ -33,6 +33,12 @@ Lỗi trong 1 tính năng chỉ làm **tính năng đó** tắt, game vẫn ch�
 6. Thử `?solo&as=bin#map=xxx`, rồi chơi thử 2 người.
 Mẹo cầu thang: đặt các bậc có tên đúng mẫu, mỗi cầu thang 1 nhóm mesh; game tự đo độ cao bậc bằng tia ray nên không cần số liệu tay.
 
+### 2c. Map ngoài trời (`MC.outdoor`, ví dụ `exterior`)
+- Chuẩn bị GLB: `python3 tools/prep_exterior.py EXTERIOR.glb assets/map-exterior.glb` (sửa clip trỏ node lỗi), rồi `python3 tools/build_manifest.py`.
+- Cỏ là card có UV trỏ vào atlas alpha → file `assets/grass-mask.png` (cắt hình bằng alphaMap); màu gốc cỏ lấy theo nền tại chỗ.
+- `MC`: `outdoor, floorY, walk0` (giới hạn đi), `camBox, grid, spawn, fence, block, blockSmall, doorTo/doorLabel` (cửa chuyển map). Mức đồ hoạ: `LEVELS` trong `src/exterior.js`.
+- Cây/đá/nhà/hàng rào có va chạm (vòng tròn/hộp); cỏ & hoa quanh chân người chơi cúi xuống, cây bụi chắn camera mờ dần (dither).
+
 ### 2b. Khi cập nhật / thay map đang có (checklist "giữ nguyên tính năng")
 Các tính năng hiện có bám vào **tên node** và **số liệu trong `MC`** (`src/map-configs.js`). Khi nhận GLB map mới, giữ đúng các tên này (hoặc sửa `MC` cho khớp) thì mọi thứ tự chạy lại:
 - **Điểm tương tác (pin)**: node `Bed`, `Desk_Chair` (hoặc `MC.seat/chair`), `Sofa`, `TV_Panel`/`TV_Screen`, cửa `Doormat`/`Landing_Doormat`/`Door_Entrance_Leaf`/`GD_Door_Entrance_Leaf`. Đổi tên → pin lệch hoặc mất.

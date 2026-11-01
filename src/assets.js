@@ -14,6 +14,7 @@ const def = (id, o = {}) => {
 // owner = map sở hữu; null = dùng chung (nhân vật). priority nhỏ = nạp trước.
 def('map-studio', {owner: 'studio', deps: ['tree'], priority: 1});
 def('map-house', {owner: 'house', priority: 1});
+def('map-exterior', {owner: 'exterior', priority: 1});
 def('tree', {owner: 'studio', priority: 3});
 def('char-vy', {owner: null, priority: 2});
 def('char-bin', {owner: null, priority: 2});

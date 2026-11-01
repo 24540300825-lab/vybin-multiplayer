@@ -10,6 +10,16 @@ export const FILES = {
   "v": "ee2a0ead",
   "size": 6287708
  },
+ "grass-mask": {
+  "file": "grass-mask.png",
+  "v": "b552db26",
+  "size": 512472
+ },
+ "map-exterior": {
+  "file": "map-exterior.glb",
+  "v": "c23814c0",
+  "size": 8952696
+ },
  "map-house": {
   "file": "map-house.glb",
   "v": "d422e6e0",

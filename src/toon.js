@@ -29,7 +29,7 @@ export const V3=(r,g,b)=>new THREE.Vector3(r,g,b);
 export const TU={uSh:{value:V3(1,1,1)},uMid:{value:V3(1,1,1)},uHi:{value:V3(1,1,1)},uGCol:{value:V3(1,1,1)},uRimCol:{value:V3(1,1,1)},
   uSunC:{value:V3(1,1,1)},uAmbS:{value:V3(1,1,1)},uAmbG:{value:V3(1,1,1)},uLampC:{value:V3(0,0,0)},uLP:{value:Array.from({length:10},()=>new THREE.Vector4(0,-99,0,1))},uLN:{value:0},uLK:{value:0},
   uDS:{value:.6},uDM:{value:.1},uHiS:{value:.5},uGS:{value:.12},uGM:{value:.04},uGStr:{value:.1},uRim:{value:0},uRimPow:{value:3},
-  uLeafA:{value:V3(.36,.5,.17)},uLeafB:{value:V3(.7,.8,.3)},uLeafMix:{value:.7},uGrassA:{value:V3(.42,.6,.2)},uGrassB:{value:V3(.7,.8,.33)},uWindT:{value:0},uWindA:{value:0.4},uWet:{value:0},uCloudSh:{value:0.5}};
+  uLeafA:{value:V3(.36,.5,.17)},uLeafB:{value:V3(.7,.8,.3)},uLeafMix:{value:.7},uGrassA:{value:V3(.42,.6,.2)},uGrassB:{value:V3(.7,.8,.33)},uWindT:{value:0},uWindA:{value:0.4},uWet:{value:0},uCloudSh:{value:0.5},uInHK:{value:1}};
 export const TOON_DEF={sh:'#a08fae',mid:'#f8e4cc',hi:'#fff8e8',dSize:0.8,dSmooth:0.12,hiSize:0.45,gStr:0.12,gSize:0.1,gSmooth:0.05,gCol:'#fff2cf',rim:0.25,rimCol:'#ffd9a8',rimPow:3.5,
   leafA:'#5d7f2a',leafB:'#b2c850',leafMix:0.7,grassA:'#6b9a33',grassB:'#b3c957',
   expo:1.0,con:1.08,sat:1.12,temp:0.12,tintSh:'#6c5aa0',tintHi:'#ffb878',tintAmt:0.35,vig:0.18,bloom:0.22,bloomTh:0.85,post:true,

@@ -3,6 +3,7 @@ import {SFX} from './sfx.js';
 export const MAP_LIST = {
   studio: {name: 'Studio (cũ)', icon: '🏢', desc: 'Gác lửng 1 cầu thang, vườn cây', assets: ['map-studio']},
   house:  {name: 'Nhà 2 tầng (mới)', icon: '🏠', desc: '2 cầu thang, giường & bàn làm việc', assets: ['map-house']},
+  exterior: {name: 'Vườn ngoài nhà', icon: '🌳', desc: 'Sân vườn quanh nhà, cổng & hàng rào', assets: ['map-exterior']},
 };
 export const DEFAULT_MAP = 'house';
 export const isMap = id => Object.prototype.hasOwnProperty.call(MAP_LIST, id);

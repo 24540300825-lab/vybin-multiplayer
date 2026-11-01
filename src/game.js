@@ -13,6 +13,8 @@ import {$,sstep,clamp,K,CFG,angDiff} from './shared.js';
 import {MAP_CONFIGS} from './map-configs.js';
 import {TU,applyToon,patchLeafMask,hexV,TP,DEPTH_LEAF} from './toon.js';
 import {Perf} from './perf.js';
+import {FU,vertFol2,FRAG_PARS,FRAG_COLOR,OCC_GLSL,makeDepthMat,bindTU} from './foliage.js';
+import {setupExterior,LEVELS} from './exterior.js';
 import './hud.js';
 import {SFX} from './sfx.js';
 import {initPins} from './ui/pins.js';
@@ -54,10 +56,11 @@ export function init(ctx){
   function toonify(root){const done=new Set();root.traverse(o=>{if(!(o.isMesh||o.isSkinnedMesh))return;
     (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{
       if(m&&m.userData&&m.userData.leafMask&&!o.customDepthMaterial){o.customDepthMaterial=DEPTH_LEAF}
-      if(!m||done.has(m)||!m.isMeshStandardMaterial)return;done.add(m);
+      if(!m||done.has(m)||!m.isMeshStandardMaterial)return;done.add(m);toonMat(m)})})}
+  function toonMat(m){
       m.onBeforeCompile=sh=>{if(m.userData.leafMask)patchLeafMask(sh);Object.assign(sh.uniforms,TU);
-        const FOL=(/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf,SW=/Wind/i.test(m.name||'')||m.userData.sway||FOL,GRD=!!m.userData.ground||/Stylized Grass/i.test(m.name||'');
-        sh.vertexShader=(SW?'#define SWAYX\n':'')+'varying vec3 vWP;uniform float uWindT,uWindA;\n'+sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+        const F2=!!m.userData.fol2,GB=!!m.userData.grass,FOL=!F2&&!GB&&(/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf,SW=!F2&&!GB&&(/Wind/i.test(m.name||'')||m.userData.sway||FOL),GRD=!!m.userData.ground||/Stylized Grass/i.test(m.name||'');
+        const VS0=(F2||GB)?vertFol2(sh.vertexShader,!!m.userData.cloudV,NOISE_GLSL,GB||!!m.userData.squash):sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
           #ifdef SWAYX
           {vec4 q=vec4(transformed,1.0);
           #ifdef USE_INSTANCING
@@ -71,7 +74,9 @@ export function init(ctx){
            _p=instanceMatrix*_p;
           #endif
           vWP=(modelMatrix*_p).xyz;}`);
-        sh.fragmentShader=(FOL?'#define FOLIAGE\n':'')+(GRD?'#define GROUNDX\n':'')+'uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <opaque_fragment>',`
+        if(F2||GB){sh.uniforms.uCenter={value:m.userData.center||new THREE.Vector3(0,0.65,0)};sh.uniforms.uHInv={value:m.userData.hInv||0.66};sh.uniforms.uWindDir=FU.uWindDir;sh.uniforms.uHybrid=FU.uHybrid;sh.uniforms.uBaseShade=FU.uBaseShade;sh.uniforms.uFolEmi=FU.uFolEmi;sh.uniforms.uGMap=FU.uGMap;sh.uniforms.uGK=FU.uGK;sh.uniforms.uPl=FU.uPl;sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}
+        sh.vertexShader=(SW?'#define SWAYX\n':'')+'varying vec3 vWP;uniform float uWindT,uWindA;\n'+VS0;
+        sh.fragmentShader=(FOL?'#define FOLIAGE\n':'')+(F2?'#define FOL2\n':'')+(GB?'#define GRASSB\n':'')+(GRD?'#define GROUNDX\n':'')+((F2||GB)?FRAG_PARS:'')+'uniform float uInHK;uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <normal_fragment_begin>',(F2||GB)?'#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\nnormal*=(gl_FrontFacing?1.0:-1.0);\n#endif\n'+(m.userData.occ?OCC_GLSL:''):'#include <normal_fragment_begin>').replace('#include <opaque_fragment>',`
         {float I=1.0,Ih=1.0,vis=1.0,Ig=0.0;
          #ifdef FOLIAGE
          {float lm=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));vec3 lf=mix(uLeafA,uLeafB,smoothstep(0.03,0.4,lm));
@@ -79,6 +84,9 @@ export function init(ctx){
          #endif
          #ifdef GROUNDX
          {float lm=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));diffuseColor.rgb=mix(diffuseColor.rgb,mix(uGrassA,uGrassB,smoothstep(0.08,0.6,lm)),0.75);}
+         #endif
+         #if defined(FOL2)||defined(GRASSB)
+${FRAG_COLOR}
          #endif
          #if ( NUM_DIR_LIGHTS > 0 )
           vec3 Ld=directionalLights[0].direction;
@@ -101,12 +109,26 @@ export function init(ctx){
          vec3 amb=mix(uAmbG,uAmbS,wn.y*0.5+0.5);
          vec3 tone=mix(uSh*amb,uMid*uSunC,I*vis);
          tone=mix(tone,uHi*uSunC,Ih*vis);
-         float inH=smoothstep(-0.2,0.2,vWP.x)*(1.0-smoothstep(9.8,10.2,vWP.x))*smoothstep(-8.2,-7.8,vWP.z)*(1.0-smoothstep(0.4,0.8,vWP.z))*step(vWP.y,6.2)*step(-0.3,vWP.y);
+         float inH=smoothstep(-0.2,0.2,vWP.x)*(1.0-smoothstep(9.8,10.2,vWP.x))*smoothstep(-8.2,-7.8,vWP.z)*(1.0-smoothstep(0.4,0.8,vWP.z))*step(vWP.y,6.2)*step(-0.3,vWP.y)*uInHK;
+         #if defined(FOL2)||defined(GRASSB)
+         tone*=1.0-0.28*vCS*(1.0-inH);
+         #else
          if(uCloudSh>0.01){float csn=vn3(vec3(vWP.x*0.05+uWindT*0.5,0.0,vWP.z*0.05+uWindT*0.2));tone*=1.0-0.28*smoothstep(0.5,0.62,csn)*uCloudSh*(1.0-inH);}
+         #endif
          vec3 col=diffuseColor.rgb*tone;
+         #if defined(FOL2)||defined(GRASSB)
+         col+=diffuseColor.rgb*uFolEmi*(0.5+0.5*vis);
+         #endif
          col*=1.0-0.2*uWet*(1.0-inH);
+         #if defined(FOL2)||defined(GRASSB)
+         col+=uGCol*uSunC*Ig*vis*uGStr*0.12;
+         #else
          col+=uGCol*uSunC*Ig*vis*uGStr*(1.0+uWet*3.0*(1.0-inH));
+         #endif
          float rim=pow(1.0-clamp(dot(geometryNormal,geometryViewDir),0.0,1.0),uRimPow)*uRim;
+         #if defined(FOL2)||defined(GRASSB)
+         rim*=0.25;
+         #endif
          col+=uRimCol*uSunC*rim*(0.35+0.65*I);
          col+=diffuseColor.rgb*uLampC*inH*(0.2+0.35*I);
          {float lp=0.0;for(int li=0;li<10;li++){if(float(li)>=uLN)break;vec3 ld=uLP[li].xyz-vWP;float q=clamp(1.0-dot(ld,ld)/(uLP[li].w*uLP[li].w),0.0,1.0);lp+=q*q;}
@@ -115,7 +137,7 @@ export function init(ctx){
           col+=diffuseColor.rgb*vec3(1.0,0.8,0.52)*lp*uLK*0.85;}
          outgoingLight=col+totalEmissiveRadiance;}
         #include <opaque_fragment>`)};
-      m.customProgramCacheKey=()=>'vytoon8'+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;});});}
+      m.customProgramCacheKey=()=>'vytoon9'+(m.userData.fol2?'F':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
 
   // env
   const env=envG.scene;toonify(env);scene.add(env);env.updateMatrixWorld(true);
@@ -127,15 +149,21 @@ export function init(ctx){
 
   // anchors
   const MAPS=MAP_CONFIGS;
-  const MC=MAPS[MAPID]||MAPS.studio;
+  const MC=MAPS[MAPID]||MAPS.studio;const OUTD=!!MC.outdoor;TU.uInHK.value=OUTD?0:1;bindTU(TU);
+  if(OUTD){const sp=MC.spawn.vy;controls.target.set(sp[0],A0y(MC)+1,sp[1]);camera.position.set(sp[0]+12,A0y(MC)+15,sp[1]+19);controls.minDistance=10;controls.maxDistance=42;controls.update();
+    controls.minAzimuthAngle=-Infinity;controls.maxAzimuthAngle=Infinity;controls.minPolarAngle=0.25;controls.maxPolarAngle=1.25;CFG.camPan=Math.PI*2;CFG.camTilt=0.9}
+  function A0y(c){return c.floorY||0}
   if(MC.tint)env.traverse(o=>{if(o.isMesh&&o.material&&MC.tint[o.material.name]!=null)o.material.color.set(MC.tint[o.material.name])});
   if(MC.hideFlat)env.traverse(o=>{if(o.isMesh&&!(o.material&&o.material.name)){const b=new THREE.Box3().setFromObject(o);if((b.max.x-b.min.x)*(b.max.z-b.min.z)>20&&b.max.y-b.min.y<1.2)o.visible=false}});
   if(MC.hide)env.traverse(o=>{if(MC.hide.test(o.name)||(o.isMesh&&o.material&&MC.hide.test(o.material.name||'')))o.visible=false});
   env.updateMatrixWorld(true);
-  const A={};A.L0=0;A.L1=box(MC.mezz[0]).max.y;
+  let EXT=null;
+  if(OUTD){EXT=setupExterior({scene,env,MC,toonMat});for(let i=envMeshes.length-1;i>=0;i--)if(!envMeshes[i].parent)envMeshes.splice(i,1);
+    env.traverse(o=>{if(o.isMesh&&/^Stylized Grass$/.test((o.material&&o.material.name)||''))o.visible=false;if(o.isMesh&&/^\.SF_/.test(o.name))o.visible=false});env.updateMatrixWorld(true)}
+  const A={};A.L0=OUTD?(MC.floorY||0):0;A.L1=OUTD?A.L0+3:box(MC.mezz[0]).max.y;
   // cầu thang: gom thành danh sách; profile độ cao lấy bằng raycast rồi làm mượt
   const stairs=[];
-  {const groups=MC.treadNames?MC.treadNames.filter(n=>byName[n]).map(n=>[byName[n]]):[Object.keys(byName).filter(n=>MC.tread.test(n)).map(n=>byName[n])];
+  {const groups=OUTD?[]:MC.treadNames?MC.treadNames.filter(n=>byName[n]).map(n=>[byName[n]]):[Object.keys(byName).filter(n=>MC.tread.test(n)).map(n=>byName[n])];
     const rc=new THREE.Raycaster();
     groups.forEach(ms=>{if(!ms.length)return;const sb=new THREE.Box3(),meshes=[];ms.forEach(o=>{sb.union(new THREE.Box3().setFromObject(o));o.traverse(q=>{if(q.isMesh)meshes.push(q)})});
       const S={x0:sb.min.x,x1:sb.max.x,z0:sb.min.z,z1:sb.max.z};S.cx=(S.x0+S.x1)/2;S.botZ=S.z1+0.15;S.topZ=S.z0-0.35;S.midZ=(S.z0+S.z1)/2;
@@ -164,18 +192,19 @@ export function init(ctx){
    pend.forEach(o=>add(o,2.4));other.forEach(o=>add(o,/Floor|Side/.test(o.name)?2.0:1.3));
    LAMPS.length=Math.min(LAMPS.length,10);
    LAMPS.forEach((v,i)=>TU.uLP.value[i].copy(v));TU.uLN.value=LAMPS.length;window.__LAMPS=LAMPS}
-  const seat=box(MC.seat);A.seatC=seat.getCenter(new THREE.Vector3());A.seatTop=seat.max.y;
-  A.chairL=A.seatC.y>(A.L0+A.L1)/2?1:0;A.CY=[A.L0,A.L1][A.chairL];
-  const CHAIR=Object.values(byName).find(o=>MC.chair.test(o.name)&&!o.isMesh)||byName['Desk_Chair'];
-  const q=new THREE.Quaternion();CHAIR.getWorldQuaternion(q);
+  const seat=OUTD?null:box(MC.seat);A.seatC=seat?seat.getCenter(new THREE.Vector3()):null;A.seatTop=seat?seat.max.y:0;
+  A.chairL=A.seatC&&A.seatC.y>(A.L0+A.L1)/2?1:0;A.CY=[A.L0,A.L1][A.chairL];
+  const CHAIR=OUTD?Object.assign(new THREE.Object3D(),{name:'__NO_CHAIR__'}):(Object.values(byName).find(o=>MC.chair.test(o.name)&&!o.isMesh)||byName['Desk_Chair']);
+  const q=new THREE.Quaternion();if(!OUTD)CHAIR.getWorldQuaternion(q);
   const fw=new THREE.Vector3(0,0,1).applyQuaternion(q);fw.y=0;fw.normalize();if(MC.chairFlip)fw.negate();   // ghế nhà 2 tầng dựng quay lưng về phía +z: mặt ghế hướng -z (về phía bàn)
   A.chairYaw=Math.atan2(fw.x,fw.z);A.fwd=fw;
-  A.mattress=box('Bed_Mattress');A.bedBox=box('Bed');
+  A.mattress=OUTD?new THREE.Box3():box('Bed_Mattress');A.bedBox=OUTD?new THREE.Box3():box('Bed');
 
   // colliders + A*
-  const G={x0:-1,z0:-9,c:0.1,W:125,H:100,R:0.13};
+  const G=OUTD?{...MC.grid,R:0.13}:{x0:-1,z0:-9,c:0.1,W:125,H:100,R:0.13};
   const blocked=[new Uint8Array(G.W*G.H),new Uint8Array(G.W*G.H)],cols=[[],[]];
-  for(const m of envMeshes){
+  if(OUTD){for(const b of EXT.colliders.boxes)cols[0].push(b)}
+  for(const m of (OUTD?[]:envMeshes)){
     if(/^Stair/.test(m.name)||isUnder(m,CHAIR.name))continue;
     if(m.isInstancedMesh)continue;      // cây/cỏ instancing: Box3 chỉ tính bản mẫu ở gốc toạ độ (0,0,0) → vật cản "ma" chặn nhầm miệng cầu thang trái (các bản thật nằm ngoài nhà)
     const b=new THREE.Box3().setFromObject(m);if(b.isEmpty())continue;
@@ -187,7 +216,11 @@ export function init(ctx){
     const i0=cl(Math.floor((b.min.x-G.R-G.x0)/G.c),0,G.W-1),i1=cl(Math.floor((b.max.x+G.R-G.x0)/G.c),0,G.W-1);
     const j0=cl(Math.floor((b.min.z-G.R-G.z0)/G.c),0,G.H-1),j1=cl(Math.floor((b.max.z+G.R-G.z0)/G.c),0,G.H-1);
     for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++)blocked[lv][j*G.W+i]=1;}});
-  {const fl=MC.mezz.map(n=>box(n));
+  if(OUTD){for(const cc of EXT.colliders.circles){const rr=cc.r+G.R,i0=cl(Math.floor((cc.x-rr-G.x0)/G.c),0,G.W-1),i1=cl(Math.floor((cc.x+rr-G.x0)/G.c),0,G.W-1),j0=cl(Math.floor((cc.z-rr-G.z0)/G.c),0,G.H-1),j1=cl(Math.floor((cc.z+rr-G.z0)/G.c),0,G.H-1);
+      for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;if((x-cc.x)**2+(z-cc.z)**2<=rr*rr)blocked[0][j*G.W+i]=1}
+      cols[0].push(new THREE.Box3(new THREE.Vector3(cc.x-cc.r,A.L0,cc.z-cc.r),new THREE.Vector3(cc.x+cc.r,A.L0+1,cc.z+cc.r)))}
+    {const w=MC.walk0;for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;if(x<w[0]||x>w[1]||z<w[2]||z>w[3]){blocked[0][j*G.W+i]=1;blocked[1][j*G.W+i]=1}}}}
+  if(!OUTD){const fl=MC.mezz.map(n=>box(n));
     for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;let ok=false;for(const b of fl)if(x>b.min.x+0.12&&x<b.max.x-0.12&&z>b.min.z+0.12&&z<b.max.z-0.12){ok=true;break}if(!ok)blocked[1][j*G.W+i]=1}}
   for(let lv=0;lv<2;lv++)for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;
     for(const S of stairs)if(x>S.x0-0.02&&x<S.x1+0.02&&z>S.z0-0.4&&z<S.z1+0.2)blocked[lv][j*G.W+i]=0;}
@@ -273,7 +306,7 @@ export function init(ctx){
   // snapshot cũng mang bảng trạng thái cửa, nên mất gói thì lần snapshot sau tự khớp lại. Phiên bản cao hơn thắng; bằng nhau mà khác trạng thái → BIN thắng (cố định, không dao động).
   const doorOpenish=d=>d.st==='open'||d.st==='opening';
   const doorsSorted=[...doorList].sort((a,b)=>a.node.name<b.node.name?-1:a.node.name>b.node.name?1:0);
-  doorList.forEach(d=>{d.v=0});
+  doorList.forEach(d=>{d.v=0;const m=/^(.*)_Leaf_[LR]$/.exec(d.node.name);d.grp=m?m[1]:null});
   function doorApply(d,want,v,senderIsBin){
     if(v<d.v)return;
     if(v===d.v&&(doorOpenish(d)===want||!senderIsBin))return;     // cùng phiên bản: khớp rồi thì thôi; khác nhau thì chỉ nhận của BIN
@@ -290,6 +323,7 @@ export function init(ctx){
     CLIMBBED_L:'ACT_BIN_SLEEP_CLIMB ON BED_L',CLIMBBED_R:'ACT_BIN_SLEEP_CLIMB ON BED_R',SLEEP_L:'ACT_BIN_SLEEP-LOOP BREATHE_L',SLEEP_R:'ACT_BIN_SLEEP-LOOP BREATHE_R',
     OFFBED_L:'ACT_BIN_SLEEP_OFF BED_L',OFFBED_R:'ACT_BIN_SLEEP_OFF BED_R'};
   const DEF_BIN={id:'bin',K:KB,eye:{close:'ACT_BIN_EYE_CLOSE',open:'ACT_BIN_EYE_OPEN',blink:'ACT_BIN_BLINK'},eyeMeshes:['Sphere002','Sphere003'],trim:null,idleBurst:true,foot:{walk:[0.29,0.77],run:[0.20,0.68]},colors:{BLACK:'#16161b',SKIN:'#f2c9b3',BLUE:'#2b37b5',ORANGE:'#f26b1d'},pos:new THREE.Vector3(4.5,0,-1.5),yaw:0.4,ctrl:'wasd'};
+  if(OUTD&&MC.spawn){DEF_VY.pos.set(MC.spawn.vy[0],A.L0,MC.spawn.vy[1]);DEF_VY.yaw=MC.spawn.vy[2];DEF_BIN.pos.set(MC.spawn.bin[0],A.L0,MC.spawn.bin[1]);DEF_BIN.yaw=MC.spawn.bin[2]}
   function makeChar(chrG,DEF){
   const K=DEF.K;
   let emitOff=0;const em=(t,a)=>{if(!DEF.remote&&!emitOff&&api.emit)api.emit(t,a)};
@@ -474,9 +508,9 @@ export function init(ctx){
     {const S=stairAt(x,z);if(S){lv=z>S.midZ?0:1;x=S.cx;z=lv?S.topZ:S.botZ;}}
     plan=[...leave(),...route(x,z,lv,run||runMode.v)];
   }
-  function cmdSleep(){em('sleep');if(P.mode==='bed')return;const p0=startPos();const sides=['L','R'].filter(x=>!occ['bed'+x]||occ['bed'+x]===DEF.id).sort((a,b)=>{const va=bedPose(a),vb=bedPose(b);return Math.hypot(va.x-p0.x,va.z-p0.z)-Math.hypot(vb.x-p0.x,vb.z-p0.z)});if(!sides.length){toast('Giường đã có 2 người');return}const side=sides[0],s=bedPose(side);occ['bed'+side]=DEF.id;
+  function cmdSleep(){if(OUTD)return;em('sleep');if(P.mode==='bed')return;const p0=startPos();const sides=['L','R'].filter(x=>!occ['bed'+x]||occ['bed'+x]===DEF.id).sort((a,b)=>{const va=bedPose(a),vb=bedPose(b);return Math.hypot(va.x-p0.x,va.z-p0.z)-Math.hypot(vb.x-p0.x,vb.z-p0.z)});if(!sides.length){toast('Giường đã có 2 người');return}const side=sides[0],s=bedPose(side);occ['bed'+side]=DEF.id;
     plan=[...leave(),...route(s.x,s.z,1,false,true),{t:'face',yaw:0},{t:'climbBed',side}];}
-  function cmdSit(type){em('sit',type||0);if(P.mode==='sit'||P.mode==='type'){if(type)plan=[{t:type==='type'?'type':'sitidle'}];return}
+  function cmdSit(type){if(OUTD)return;em('sit',type||0);if(P.mode==='sit'||P.mode==='type'){if(type)plan=[{t:type==='type'?'type':'sitidle'}];return}
     if(occ.chair&&occ.chair!==DEF.id){toast('Ghế đang có người');return}
     const side=pickSide(chairStandOf),s=chairStandOf(side);
     plan=[...leave(),...route(s.x,s.z,A.chairL,false,true),{t:'face',yaw:A.chairYaw},{t:'climbChair',side}];if(type==='type')plan.push({t:'type'});}
@@ -736,12 +770,17 @@ export function init(ctx){
     const hits=ray.intersectObjects(envMeshes,false);
     for(const h of hits){
       if(h.object.userData.glass)continue;
-      {const dr=doorOf(h.object);if(dr){doHalo(dr.node);toggleDoor(dr);dr.v++;dr.want=undefined;if(api.emit)api.emit('door',[dr.node.name,doorOpenish(dr)?1:0,dr.v]);return}}
+      {const dr=doorOf(h.object);if(dr){const want=!doorOpenish(dr);const grp=doorList.filter(x=>x===dr||(dr.grp&&x.grp===dr.grp));   // cánh đôi (cửa chính, cổng): bấm 1 cánh thì cả hai cùng mở/đóng
+      grp.forEach(x=>{doHalo(x.node);if(doorOpenish(x)!==want||x===dr){if(doorOpenish(x)!==want)toggleDoor(x);x.v++;x.want=undefined;if(api.emit)api.emit('door',[x.node.name,doorOpenish(x)?1:0,x.v])}});return}}
       if(isUnder(h.object,'Bed')){doHalo('Bed');cmdSleep();return}
       if(isUnder(h.object,CHAIR.name)){doHalo(CHAIR.name);cmdSit();return}
       const n=h.face?h.face.normal.clone().transformDirection(h.object.matrixWorld):new THREE.Vector3(0,1,0);
       if(n.y<0.6)continue;
-      const p=h.point;marker.position.set(p.x,p.y+0.02,p.z);marker.visible=true;markT=1.2;
+      const p=h.point;
+      if(OUTD){   // ngoài trời: chỉ nhận bấm trên mặt đất/lối đi; bấm lên mái nhà/tường hoặc vật cản thì bỏ qua (tránh bị dẫn đi vòng ra sau nhà)
+        if(p.y>A.L0+0.7)return;const [ci,cj]=cell(p.x,p.z);let ok=free(0,ci,cj);for(let r=1;r<=10&&!ok;r++)for(let dj=-r;dj<=r&&!ok;dj++)for(let di=-r;di<=r;di++){if(Math.max(Math.abs(di),Math.abs(dj))===r&&free(0,ci+di,cj+dj)){ok=true;break}}
+        if(!ok)return}
+      marker.position.set(p.x,p.y+0.02,p.z);marker.visible=true;markT=1.2;
       cmdMove(p.x,p.z,p.y>2?1:0,run);return;
     }
   }
@@ -758,7 +797,7 @@ export function init(ctx){
   // ===== nút tương tác ghim 3D: ghế / giường / TV / cửa (src/ui/pins.js; thông số Figma trong docs/UI.md) =====
   {const ctr=n=>{const o=byName[n];if(!o)return null;env.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(o);return b.isEmpty()?null:b};
    const mid=(b,dy)=>b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+dy,(b.min.z+b.max.z)/2):null;
-   const sofaB=ctr('Sofa'),bedB=ctr('Bed'),tvB=ctr('TV_Screen')||ctr('TV_Panel'),doorB=ctr('Doormat')||ctr('Landing_Doormat')||ctr('Door_Entrance_Leaf')||ctr('GD_Door_Entrance_Leaf');
+   const sofaB=ctr('Sofa'),bedB=ctr('Bed'),tvB=ctr('TV_Screen')||ctr('TV_Panel'),doorB=OUTD?ctr('Door_Main'):(ctr('Doormat')||ctr('Landing_Doormat')||ctr('Door_Entrance_Leaf')||ctr('GD_Door_Entrance_Leaf'));
    const chairPt=A.seatC?new THREE.Vector3(A.seatC.x,A.seatTop+0.62,A.seatC.z):null;
    const bedPt=mid(bedB,0.25),tvPt=mid(tvB,0.35);
    const doorPt=doorB?new THREE.Vector3((doorB.min.x+doorB.max.x)/2,doorB.max.y+(doorB.max.y-doorB.min.y>0.5?-0.8:0.15),(doorB.min.z+doorB.max.z)/2):null;
@@ -769,7 +808,7 @@ export function init(ctx){
     {key:'tv',icon:'tv',label:'Xem TV',at:()=>tvPt,act:()=>{const s=tvStand();if(s)cmdMove(s.x,s.z,s.lv,false)}},
     {key:'chair',icon:'chair',label:'Ngồi',at:()=>chairPt,state:()=>P0.mode==='sit'||P0.mode==='type'?{on:true,label:'Đứng dậy'}:null,act:()=>{if(P0.mode==='sit'||P0.mode==='type')cmdOffChair();else cmdSit()}},
     {key:'bed',icon:'sleep',label:'Ngủ',at:()=>bedPt,state:()=>P0.mode==='bed'?{on:true,label:'Thức dậy'}:null,act:()=>{if(P0.mode==='bed')cmdWake();else cmdSleep()}},
-    {key:'door',icon:'door',label:'Bản đồ',at:()=>doorPt,act:()=>{const b=$('iMap');if(b)b.click()}}];
+    {key:'door',icon:'door',label:MC.doorLabel||'Bản đồ',at:()=>doorPt,act:()=>{if(MC.doorTo&&window.__switchMap){window.__switchMap(MC.doorTo);return}const b=$('iMap');if(b)b.click()}}];
    const pn=initPins({camera,items:items.filter(i=>i.at())});pinsUpd=pn.update;api.pins=pn;}
   // phím tắt (src/ui/shortcuts.js) → cùng các lệnh với nút ẩn ở trên
   {const ACT={walk:'bWalk',run:'bRun',sit:'bSit',type:'bType',off:'bOff',sleep:'bSleep',wake:'bWake'};addEventListener('vy:act',e=>{const b=ACT[e.detail];if(b)$(b).click()})}
@@ -829,7 +868,8 @@ export function init(ctx){
   let grassCol=null;const grassTex=(()=>{let t=null;const gn=MC.gtex||'Plane001';env.traverse(o=>{if(o.isMesh&&o.name===gn&&o.material.map){t=o.material.map;grassCol=o.material.color.clone()}});return t})();
   const gTex=grassTex?grassTex.clone():null;if(gTex){gTex.channel=0;gTex.wrapS=gTex.wrapT=THREE.RepeatWrapping;gTex.repeat.set(110,110);gTex.needsUpdate=true}
   const ground=new THREE.Mesh(new THREE.CircleGeometry(650,48),new THREE.MeshStandardMaterial({map:gTex,color:(MC.gtex&&grassCol)||0xffffff,roughness:1,metalness:0}));ground.material.userData.ground=true;toonify(ground);
-  ground.rotation.x=-Math.PI/2;ground.position.set(0,-0.3,0);ground.renderOrder=-999;ground.receiveShadow=false;scene.add(ground);
+  ground.rotation.x=-Math.PI/2;ground.position.set(0,OUTD?A.L0-0.03:-0.3,0);ground.renderOrder=-999;ground.receiveShadow=OUTD;scene.add(ground);
+  if(OUTD){envMeshes.push(ground);FU.uGMap.value=gTex}
 
   // ===== TỐI ƯU: gộp mesh tĩnh theo material (batching), tắt matrix auto, ngoại cảnh: bỏ bóng + cull theo khoảng cách =====
   const OPT={far:[],inst:[]};
@@ -1121,7 +1161,11 @@ export function init(ctx){
   function updInst(){const t=controls.target;for(const c of OPT.inst){const u=c.userData,d=Math.hypot(u.cx-t.x,u.cz-t.z);
       const f=Math.min(1,Math.max(0.05,1.05-d/26));const vis=d<62,sh=d<13;let n=Math.ceil(u.n*f);
       if(c.visible!==vis)c.visible=vis;if(c.count!==n)c.count=n;if(c.castShadow!==sh)c.castShadow=sh}}
-  function updCull(){updInst();const cx=controls.target;OPT.far.forEach(o=>{if(!o.userData.c){const b=new THREE.Box3().setFromObject(o);o.userData.c=b.getCenter(new THREE.Vector3());o.userData.r=b.getSize(new THREE.Vector3()).length()/2}
+  let curLvl='';
+  function applyLevel(){const q=TP.quality,lvl=q==='auto'?(curPR<0.8?'low':curPR<1.1?'medium':'high'):q;if(lvl===curLvl||!LEVELS[lvl])return;curLvl=lvl;EXT.setLevel(lvl);setRainCount(LEVELS[lvl].rain);
+    const ms={low:1536,medium:2048,high:2560}[lvl],hs={low:13,medium:15,high:17}[lvl],sh=sun.shadow;
+    if(sh.mapSize.x!==ms){sh.mapSize.set(ms,ms);if(sh.map){sh.map.dispose();sh.map=null}}Object.assign(sh.camera,{left:-hs,right:hs,top:hs*0.9,bottom:-hs*0.9});sh.camera.updateProjectionMatrix()}
+  function updCull(){if(EXT){applyLevel();EXT.update(controls.target,camera.position,scene.fog.color)}else updInst();const cx=controls.target;OPT.far.forEach(o=>{if(!o.userData.c){const b=new THREE.Box3().setFromObject(o);o.userData.c=b.getCenter(new THREE.Vector3());o.userData.r=b.getSize(new THREE.Vector3()).length()/2}
       const d=o.userData.c.distanceTo(camera.position)-o.userData.r;o.visible=d<300})}
 
   // ===== MÔI TRƯỜNG: ngày/đêm · thời tiết · light shafts · post-fx =====
@@ -1226,35 +1270,28 @@ export function init(ctx){
     fragmentShader:'varying float vF;uniform float uA;void main(){float d=length(gl_PointCoord-0.5);float a=(1.0-smoothstep(0.1,0.5,d))*vF*uA;gl_FragColor=vec4(vec3(1.0,0.88,0.65)*a,a);}'});
   const motes=new THREE.Points(motesG,motesM);motes.frustumCulled=false;motes.raycast=()=>{};motes.renderOrder=6;scene.add(motes);
   // mưa + tuyết (bỏ hạt trong khối nhà vì nhà cắt mái)
-  const RN=4200;const rseed=new Float32Array(RN*4*3),rcor=new Float32Array(RN*4*2),ridx=[];
-  for(let i=0;i<RN;i++){const a=Math.random(),b=Math.random(),c=Math.random();for(let k=0;k<4;k++){const o=(i*4+k)*3;rseed[o]=a;rseed[o+1]=b;rseed[o+2]=c;rcor[(i*4+k)*2]=(k===0||k===3)?-1:1;rcor[(i*4+k)*2+1]=k<2?0:1}
-    const q=i*4;ridx.push(q,q+1,q+2,q,q+2,q+3)}
-  const rainG=new THREE.BufferGeometry();rainG.setAttribute('position',new THREE.BufferAttribute(new Float32Array(RN*4*3),3));rainG.setAttribute('seed',new THREE.BufferAttribute(rseed,3));rainG.setAttribute('corner',new THREE.BufferAttribute(rcor,2));rainG.setIndex(ridx);
+  // MƯA kiểu Foliage Test: LineSegments (mỗi giọt 1 vệt nghiêng theo gió), rơi theo chu kỳ trong hộp 30×16×30 bám theo tâm nhìn (nên luôn quanh người chơi).
+  // Số giọt tuỳ mức đồ họa (setRainCount); độ dày mưa = tỉ lệ giọt giữ lại (aRnd < uAmt); giọt trong khối nhà (nhà cắt mái) bị bỏ.
+  const RN=6000;
+  const rseed=new Float32Array(RN*2*3),rEnd=new Float32Array(RN*2),rRnd=new Float32Array(RN*2);
+  for(let i=0;i<RN;i++){const a=Math.random(),b=Math.random(),c=Math.random(),r=Math.random();for(let k=0;k<2;k++){const o=(i*2+k)*3;rseed[o]=a;rseed[o+1]=b;rseed[o+2]=c;rEnd[i*2+k]=k;rRnd[i*2+k]=r}}
+  const rainG=new THREE.BufferGeometry();rainG.setAttribute('position',new THREE.BufferAttribute(new Float32Array(RN*2*3),3));rainG.setAttribute('seed',new THREE.BufferAttribute(rseed,3));rainG.setAttribute('aEnd',new THREE.BufferAttribute(rEnd,1));rainG.setAttribute('aRnd',new THREE.BufferAttribute(rRnd,1));
   const PRE=`uniform vec3 uC;uniform float uT,uAmt,uWind;`;
-  const HOUSE='bool inHouse(vec3 p){return p.x>-0.2&&p.x<10.2&&p.z>-8.2&&p.z<0.8&&p.y<6.3;}';
-  const rainU={uT:beamU.uT,uWind:{value:0},uInt:{value:1},uPx:{value:1},uRes:{value:new THREE.Vector2(1,1)},uC:{value:new THREE.Vector3()},uAmt:{value:0},uCol:{value:new THREE.Color('#d6e4f5')}};
-  const rainM=new THREE.ShaderMaterial({uniforms:rainU,transparent:true,depthWrite:false,fog:false,side:THREE.DoubleSide,
-    vertexShader:PRE+HOUSE+`uniform float uInt,uPx;uniform vec2 uRes;attribute vec3 seed;attribute vec2 corner;varying float vA;varying float vX;varying float vT;varying float vN;void main(){
-      float H=22.0;float spd=(19.0+seed.y*8.0)*(0.85+0.3*uInt);float y=mod(seed.y*H*7.3-uT*spd,H);
-      vec3 p=vec3(uC.x-19.0+mod(seed.x*38.0-(uC.x-19.0),38.0),y-1.2,uC.z-19.0+mod(seed.z*38.0-(uC.z-19.0),38.0));
-      float len=(0.5+seed.x*0.45)*(0.65+0.45*uInt);
-      float nr0=1.0-smoothstep(5.0,42.0,length(p-cameraPosition));len*=1.0+0.9*nr0;   // gần camera: vệt dài hơn (nhoè chuyển động)
-      vec3 vel=normalize(vec3(uWind*0.22,1.0,0.03))*len;
-      float keep=step(fract(seed.x*91.7+seed.z*13.3),uAmt);if(inHouse(p))keep=0.0;
-      vec4 ca=projectionMatrix*viewMatrix*vec4(p,1.0),cb=projectionMatrix*viewMatrix*vec4(p+vel,1.0);
-      float asp=uRes.x/uRes.y;vec2 sa=ca.xy/ca.w,sb=cb.xy/cb.w;vec2 dir=(sb-sa)*vec2(asp,1.0);float dl=length(dir);dir=dl>1e-5?dir/dl:vec2(0.0,1.0);
-      vec2 nr=vec2(-dir.y,dir.x)/vec2(asp,1.0);float wpx=(0.8+uInt*0.4)*uPx*(0.75+seed.z*0.5)*(0.7+1.5*nr0);   // gần: hạt to hơn; xa: mảnh
-      vec4 c=mix(ca,cb,corner.y);c.xy+=nr*corner.x*wpx*2.0/uRes.y*c.w;
-      float df=(1.0-smoothstep(26.0,70.0,ca.w))*smoothstep(9.0,22.0,ca.w);
-      vA=keep*df*(0.5+0.5*seed.y)*(0.45+0.75*nr0);vX=corner.x;vT=corner.y;vN=nr0;
-      gl_Position=keep>0.5?c:vec4(2.0,2.0,2.0,1.0);}`,
-    fragmentShader:'uniform vec3 uCol;varying float vA;varying float vX;varying float vT;varying float vN;void main(){'
-      // giọt mưa điện ảnh: đầu sáng, đuôi tan dần (ease), lõi trắng mảnh + viền mềm; xa thì xanh lạnh mờ, gần thì sáng trắng ấm hơn
-      +'float ax=abs(vX);float body=pow(1.0-smoothstep(0.0,1.0,ax),1.6);float core=1.0-smoothstep(0.0,0.38,ax);'
-      +'float tail=pow(1.0-vT,1.7)*smoothstep(0.0,0.08,1.0-vT);float head=smoothstep(0.55,0.0,vT)*0.5;'
-      +'vec3 far=vec3(0.58,0.7,0.88),near=mix(uCol,vec3(1.0),0.45);vec3 c=mix(far,near,vN);c=mix(c,vec3(1.0),core*0.5);'
-      +'gl_FragColor=vec4(c,vA*body*(tail*0.8+head)*(0.75+0.5*core));}'});
-  const rain=new THREE.Mesh(rainG,rainM);rain.frustumCulled=false;rain.raycast=()=>{};rain.visible=false;rain.renderOrder=7;scene.add(rain);
+  const HOUSE=OUTD?'bool inHouse(vec3 p){return p.x>-10.8&&p.x<20.8&&p.z>-10.8&&p.z<1.6&&p.y<10.5;}':'bool inHouse(vec3 p){return p.x>-0.2&&p.x<10.2&&p.z>-8.2&&p.z<0.8&&p.y<6.3;}';
+  const rainU={uT:beamU.uT,uWind:{value:0},uInt:{value:1},uPx:{value:1},uRes:{value:new THREE.Vector2(1,1)},uC:{value:new THREE.Vector3()},uAmt:{value:0},uCol:{value:new THREE.Color('#d6e4f5')},uFloor:{value:A.L0},uWindDir:FU.uWindDir};
+  const rainM=new THREE.ShaderMaterial({uniforms:rainU,transparent:true,depthWrite:false,fog:false,
+    vertexShader:PRE+HOUSE+`uniform float uInt,uFloor;uniform vec2 uWindDir;attribute vec3 seed;attribute float aEnd;attribute float aRnd;varying float vA;void main(){
+      vec3 p;p.x=uC.x-15.0+mod(seed.x*30.0-(uC.x-15.0),30.0);p.z=uC.z-15.0+mod(seed.z*30.0-(uC.z-15.0),30.0);
+      p.y=mod(seed.y*16.0-uT*(16.0+aRnd*6.0)*(0.9+0.2*uInt),16.0);
+      p.xz+=uWindDir*uWind*0.12*p.y;
+      p+=aEnd*vec3(uWindDir.x*uWind*0.05,0.55+0.25*uInt,uWindDir.y*uWind*0.05);
+      p.y+=uFloor+0.1;
+      float keep=(aRnd<uAmt?1.0:0.0);if(inHouse(p))keep=0.0;
+      vA=keep*(1.0-0.7*aEnd);
+      gl_Position=keep>0.5?projectionMatrix*viewMatrix*vec4(p,1.0):vec4(2.0,2.0,2.0,1.0);}`,
+    fragmentShader:'uniform vec3 uCol;varying float vA;void main(){if(vA<0.01)discard;gl_FragColor=vec4(uCol,vA*0.62);}'});
+  const rain=new THREE.LineSegments(rainG,rainM);rain.frustumCulled=false;rain.raycast=()=>{};rain.visible=false;rain.renderOrder=7;scene.add(rain);
+  const setRainCount=n=>rainG.setDrawRange(0,Math.min(RN,n)*2);setRainCount(4200);
   // gợn nước trên mặt đất (ripples)
   const RP=520;const pseed=new Float32Array(RP*4*3),pcor=new Float32Array(RP*4*2),pidx=[];
   for(let i=0;i<RP;i++){const a=Math.random(),b=Math.random(),c=Math.random();for(let k=0;k<4;k++){const o=(i*4+k)*3;pseed[o]=a;pseed[o+1]=b;pseed[o+2]=c;pcor[(i*4+k)*2]=(k===0||k===3)?-1:1;pcor[(i*4+k)*2+1]=k<2?-1:1}const q=i*4;pidx.push(q,q+1,q+2,q,q+2,q+3)}
@@ -1263,7 +1300,7 @@ export function init(ctx){
     vertexShader:`uniform vec3 uC;uniform float uT,uAmt;attribute vec3 seed;attribute vec2 corner;varying vec2 vC;varying float vA;void main(){
       vec3 p=vec3(uC.x-16.0+mod(seed.x*32.0-(uC.x-16.0),32.0),-0.2,uC.z-16.0+mod(seed.z*32.0-(uC.z-16.0),32.0));
       float ph=fract(uT*(0.8+seed.y*0.5)+seed.y*7.0);float keep=step(fract(seed.x*53.1+seed.z*17.7),uAmt);
-      bool slab=p.x>-0.5&&p.x<16.2&&p.z>-8.6&&p.z<1.4;if(slab)keep=0.0;
+      bool slab=${OUTD?'p.x>-10.8&&p.x<20.8&&p.z>-10.8&&p.z<1.6':'p.x>-0.5&&p.x<16.2&&p.z>-8.6&&p.z<1.4'};if(slab)keep=0.0;
       p+=vec3(corner.x,0.0,corner.y)*(0.05+ph*0.3);vC=corner;vA=(1.0-ph)*(1.0-ph)*keep*0.4;
       gl_Position=keep>0.5?projectionMatrix*viewMatrix*vec4(p,1.0):vec4(2.0,2.0,2.0,1.0);}`,
     fragmentShader:'uniform vec3 uCol;varying vec2 vC;varying float vA;void main(){float r=length(vC);float ring=smoothstep(0.62,0.82,r)*(1.0-smoothstep(0.86,1.0,r));float ring2=smoothstep(0.3,0.4,r)*(1.0-smoothstep(0.44,0.54,r))*0.55;gl_FragColor=vec4(mix(uCol,vec3(1.0),0.35),(ring+ring2)*vA);}'});
@@ -1304,6 +1341,7 @@ export function init(ctx){
     const isDay=((t-5.5+24)%24)<14;const act=isDay?S:M;
     sunPos.copy(S.v);moonPos.copy(M.v);
     const hAbove=Math.sin(Math.max(act.el,0));const fade=Math.min(1,hAbove/0.12);
+    if(OUTD){const g=2;_tc.set(Math.round(controls.target.x/g)*g,A.L0+1,Math.round(controls.target.z/g)*g)}
     sunLight.position.copy(_tc).addScaledVector(act.v,32);sunLight.target.position.copy(_tc);
     sunLight.color.copy(k.sun);sunLight.intensity=Math.max(0.05,2.2*k.sunI*WC.dim*fade);
     hemiL.color.copy(k.ambS);hemiL.groundColor.copy(k.ambG);hemiL.intensity=0.9;
@@ -1320,7 +1358,7 @@ export function init(ctx){
     skyU.uSunV.value=(isDay?fade:0)*(1-Math.min(1,(0.6-WC.cov)*3.5));
     skyU.sunDir.value.copy(S.v);skyU.moonDir.value.copy(M.v);
     // sương
-    scene.fog.color.copy(des(k.fog));scene.fog.near=WC.fn;scene.fog.far=WC.ff;0;
+    scene.fog.color.copy(des(k.fog));scene.fog.near=WC.fn*(OUTD?0.8:1);scene.fog.far=WC.ff*(OUTD?0.55:1);
     // grade
     GU.uExpo.value=TP.expo*(1-(1-WC.dim)*0.3);GU.uCon.value=TP.con;GU.uSat.value=TP.sat*(1-WC.des*0.35);GU.uTemp.value=TP.temp+k.gt;GU.uVig.value=TP.vig;GU.uTintAmt.value=TP.tintAmt;GU.uFlash.value=flash*0.6;
     const hs=h=>{const v=hexV(h);return new THREE.Vector3(v.x,v.y,v.z)};GU.uTintSh.value.copy(hexV(TP.tintSh));GU.uTintHi.value.copy(hexV(TP.tintHi));
@@ -1328,7 +1366,7 @@ export function init(ctx){
     // light shafts
     const dirL=act.v,ltC=des(k.sun);beamU.uCol.value.copy(ltC);beamU.uDir.value.copy(dirL).multiplyScalar(-1);
     let any=0;for(const b of beams){const fct=Math.max(0,b.nrm.dot(dirL)-0.12);const I=TP.rays*fct*0.42*k.sunI*WC.dim*fade*(1-WC.des*0.4);b.mat.uniforms.uI.value=I;b.m.visible=I>0.01;any=Math.max(any,I)}
-    motesM.uniforms.uA.value=Math.min(1,any*1.2)*0.9*TP.motes;motes.visible=motesM.uniforms.uA.value>0.01;
+    motesM.uniforms.uA.value=OUTD?0:Math.min(1,any*1.2)*0.9*TP.motes;motes.visible=motesM.uniforms.uA.value>0.01;
     // thời tiết hạt
     rainU.uAmt.value=Math.min(1,WC.rain);rainU.uInt.value=Math.max(0.4,WC.int);ripM.uniforms.uAmt.value=Math.min(1,WC.rain);rain.visible=WC.rain>0.03;ripples.visible=rain.visible;rainU.uCol.value.setRGB(0.55+0.4*k.day,0.62+0.35*k.day,0.78+0.2*k.day);snowU.uAmt.value=Math.min(1,WC.snow);snow.visible=WC.snow>0.03;
     garden.visible=!!TP.garden;if(gardenAnim.lamp)gardenAnim.lamp.emissiveIntensity=0.25+2.4*Math.max(k.lamp,WC.dim<0.5?0.3:0);TU.uWindA.value=WC.wind;TU.uWet.value=WC.wet;TU.uCloudSh.value=WC.cs*(0.2+0.8*k.day);rainU.uWind.value=WC.wind;
@@ -1377,7 +1415,9 @@ export function init(ctx){
     {const f=local;tmp.set(f.char.position.x,f.char.position.y+0.7,f.char.position.z);
       tmp2.copy(tmp).sub(controls.target).multiplyScalar(Math.min(1,dt*3));controls.target.add(tmp2);camera.position.add(tmp2);}
     controls.update();
-    {const t=controls.target,cx=clamp(t.x,0.5,9.5),cy=clamp(t.y,0.3,5.5),cz=clamp(t.z,-7.6,0.3);
+    if(OUTD){const lp=local.char.position;FU.uPl.value[0].set(lp.x,lp.y,lp.z);if(remote&&remote.char.visible){const rp=remote.char.position;FU.uPl.value[1].set(rp.x,rp.y,rp.z)}else FU.uPl.value[1].set(1e5,0,1e5);
+      FU.uOcc.value.set(camera.position.x,camera.position.y,camera.position.z,1);FU.uOccPl.value.set(lp.x,lp.y+0.9,lp.z)}
+    {const t=controls.target,cb=OUTD?MC.camBox:[0.5,9.5,-7.6,0.3],cx=clamp(t.x,cb[0],cb[1]),cy=clamp(t.y,OUTD?A.L0:0.3,OUTD?A.L0+4:5.5),cz=clamp(t.z,cb[2],cb[3]);
       if(!window.__free&&(cx!==t.x||cy!==t.y||cz!==t.z)){tmp.set(cx-t.x,cy-t.y,cz-t.z);t.add(tmp);camera.position.add(tmp);}}
     sky.position.copy(camera.position);envStep(dt);glassStep();
     if((tickN++&15)===0)updCull();
@@ -1423,5 +1463,5 @@ export function init(ctx){
   api.syncEnvOut=()=>window.__envChanged();
   api.warm=()=>renderer.compileAsync?renderer.compileAsync(scene,camera):Promise.resolve();
   api.dispose=()=>{try{remote&&remote.dispose();local.dispose()}catch(e){}renderer.dispose()};
-  window.VY={Perf,local,get remote(){return remote},api,A,scene,camera,renderer,controls,tick,THREE,doorList,toggleDoor,occ,TP,envApply,rain,ripples,garden,WC};
+  window.__FU=FU;window.VY={EXT,Perf,local,get remote(){return remote},api,A,scene,camera,renderer,controls,tick,THREE,doorList,toggleDoor,occ,TP,envApply,rain,ripples,garden,WC};
 }
