@@ -117,7 +117,7 @@ export function setupExterior(c) {
       else r.userData.occ = true;                           // bụi/cây cao: mờ dần khi chắn giữa camera và người
       // lá chưa có màu/texture (trắng): tô xanh lá theo palette của các lá có màu trong file
       if (!r.map && r.color.r > 0.95 && r.color.g > 0.95 && r.color.b > 0.95) {
-        if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.map = FOLMAP; r.color.setRGB(1.25, 1.2, 0.98); r.userData.bush = true; }     // bụi: UV trỏ vào gradient xanh của foliage-a → mỗi mảng lá lệch tông nhẹ (như texture mode ở Blender)
+        if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.map = FOLMAP; r.color.setRGB(1.5, 1.48, 1.2); r.userData.bush = true; }     // bụi: UV trỏ vào gradient xanh của foliage-a → mỗi mảng lá lệch tông nhẹ (như texture mode ở Blender)
         else r.color.setRGB(0.30, 0.42, 0.04);
       }
     }
@@ -266,14 +266,14 @@ export function setupExterior(c) {
       const mat = styleMat(Array.isArray(src.material) ? src.material[0] : src.material, src.geometry);
       const im = new THREE.InstancedMesh(src.geometry, mat, arr.length);
       arr.forEach((mm, i) => im.setMatrixAt(i, mm));
-      im.instanceMatrix.needsUpdate = true; im.matrixAutoUpdate = false; im.castShadow = false; im.receiveShadow = cls !== 'grass';     // cỏ chỉ ĐỔ bóng xuống thảm, không nhận bóng của chính cỏ → đồng màu, hoà vào thảm
+      im.instanceMatrix.needsUpdate = true; im.matrixAutoUpdate = false; im.castShadow = false; im.receiveShadow = cls === 'tree' || cls === 'rock';     // cỏ chỉ ĐỔ bóng xuống thảm, không nhận bóng của chính cỏ → đồng màu, hoà vào thảm
       im.computeBoundingSphere();
       if (mat.userData.grass) { if (!grassDepth) grassDepth = makeDepthMat(grassMask()); im.customDepthMaterial = grassDepth; }
       else if (mat.userData.fol2) im.customDepthMaterial = depthMat;
       group.add(im);
       // mức LOD xa: cùng ma trận (dùng chung buffer), hình học đã giảm ~85% tam giác
       let im1 = null; const lg = CLASS[cls].lod ? simplified(src.geometry, 0.16) : null;
-      if (lg) { im1 = new THREE.InstancedMesh(lg, mat, arr.length); im1.instanceMatrix = im.instanceMatrix; im1.matrixAutoUpdate = false; im1.castShadow = false; im1.receiveShadow = cls !== 'grass'; im1.boundingSphere = im.boundingSphere; im1.visible = false;
+      if (lg) { im1 = new THREE.InstancedMesh(lg, mat, arr.length); im1.instanceMatrix = im.instanceMatrix; im1.matrixAutoUpdate = false; im1.castShadow = false; im1.receiveShadow = cls === 'tree' || cls === 'rock'; im1.boundingSphere = im.boundingSphere; im1.visible = false;
         if (im.customDepthMaterial) im1.customDepthMaterial = im.customDepthMaterial; group.add(im1); }
       cells.push({im, im1, cls, n: arr.length, cx, cz, far: !!far});
     }

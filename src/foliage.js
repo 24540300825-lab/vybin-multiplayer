@@ -7,7 +7,7 @@ import * as THREE from 'three';
 export const FU = {
   uWindDir: {value: new THREE.Vector2(1, 0.45).normalize()},
   uHybrid: {value: 0.5},       // 0 = normal hướng lên, 1 = toả ra từ tâm
-  uBaseShade: {value: 0.74},   // độ tối ở gốc
+  uBaseShade: {value: 0.86},   // độ tối ở gốc
   uFolEmi: {value: 0.16},      // phần "phát sáng": cộng lại màu gốc để vùng bóng vẫn rực, không xám
   uGMap: {value: null},        // texture nền (cỏ lấy màu theo đúng điểm nền nó đứng)
   uGTint: {value: new THREE.Color(1, 1, 1)},   // chỉnh màu nền ngoài vườn (tươi, đậm hơn) — cỏ lấy màu nền nhân cùng hệ số → cỏ/nền luôn khớp
