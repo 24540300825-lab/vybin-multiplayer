@@ -14,7 +14,7 @@ export const LEVELS = {
 };
 // theo loại: tầm nhìn tối đa (m), đường cong mật độ theo khoảng cách (d0 = bắt đầu thưa, d1 = còn tối thiểu), có đổ bóng không
 const CLASS = {
-  grass:  {maxD: 60,  d0: 30, d1: 56,  min: 0.04, shadow: false, cell: 6,  lod: 0},
+  grass:  {maxD: 60,  d0: 30, d1: 56,  min: 0.04, shadow: true,  cell: 6,  lod: 0},
   flower: {maxD: 55,  d0: 26, d1: 50,  min: 0.03, shadow: false, cell: 7,  lod: 30},
   bush:   {maxD: 110, d0: 45, d1: 105, min: 0.12, shadow: true,  cell: 8,  lod: 48},
   tree:   {maxD: 230, d0: 70, d1: 220, min: 0.35, shadow: true,  cell: 12, lod: 70},
@@ -82,6 +82,7 @@ function geoInfo(g) {
 export function setupExterior(c) {
   const {scene, env, MC, toonMat} = c;
   const depthMat = makeDepthMat();
+  let grassDepth = null;
   const group = new THREE.Group(); group.name = 'EXT_CELLS'; scene.add(group);
   const cells = [];          // {im, cls, n, cx, cz, r}
   const colliders = {boxes: [], circles: []};
@@ -116,12 +117,12 @@ export function setupExterior(c) {
       else r.userData.occ = true;                           // bụi/cây cao: mờ dần khi chắn giữa camera và người
       // lá chưa có màu/texture (trắng): tô xanh lá theo palette của các lá có màu trong file
       if (!r.map && r.color.r > 0.95 && r.color.g > 0.95 && r.color.b > 0.95) {
-        if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.map = FOLMAP; r.color.setRGB(0.94, 1.0, 1.12); }     // bụi: UV trỏ vào gradient xanh của foliage-a → mỗi mảng lá lệch tông nhẹ (như texture mode ở Blender)
+        if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.map = FOLMAP; r.color.setRGB(1.25, 1.2, 0.98); r.userData.bush = true; }     // bụi: UV trỏ vào gradient xanh của foliage-a → mỗi mảng lá lệch tông nhẹ (như texture mode ở Blender)
         else r.color.setRGB(0.30, 0.42, 0.04);
       }
     }
     if (fol && r.map) r.color.multiply(new THREE.Color(0.94, 1.0, 1.1));     // bớt vàng: kéo cây/bụi về xanh lá cùng tông nền
-    r.userData.desat = grass ? 0.95 : (r.userData.squash ? 0.8 : 0.88);     // hoa/bụi/cây bớt rực → tông điện ảnh
+    r.userData.desat = grass ? 0.95 : (r.userData.bush ? 0.7 : (r.userData.squash ? 0.8 : 0.88));     // hoa/bụi/cây bớt rực → tông điện ảnh
     r.metalness = 0; r.roughness = 1;
     toonMat(r); matCache.set(key, r); return r;
   }
@@ -243,10 +244,7 @@ export function setupExterior(c) {
     const W = ref.matrixWorld; let mats = [];
     const hb = MC.houseBox;
     const dt = MC.dropTrees;
-    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (dt && cls === 'tree') { V3.setFromMatrixPosition(mm); if (dt.some(q => Math.hypot(V3.x - q[0], V3.z - q[1]) < 1.6)) continue; } if (hb) { V3.setFromMatrixPosition(mm); if (V3.x > hb[0] && V3.x < hb[1] && V3.z > hb[2]) {
-        // bush: chỉ bỏ phần nằm TRONG nhà (z<0.2), giữ hàng rào cây sát mặt tiền; cây to: bỏ luôn mọi cây mọc sát/xuyên tường nhà (z<4.6)
-        const zc = cls === 'bush' || cls === 'flower' || cls === 'grass' ? 0.2 : (cls === 'tree' ? 4.6 : hb[3]);
-        if (V3.z < zc) continue; } }
+    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (dt && cls === 'tree') { V3.setFromMatrixPosition(mm); if (dt.some(q => Math.hypot(V3.x - q[0], V3.z - q[1]) < 1.6)) continue; } 
       mats.push(mm); }
     if (!mats.length) { set.forEach(m => m.removeFromParent()); continue; }
     nIn += mats.length;
@@ -268,13 +266,14 @@ export function setupExterior(c) {
       const mat = styleMat(Array.isArray(src.material) ? src.material[0] : src.material, src.geometry);
       const im = new THREE.InstancedMesh(src.geometry, mat, arr.length);
       arr.forEach((mm, i) => im.setMatrixAt(i, mm));
-      im.instanceMatrix.needsUpdate = true; im.matrixAutoUpdate = false; im.castShadow = false; im.receiveShadow = true;
+      im.instanceMatrix.needsUpdate = true; im.matrixAutoUpdate = false; im.castShadow = false; im.receiveShadow = cls !== 'grass';     // cỏ chỉ ĐỔ bóng xuống thảm, không nhận bóng của chính cỏ → đồng màu, hoà vào thảm
       im.computeBoundingSphere();
-      if (mat.userData.fol2 || mat.userData.grass) im.customDepthMaterial = depthMat;
+      if (mat.userData.grass) { if (!grassDepth) grassDepth = makeDepthMat(grassMask()); im.customDepthMaterial = grassDepth; }
+      else if (mat.userData.fol2) im.customDepthMaterial = depthMat;
       group.add(im);
       // mức LOD xa: cùng ma trận (dùng chung buffer), hình học đã giảm ~85% tam giác
       let im1 = null; const lg = CLASS[cls].lod ? simplified(src.geometry, 0.16) : null;
-      if (lg) { im1 = new THREE.InstancedMesh(lg, mat, arr.length); im1.instanceMatrix = im.instanceMatrix; im1.matrixAutoUpdate = false; im1.castShadow = false; im1.receiveShadow = true; im1.boundingSphere = im.boundingSphere; im1.visible = false;
+      if (lg) { im1 = new THREE.InstancedMesh(lg, mat, arr.length); im1.instanceMatrix = im.instanceMatrix; im1.matrixAutoUpdate = false; im1.castShadow = false; im1.receiveShadow = cls !== 'grass'; im1.boundingSphere = im.boundingSphere; im1.visible = false;
         if (im.customDepthMaterial) im1.customDepthMaterial = im.customDepthMaterial; group.add(im1); }
       cells.push({im, im1, cls, n: arr.length, cx, cz, far: !!far});
     }
@@ -349,7 +348,7 @@ export function setupExterior(c) {
     vertexShader: 'varying float vY;uniform float uH;void main(){vY=(position.y)/uH+0.5;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
     fragmentShader: 'uniform vec3 uCol;uniform float uA;varying float vY;void main(){float a=uA*pow(1.0-smoothstep(0.0,1.0,vY),1.6);gl_FragColor=vec4(uCol,a);}',
   });
-  [[200, 46, 0.80], [105, 16, 0.38]].forEach(([r, h, a], i) => {
+  [[200, 24, 0.55], [105, 9, 0.26]].forEach(([r, h, a], i) => {
     const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 48, 1, true), hazeMat(h, a));
     m.position.y = (MC.floorY || 0) + h / 2 - 1.5; m.renderOrder = 4 + i; m.frustumCulled = false; m.raycast = () => {}; scene.add(m); hazes.push(m);
   });

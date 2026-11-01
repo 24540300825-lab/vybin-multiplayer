@@ -831,7 +831,7 @@ ${FRAG_COLOR}
     float h31(vec3 p){p=fract(p*0.3183099+vec3(.1,.2,.3));p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
     float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
     void main(){vec3 d=normalize(vD);float h=d.y;
-      float t=clamp(h,0.0,1.0);
+      float t=clamp(h*(1.0+0.9*uOut),0.0,1.0);
       vec3 c=cHor;c=mix(c,cPink,smoothstep(0.02,0.06,t));c=mix(c,cMid,smoothstep(0.1,0.16,t));c=mix(c,cTop,smoothstep(0.3,0.38,t));
       if(h<0.0)c=cHor;
       float up=step(0.0,h);
@@ -1458,6 +1458,7 @@ ${FRAG_COLOR}
     {const f=local;tmp.set(f.char.position.x,f.char.position.y+0.7,f.char.position.z);
       tmp2.copy(tmp).sub(controls.target).multiplyScalar(Math.min(1,dt*3));controls.target.add(tmp2);camera.position.add(tmp2);}
     controls.update();
+    if(OUTD){const pol=controls.getPolarAngle(),e=clamp((pol-1.0)/0.46,0,1);camera.rotateX(0.34*e*e*(3-2*e))}   // nhìn ngang thì ngẩng thêm ~19° để thấy trời & mây
     if(OUTD){const lp=local.char.position;FU.uPl.value[0].set(lp.x,lp.y,lp.z);if(remote&&remote.char.visible){const rp=remote.char.position;FU.uPl.value[1].set(rp.x,rp.y,rp.z)}else FU.uPl.value[1].set(1e5,0,1e5);
       FU.uOcc.value.set(camera.position.x,camera.position.y,camera.position.z,1);FU.uOccPl.value.set(lp.x,lp.y+0.9,lp.z)}
     {const t=controls.target,cb=OUTD?MC.camBox:[0.5,9.5,-7.6,0.3],cx=clamp(t.x,cb[0],cb[1]),cy=clamp(t.y,OUTD?A.L0:0.3,OUTD?A.L0+4:5.5),cz=clamp(t.z,cb[2],cb[3]);

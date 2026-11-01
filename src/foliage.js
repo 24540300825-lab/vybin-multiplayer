@@ -49,7 +49,12 @@ vec4 wpos = modelMatrix * mvPosition;
 vec3 rootW = ( modelMatrix * vec4( instBase, 1.0 ) ).xyz;
 wpos.xyz += windOffset( transformed, rootW, instScale );
 #ifdef SQUASH
-{ float dp = min( distance( rootW.xz, uPl[0].xz ), distance( rootW.xz, uPl[1].xz ) ); wpos.y = rootW.y + ( wpos.y - rootW.y ) * mix( 0.28, 1.0, smoothstep( 0.45, 1.7, dp ) ); }
+{ vec2 d0 = rootW.xz - uPl[0].xz, d1 = rootW.xz - uPl[1].xz; float r0 = length( d0 ), r1 = length( d1 );
+  float k0 = 1.0 - smoothstep( 0.15, 2.4, r0 ), k1 = 1.0 - smoothstep( 0.15, 2.4, r1 ); k0 *= k0; k1 *= k1;
+  float hh = clamp( ( wpos.y - rootW.y ) / 1.1, 0.0, 1.0 );
+  vec2 push = d0 / max( r0, 0.08 ) * k0 + d1 / max( r1, 0.08 ) * k1;
+  wpos.xz += push * hh * hh * 0.6;                                   // ngọn nghiêng toả ra khỏi chân người, mềm dần theo khoảng cách
+  wpos.y = rootW.y + ( wpos.y - rootW.y ) * ( 1.0 - 0.5 * max( k0, k1 ) * ( 0.4 + 0.6 * hh ) ); }
 #endif
 vRoot = rootW.xz;
 vHash = fract( sin( dot( rootW.xz, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
@@ -98,9 +103,10 @@ export const FRAG_COLOR = `
 `;
 
 // vật liệu bóng đổ: dùng chung hàm gió → bóng lá đung đưa khớp lá
-export function makeDepthMat() {
+export function makeDepthMat(alphaMap) {
   const d = new THREE.MeshDepthMaterial({depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide});
-  d.customProgramCacheKey = () => 'fol2-depth1';
+  if (alphaMap) { d.alphaMap = alphaMap; d.alphaTest = 0.4; }
+  d.customProgramCacheKey = () => alphaMap ? 'fol2-depth-a' : 'fol2-depth1';
   d.onBeforeCompile = sh => {
     sh.uniforms.uWindT = TUref.uWindT; sh.uniforms.uWindA = TUref.uWindA; sh.uniforms.uWindDir = FU.uWindDir;
     sh.vertexShader = 'uniform float uWindT,uWindA;\n' + WIND_FN + '\n' + sh.vertexShader.replace('#include <project_vertex>', `
