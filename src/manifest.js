@@ -30,11 +30,6 @@ export const FILES = {
   "v": "c5fc07c0",
   "size": 3131688
  },
- "sky-hdri": {
-  "file": "sky-hdri.jpg",
-  "v": "5ebff21a",
-  "size": 84454
- },
  "tree": {
   "file": "tree.glb",
   "v": "1c364e0d",
