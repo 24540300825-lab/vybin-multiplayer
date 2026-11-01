@@ -156,7 +156,6 @@ ${FRAG_COLOR}
   const MC=MAPS[MAPID]||MAPS.studio;const OUTD=!!MC.outdoor;TU.uInHK.value=OUTD?0:1;bindTU(TU);
   if(OUTD){const sp=MC.spawn.vy;controls.target.set(sp[0],A0y(MC)+1,sp[1]);camera.fov=30;camera.updateProjectionMatrix();camera.position.set(sp[0]+7.2,A0y(MC)+9,sp[1]+11.4);controls.minDistance=5;controls.maxDistance=28;controls.update();
     controls.minAzimuthAngle=-Infinity;controls.maxAzimuthAngle=Infinity;controls.minPolarAngle=0.12;controls.maxPolarAngle=1.5;CFG.camPan=Math.PI*2;CFG.camTilt=0.9}
-  if(OUTD)controls.mouseButtons={LEFT:-1,MIDDLE:THREE.MOUSE.ROTATE,RIGHT:THREE.MOUSE.PAN};   // ngoài vườn: giữ chuột GIỮA + kéo để xoay camera (như Blender); chuột trái chỉ để bấm chọn điểm chạy
   function A0y(c){return c.floorY||0}
   if(MC.tint)env.traverse(o=>{if(o.isMesh&&o.material&&MC.tint[o.material.name]!=null)o.material.color.set(MC.tint[o.material.name])});
   if(MC.hideFlat)env.traverse(o=>{if(o.isMesh&&!(o.material&&o.material.name)){const b=new THREE.Box3().setFromObject(o);if((b.max.x-b.min.x)*(b.max.z-b.min.z)>20&&b.max.y-b.min.y<1.2)o.visible=false}});
