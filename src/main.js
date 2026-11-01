@@ -14,6 +14,15 @@ addEventListener('unhandledrejection', e => console.error('[unhandled]', e.reaso
 
 async function boot() {
   let sess = null, slot, mapId, gate = null;
+  // KHỞI ĐỘNG SỚM, SONG SONG với bước chọn nhân vật / kết nối phòng: đoán map + nhân vật (hash/localStorage) rồi tải & parse ngay GLB + engine.
+  // Đoán đúng (gần như luôn đúng ở lần vào sau) → tới bước 2 mọi thứ đã sẵn; đoán sai chỉ tốn một ít băng thông (asset có cache bền).
+  const earlyEngine = import('./game.js'); earlyEngine.catch(() => {});
+  {
+    let gm = (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap'); if (!isMap(gm)) gm = DEFAULT_MAP;
+    const gc = (CONFIG.as === 'bin' || CONFIG.as === 'vy') ? CONFIG.as : (localStorage.getItem('vyChar') || '');
+    const pre = [gm]; for (const id of pre) MAP_LIST[id].assets.forEach(a => Assets.load(a).catch(() => {}));
+    if (gc === 'bin' || gc === 'vy') Assets.load('char-' + gc).catch(() => {});
+  }
   const {mountGate} = await import('./ui/mp-ui.js');
   gate = mountGate();
   const hide = () => { $('load').classList.add('out'); setTimeout(() => $('load').style.display = 'none', 750); };   // dùng cho màn lỗi/cổng: mờ đi ngay
@@ -65,7 +74,7 @@ async function boot() {
 
   // ---------- 2) nạp song song: engine (JS) + asset map + nhân vật của mình ----------
   LB(10, 'Đang tải bản đồ & nhân vật ' + slot.toUpperCase() + '...');
-  const enginePromise = import('./game.js');
+  const enginePromise = earlyEngine;
   const ids = [...MAP_LIST[mapId].assets, 'char-' + slot];
   const files = await Assets.loadGroup(ids, p => LB(10 + p * 60));
   const eng = await enginePromise;
