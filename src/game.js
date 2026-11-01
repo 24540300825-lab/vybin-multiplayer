@@ -117,7 +117,7 @@ ${FRAG_COLOR}
          #endif
          vec3 col=diffuseColor.rgb*tone;
          #if defined(FOL2)||defined(GRASSB)
-         col+=diffuseColor.rgb*uFolEmi*(0.5+0.5*vis);
+         col+=diffuseColor.rgb*uFolEmi*mix(amb,uSunC,0.5*vis)*1.15;   // phần "phát sáng" của lá cũng ăn theo tông môi trường (sáng/tối/hoàng hôn/mưa)
          #endif
          col*=1.0-0.2*uWet*(1.0-inH);
          #if defined(FOL2)||defined(GRASSB)
