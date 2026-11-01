@@ -1458,7 +1458,7 @@ ${FRAG_COLOR}
     {const f=local;tmp.set(f.char.position.x,f.char.position.y+0.7,f.char.position.z);
       tmp2.copy(tmp).sub(controls.target).multiplyScalar(Math.min(1,dt*3));controls.target.add(tmp2);camera.position.add(tmp2);}
     controls.update();
-    if(OUTD){const pol=controls.getPolarAngle(),e=clamp((pol-1.0)/0.46,0,1);camera.rotateX(0.34*e*e*(3-2*e))}   // nhìn ngang thì ngẩng thêm ~19° để thấy trời & mây
+    if(OUTD){const pol=controls.getPolarAngle(),e=clamp((pol-0.95)/0.5,0,1),f=18+22*e*e*(3-2*e);if(Math.abs(camera.fov-f)>0.05){camera.fov=f;camera.updateProjectionMatrix()}}   // camera vẫn ghim vào nhân vật; hạ góc nhìn thì mở rộng FOV để thấy trời & mây
     if(OUTD){const lp=local.char.position;FU.uPl.value[0].set(lp.x,lp.y,lp.z);if(remote&&remote.char.visible){const rp=remote.char.position;FU.uPl.value[1].set(rp.x,rp.y,rp.z)}else FU.uPl.value[1].set(1e5,0,1e5);
       FU.uOcc.value.set(camera.position.x,camera.position.y,camera.position.z,1);FU.uOccPl.value.set(lp.x,lp.y+0.9,lp.z)}
     {const t=controls.target,cb=OUTD?MC.camBox:[0.5,9.5,-7.6,0.3],cx=clamp(t.x,cb[0],cb[1]),cy=clamp(t.y,OUTD?A.L0:0.3,OUTD?A.L0+4:5.5),cz=clamp(t.z,cb[2],cb[3]);

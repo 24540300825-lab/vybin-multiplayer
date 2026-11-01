@@ -348,7 +348,7 @@ export function setupExterior(c) {
     vertexShader: 'varying float vY;uniform float uH;void main(){vY=(position.y)/uH+0.5;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
     fragmentShader: 'uniform vec3 uCol;uniform float uA;varying float vY;void main(){float a=uA*pow(1.0-smoothstep(0.0,1.0,vY),1.6);gl_FragColor=vec4(uCol,a);}',
   });
-  [[200, 24, 0.55], [105, 9, 0.26]].forEach(([r, h, a], i) => {
+  [[200, 11, 0.42], [105, 5, 0.2]].forEach(([r, h, a], i) => {
     const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 48, 1, true), hazeMat(h, a));
     m.position.y = (MC.floorY || 0) + h / 2 - 1.5; m.renderOrder = 4 + i; m.frustumCulled = false; m.raycast = () => {}; scene.add(m); hazes.push(m);
   });
