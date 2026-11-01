@@ -290,9 +290,9 @@ export function setupExterior(c) {
     const lc = new THREE.Vector3((x0 + x1) / 2, 0, (z0 + z1) / 2), lr = Math.max(x1 - x0, z1 - z0) / 2 * (cls === 'rock' ? 0.82 : 1.0);
     for (const mm of mats) {
       const sc = Math.hypot(mm.elements[0], mm.elements[1], mm.elements[2]);
-      const r = lr * sc + (cls === 'tree' ? 0.03 : 0);
-      if (r < 0.18) continue;              // đá nhỏ / thân mảnh: bước qua được
-      if (cls === 'rock' && ymax * sc < 0.28) continue;
+      const r = lr * sc * (cls === 'rock' ? 0.55 : 1) + (cls === 'tree' ? 0.03 : 0);   // đá: vùng cản nhỏ hơn hình thật → nhân vật lướt qua dễ
+      if (r < (cls === 'rock' ? 0.3 : 0.18)) continue;              // đá nhỏ / thân mảnh: bước qua được
+      if (cls === 'rock' && ymax * sc < 0.5) continue;
       const p = lc.clone().applyMatrix4(mm);
       colliders.circles.push({x: p.x, z: p.z, r});
     }
