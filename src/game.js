@@ -123,7 +123,11 @@ ${FRAG_COLOR}
          #if defined(FOL2)||defined(GRASSB)
          col+=diffuseColor.rgb*uFolEmi*mix(amb,uSunC,0.5*vis)*1.15;   // phần "phát sáng" của lá cũng ăn theo tông môi trường (sáng/tối/hoàng hôn/mưa)
          #endif
+         #if defined(FOL2)||defined(GRASSB)
+         col*=1.0-0.06*uWet*(1.0-inH); col=mix(col,col*vec3(0.9,1.1,0.9),uWet*0.6);   // lá ướt: không tối/xám bẩn, hơi tươi hơn
+         #else
          col*=1.0-0.2*uWet*(1.0-inH);
+         #endif
          #if defined(FOL2)||defined(GRASSB)
          col+=uGCol*uSunC*Ig*vis*uGStr*0.12;
          #else
@@ -164,6 +168,11 @@ ${FRAG_COLOR}
   let EXT=null;
   if(OUTD){const _t0=performance.now();EXT=setupExterior({scene,env,MC,toonMat});console.log('[ext] setup '+Math.round(performance.now()-_t0)+'ms');if(/[?&]tune\b/.test(location.search))import('./tune.js').then(m=>m.mountTune(EXT,FU));for(let i=envMeshes.length-1;i>=0;i--)if(!envMeshes[i].parent)envMeshes.splice(i,1);
     env.traverse(o=>{if(o.isMesh&&/^Stylized Grass$/.test((o.material&&o.material.name)||''))o.visible=false;if(o.isMesh&&/^\.SF_/.test(o.name))o.visible=false});env.updateMatrixWorld(true)}
+  // kính cửa sổ/cửa chính nhìn từ ngoài: đặc (không thấy nội thất), màu xanh trời theo giờ & thời tiết, hơi bóng
+  const WGLASS=[];if(OUTD)env.traverse(o=>{if(!o.isMesh)return;[].concat(o.material).forEach(m=>{if(m&&/^M_Glass/.test(m.name)&&!WGLASS.includes(m)){m.transparent=false;m.opacity=1;m.depthWrite=true;m.alphaMap=null;m.needsUpdate=true;WGLASS.push(m)}})});
+  const _gc1=new THREE.Color(),_gc2=new THREE.Color();
+  const updGlass=(day,dim,des)=>{if(!WGLASS.length)return;_gc1.setRGB(0.55,0.78,0.97).multiplyScalar(0.28+0.72*day*(0.55+0.45*dim));_gc2.setRGB(0.5,0.56,0.62).multiplyScalar(0.3+0.5*day*dim);_gc1.lerp(_gc2,Math.min(1,des*0.9));
+    WGLASS.forEach(m=>{m.color.copy(_gc1);if(m.emissive){m.emissive.copy(_gc1).multiplyScalar(0.22);m.emissiveIntensity=1}if('roughness' in m)m.roughness=0.12;if('metalness' in m)m.metalness=0.35})};
   const A={};A.L0=OUTD?(MC.floorY||0):0;A.L1=OUTD?A.L0+3:box(MC.mezz[0]).max.y;
   // cầu thang: gom thành danh sách; profile độ cao lấy bằng raycast rồi làm mượt
   const stairs=[];
@@ -871,8 +880,8 @@ ${FRAG_COLOR}
         float f1=vn(q*vec2(1.0,1.7))*0.5+vn(q*vec2(2.1,3.5))*0.28+vn(q*vec2(4.4,7.3))*0.09+vn(q*vec2(8.7,13.0))*0.03;
         vec2 sl=normalize(sunDir.xz+vec2(0.001))*0.07;
         vec2 q2=q+sl;
-        float f2=vn(q2*vec2(1.0,1.7))*0.5+vn(q2*vec2(2.1,3.5))*0.28+vn(q2*vec2(4.4,7.3))*0.09+vn(q2*vec2(8.7,13.0))*0.03;
         float cov=cth-0.02;
+        float f2=f1;if(f1>cov-0.03)f2=vn(q2*vec2(1.0,1.7))*0.5+vn(q2*vec2(2.1,3.5))*0.28+vn(q2*vec2(4.4,7.3))*0.09+vn(q2*vec2(8.7,13.0))*0.03;   // lớp lệch nắng chỉ tính nơi có mây (nửa số lần noise ở nền trời trống)
         float body=smoothstep(cov,cov+0.016,f1)*smoothstep(0.015,0.14,h);
         float lt=smoothstep(-0.012,0.014,f2-f1+0.006);
         float edge=1.0-smoothstep(cov+0.016,cov+0.07,f1);
@@ -1417,7 +1426,7 @@ ${FRAG_COLOR}
     motesM.uniforms.uA.value=OUTD?0:Math.min(1,any*1.2)*0.9*TP.motes;motes.visible=motesM.uniforms.uA.value>0.01;
     // thời tiết hạt
     rainU.uAmt.value=Math.min(1,WC.rain);rainU.uInt.value=Math.max(0.4,WC.int);ripM.uniforms.uAmt.value=Math.min(1,WC.rain);rain.visible=WC.rain>0.03;ripples.visible=rain.visible;rainU.uCol.value.setRGB(0.55+0.4*k.day,0.62+0.35*k.day,0.78+0.2*k.day);snowU.uAmt.value=Math.min(1,WC.snow);snow.visible=WC.snow>0.03;
-    garden.visible=!!TP.garden;if(gardenAnim.lamp)gardenAnim.lamp.emissiveIntensity=0.25+2.4*Math.max(k.lamp,WC.dim<0.5?0.3:0);TU.uWindA.value=WC.wind;TU.uWet.value=WC.wet;TU.uCloudSh.value=WC.cs*(0.2+0.8*k.day);rainU.uWind.value=WC.wind;
+    garden.visible=!!TP.garden;if(gardenAnim.lamp)gardenAnim.lamp.emissiveIntensity=0.25+2.4*Math.max(k.lamp,WC.dim<0.5?0.3:0);TU.uWindA.value=WC.wind;TU.uWet.value=WC.wet;TU.uCloudSh.value=WC.cs*(0.2+0.8*k.day);rainU.uWind.value=WC.wind;updGlass(k.day,WC.dim,WC.des);
     if(RA.g)RA.g.gain.value=Math.min(1,WC.rain)*0.1*(0.4+0.35*WC.int);
     // âm môi trường (gió, chim ban ngày, dế ban đêm) + tiếng báo khi thời tiết đổi
     if(TP.weather!==sfxW){if(sfxW!=null&&dt>0)SFX.play('weather');sfxW=TP.weather}

@@ -8,9 +8,9 @@ import {makeDepthMat} from './foliage.js';
 
 // ---- mức chất lượng: mật độ, tầm nhìn, bóng, số lớp sương, hạt mưa -----------------------------------------
 export const LEVELS = {
-  low:    {dens: 0.40, dist: 0.62, shadowR: 9,  haze: 1, rain: 2400, far: 0.45},
-  medium: {dens: 0.72, dist: 0.85, shadowR: 12, haze: 2, rain: 4200, far: 0.75},
-  high:   {dens: 1.00, dist: 1.00, shadowR: 15, haze: 2, rain: 6000, far: 1.00},
+  low:    {dens: 0.40, dist: 0.62, shadowR: 9,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.45},
+  medium: {dens: 0.72, dist: 0.85, shadowR: 12, grassShadowR: 5,  haze: 2, rain: 4200, far: 0.75},
+  high:   {dens: 1.00, dist: 1.00, shadowR: 15, grassShadowR: 8,  haze: 2, rain: 6000, far: 1.00},
 };
 // theo loại: tầm nhìn tối đa (m), đường cong mật độ theo khoảng cách (d0 = bắt đầu thưa, d1 = còn tối thiểu), có đổ bóng không
 const CLASS = {
@@ -117,12 +117,12 @@ export function setupExterior(c) {
       else r.userData.occ = true;                           // bụi/cây cao: mờ dần khi chắn giữa camera và người
       // lá chưa có màu/texture (trắng): tô xanh lá theo palette của các lá có màu trong file
       if (!r.map && r.color.r > 0.95 && r.color.g > 0.95 && r.color.b > 0.95) {
-        if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.map = FOLMAP; r.color.setRGB(1.8, 1.8, 1.4); r.userData.bush = true; }     // bụi: UV trỏ vào gradient xanh của foliage-a → mỗi mảng lá lệch tông nhẹ (như texture mode ở Blender)
+        if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.map = FOLMAP; r.color.setRGB(1.7, 1.9, 1.4); r.userData.bush = true; }     // bụi: UV trỏ vào gradient xanh của foliage-a → mỗi mảng lá lệch tông nhẹ (như texture mode ở Blender)
         else r.color.setRGB(0.30, 0.42, 0.04);
       }
     }
     if (fol && r.map) r.color.multiply(new THREE.Color(0.94, 1.0, 1.1));     // bớt vàng: kéo cây/bụi về xanh lá cùng tông nền
-    r.userData.desat = grass ? 0.95 : (r.userData.bush ? 0.55 : (r.userData.squash ? 0.8 : 0.88));     // hoa/bụi/cây bớt rực → tông điện ảnh
+    r.userData.desat = grass ? 0.95 : (r.userData.bush ? 0.7 : (r.userData.squash ? 0.8 : 0.88));     // hoa/bụi/cây bớt rực → tông điện ảnh
     r.metalness = 0; r.roughness = 1;
     toonMat(r); matCache.set(key, r); return r;
   }
@@ -370,7 +370,7 @@ export function setupExterior(c) {
       const dens = ce.cls === 'tree' && ce.far ? Math.max(f, lv.far * 0.4) : f;
       const n = Math.max(1, Math.ceil(ce.n * Math.min(1, dens)));
       if (ce.im.count !== n) { ce.im.count = n; if (ce.im1) ce.im1.count = n; }
-      const sh = CL.shadow && d < lv.shadowR + 4;
+      const sh = CL.shadow && d < (ce.cls === 'grass' ? lv.grassShadowR : lv.shadowR + 4);   // cỏ: bóng chỉ ở sát nhân vật (đắt nhất vì alpha-test + rất nhiều thể hiện)
       if (ce.im.castShadow !== sh) { ce.im.castShadow = sh; if (ce.im1) ce.im1.castShadow = sh; }
     }
     for (const h of hazes) { h.position.x = target.x; h.position.z = target.z; if (fogColor) h.material.uniforms.uCol.value.copy(fogColor);  }
