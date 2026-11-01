@@ -97,7 +97,7 @@ export const FRAG_COLOR = `
    float glm = dot( gt, vec3( 0.299, 0.587, 0.114 ) );
    vec3 gc = mix( gt, mix( uGrassA, uGrassB, smoothstep( 0.08, 0.6, glm ) ) * uGTint, 0.75 );
    vec3 tip = gc * vec3( 1.06, 1.05, 0.92 );
-   vec3 c = mix( gc * 0.74, tip, smoothstep( 0.0, 0.9, vLeafH ) );
+   vec3 c = mix( gc * 0.88, tip, smoothstep( 0.0, 0.9, vLeafH ) );
    diffuseColor.rgb = varyCol( c * uGrTint, vHash, uGrVar ); }
 #endif
 `;
