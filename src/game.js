@@ -108,13 +108,14 @@ ${FRAG_COLOR}
          #endif
          vec3 wn=inverseTransformDirection(geometryNormal,viewMatrix);
          vec3 amb=mix(uAmbG,uAmbS,wn.y*0.5+0.5);
-         vec3 tone=mix(uSh*amb,uMid*uSunC,I*vis);
+         vec3 shC=min(uSh*amb,uMid*uSunC*0.78);   // vùng bóng luôn TỐI hơn vùng sáng (ban đêm/mưa ánh trăng yếu hơn ambient → trước đây bóng lại sáng hơn)
+         vec3 tone=mix(shC,uMid*uSunC,I*vis);
          tone=mix(tone,uHi*uSunC,Ih*vis);
          #if (defined(GRASSB)||defined(BUSHF))&&(NUM_DIR_LIGHTS>0)
          // cỏ + bụi: chiếu sáng Y HỆT mặt thảm phía dưới (pháp tuyến hướng lên, cùng ánh nắng/ambient) → luôn cùng tông với thảm ở mọi giờ & thời tiết; không tự đổ bóng lên chính nó
          {vec3 upV=normalize((viewMatrix*vec4(0.0,1.0,0.0,0.0)).xyz);float aU=acos(clamp(dot(upV,Ld),-1.0,1.0));
           float Iu=aU<maxA?1.0:((sm>0.0001&&aU<maxA+sm)?1.0-(aU-maxA)/sm:0.0),Ihu=aU<hiA?1.0:((sm>0.0001&&aU<hiA+sm)?1.0-(aU-hiA)/sm:0.0);
-          tone=mix(uSh*uAmbS,uMid*uSunC,Iu);tone=mix(tone,uHi*uSunC,Ihu);}
+          tone=mix(min(uSh*uAmbS,uMid*uSunC*0.78),uMid*uSunC,Iu);tone=mix(tone,uHi*uSunC,Ihu);}
          #endif
          float inH=smoothstep(-0.2,0.2,vWP.x)*(1.0-smoothstep(9.8,10.2,vWP.x))*smoothstep(-8.2,-7.8,vWP.z)*(1.0-smoothstep(0.4,0.8,vWP.z))*step(vWP.y,6.2)*step(-0.3,vWP.y)*uInHK;
          #if defined(FOL2)||defined(GRASSB)
