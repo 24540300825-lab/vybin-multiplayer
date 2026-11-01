@@ -7,9 +7,10 @@ import * as THREE from 'three';
 export const FU = {
   uWindDir: {value: new THREE.Vector2(1, 0.45).normalize()},
   uHybrid: {value: 0.5},       // 0 = normal hướng lên, 1 = toả ra từ tâm
-  uBaseShade: {value: 0.58},   // độ tối ở gốc
+  uBaseShade: {value: 0.74},   // độ tối ở gốc
   uFolEmi: {value: 0.16},      // phần "phát sáng": cộng lại màu gốc để vùng bóng vẫn rực, không xám
   uGMap: {value: null},        // texture nền (cỏ lấy màu theo đúng điểm nền nó đứng)
+  uGTint: {value: new THREE.Color(1, 1, 1)},   // chỉnh màu nền ngoài vườn (tươi, đậm hơn) — cỏ lấy màu nền nhân cùng hệ số → cỏ/nền luôn khớp
   uGK: {value: 0.0846},        // 110 / 1300: bước lặp texture nền theo mét (khớp CircleGeometry bán kính 650 với repeat 110)
   uFolTint: {value: new THREE.Color(1, 1, 1)},   // nhân vào màu nền lá/cây/hoa (panel ?tune)
   uFolVar: {value: new THREE.Vector2(0.05, 0.14)},   // biến thiên ngẫu nhiên theo từng cây/bụi: x = lệch hue (vòng), y = lệch sáng
@@ -87,9 +88,9 @@ export const FRAG_COLOR = `
    diffuseColor.rgb = varyCol( diffuseColor.rgb * uFolTint, vHash, uFolVar ); }
 #endif
 #ifdef GRASSB
- { vec3 gt = texture2D( uGMap, vec2( 55.0 + vRoot.x * uGK, 55.0 - vRoot.y * uGK ) ).rgb;
+ { vec3 gt = texture2D( uGMap, vec2( 55.0 + vRoot.x * uGK, 55.0 - vRoot.y * uGK ) ).rgb * uGTint;
    float glm = dot( gt, vec3( 0.299, 0.587, 0.114 ) );
-   vec3 gc = mix( gt, mix( uGrassA, uGrassB, smoothstep( 0.08, 0.6, glm ) ), 0.75 );
+   vec3 gc = mix( gt, mix( uGrassA, uGrassB, smoothstep( 0.08, 0.6, glm ) ) * uGTint, 0.75 );
    vec3 tip = gc * vec3( 1.06, 1.05, 0.92 );
    vec3 c = mix( gc * 0.74, tip, smoothstep( 0.0, 0.9, vLeafH ) );
    diffuseColor.rgb = varyCol( c * uGrTint, vHash, uGrVar ); }

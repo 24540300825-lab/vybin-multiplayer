@@ -74,16 +74,16 @@ export function init(ctx){
            _p=instanceMatrix*_p;
           #endif
           vWP=(modelMatrix*_p).xyz;}`);
-        if(F2||GB){sh.uniforms.uCenter={value:m.userData.center||new THREE.Vector3(0,0.65,0)};sh.uniforms.uHInv={value:m.userData.hInv||0.66};sh.uniforms.uWindDir=FU.uWindDir;sh.uniforms.uHybrid=FU.uHybrid;sh.uniforms.uBaseShade=FU.uBaseShade;sh.uniforms.uFolEmi=FU.uFolEmi;sh.uniforms.uGMap=FU.uGMap;sh.uniforms.uGK=FU.uGK;sh.uniforms.uPl=FU.uPl;sh.uniforms.uFolTint=FU.uFolTint;sh.uniforms.uFolVar=FU.uFolVar;sh.uniforms.uGrTint=FU.uGrTint;sh.uniforms.uGrVar=FU.uGrVar;sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}
+        if(F2||GB){sh.uniforms.uCenter={value:m.userData.center||new THREE.Vector3(0,0.65,0)};sh.uniforms.uHInv={value:m.userData.hInv||0.66};sh.uniforms.uWindDir=FU.uWindDir;sh.uniforms.uHybrid=FU.uHybrid;sh.uniforms.uBaseShade=FU.uBaseShade;sh.uniforms.uFolEmi=FU.uFolEmi;sh.uniforms.uGMap=FU.uGMap;sh.uniforms.uGK=FU.uGK;sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uPl=FU.uPl;sh.uniforms.uFolTint=FU.uFolTint;sh.uniforms.uFolVar=FU.uFolVar;sh.uniforms.uGrTint=FU.uGrTint;sh.uniforms.uGrVar=FU.uGrVar;sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}
         sh.vertexShader=(SW?'#define SWAYX\n':'')+'varying vec3 vWP;uniform float uWindT,uWindA;\n'+VS0;
-        sh.fragmentShader=(FOL?'#define FOLIAGE\n':'')+(F2?'#define FOL2\n':'')+(GB?'#define GRASSB\n':'')+(GRD?'#define GROUNDX\n':'')+((F2||GB)?FRAG_PARS:'')+'uniform float uInHK;uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <normal_fragment_begin>',(F2||GB)?'#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\nnormal*=(gl_FrontFacing?1.0:-1.0);\n#endif\n'+(m.userData.occ?OCC_GLSL:''):'#include <normal_fragment_begin>').replace('#include <opaque_fragment>',`
+        sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uDesat={value:m.userData.desat==null?1:m.userData.desat};sh.fragmentShader='uniform float uDesat;uniform vec3 uGTint;\n'+(FOL?'#define FOLIAGE\n':'')+(F2?'#define FOL2\n':'')+(GB?'#define GRASSB\n':'')+(GRD?'#define GROUNDX\n':'')+((F2||GB)?FRAG_PARS:'')+'uniform float uInHK;uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <normal_fragment_begin>',(F2||GB)?'#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\nnormal*=(gl_FrontFacing?1.0:-1.0);\n#endif\n'+(m.userData.occ?OCC_GLSL:''):'#include <normal_fragment_begin>').replace('#include <opaque_fragment>',`
         {float I=1.0,Ih=1.0,vis=1.0,Ig=0.0;
          #ifdef FOLIAGE
          {float lm=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));vec3 lf=mix(uLeafA,uLeafB,smoothstep(0.03,0.4,lm));
           diffuseColor.rgb=mix(diffuseColor.rgb,lf,uLeafMix)*mix(0.7,1.0,smoothstep(-0.25,0.9,vWP.y));}
          #endif
          #ifdef GROUNDX
-         {float lm=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));diffuseColor.rgb=mix(diffuseColor.rgb,mix(uGrassA,uGrassB,smoothstep(0.08,0.6,lm)),0.75);}
+         {float lm=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));diffuseColor.rgb=mix(diffuseColor.rgb,mix(uGrassA,uGrassB,smoothstep(0.08,0.6,lm)),0.75)*uGTint;}
          #endif
          #if defined(FOL2)||defined(GRASSB)
 ${FRAG_COLOR}
@@ -96,6 +96,7 @@ ${FRAG_COLOR}
           I=ang<maxA?1.0:((sm>0.0001&&ang<maxA+sm)?1.0-(ang-maxA)/sm:0.0);
           float hiA=maxA*uHiS;
           Ih=ang<hiA?1.0:((sm>0.0001&&ang<hiA+sm)?1.0-(ang-hiA)/sm:0.0);
+          diffuseColor.rgb=mix(vec3(dot(diffuseColor.rgb,vec3(0.299,0.587,0.114))),diffuseColor.rgb,uDesat);
           float la=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));
           float ex=max(ndl,0.0)*dot(directionalLights[0].color,vec3(0.299,0.587,0.114))/PI*la;
           vis=ex>0.002?clamp(dot(reflectedLight.directDiffuse,vec3(0.299,0.587,0.114))/ex,0.0,1.0):1.0;
@@ -150,8 +151,8 @@ ${FRAG_COLOR}
   // anchors
   const MAPS=MAP_CONFIGS;
   const MC=MAPS[MAPID]||MAPS.studio;const OUTD=!!MC.outdoor;TU.uInHK.value=OUTD?0:1;bindTU(TU);
-  if(OUTD){const sp=MC.spawn.vy;controls.target.set(sp[0],A0y(MC)+1,sp[1]);camera.position.set(sp[0]+12,A0y(MC)+15,sp[1]+19);controls.minDistance=10;controls.maxDistance=42;controls.update();
-    controls.minAzimuthAngle=-Infinity;controls.maxAzimuthAngle=Infinity;controls.minPolarAngle=0.25;controls.maxPolarAngle=1.25;CFG.camPan=Math.PI*2;CFG.camTilt=0.9}
+  if(OUTD){const sp=MC.spawn.vy;controls.target.set(sp[0],A0y(MC)+1,sp[1]);camera.position.set(sp[0]+12,A0y(MC)+15,sp[1]+19);controls.minDistance=8;controls.maxDistance=46;controls.update();
+    controls.minAzimuthAngle=-Infinity;controls.maxAzimuthAngle=Infinity;controls.minPolarAngle=0.12;controls.maxPolarAngle=1.46;CFG.camPan=Math.PI*2;CFG.camTilt=0.9}
   function A0y(c){return c.floorY||0}
   if(MC.tint)env.traverse(o=>{if(o.isMesh&&o.material&&MC.tint[o.material.name]!=null)o.material.color.set(MC.tint[o.material.name])});
   if(MC.hideFlat)env.traverse(o=>{if(o.isMesh&&!(o.material&&o.material.name)){const b=new THREE.Box3().setFromObject(o);if((b.max.x-b.min.x)*(b.max.z-b.min.z)>20&&b.max.y-b.min.y<1.2)o.visible=false}});
@@ -821,11 +822,11 @@ ${FRAG_COLOR}
   // ===== BẦU TRỜI stylized (dải màu + mặt trời + mây khối) + sương + nền cỏ vô hạn =====
   const SKY={top:'#86b3ea',mid:'#c9d6f2',pink:'#f5c6c6',hor:'#ffe3c4'};
   const skyU={cTop:{value:new THREE.Color(SKY.top)},cMid:{value:new THREE.Color(SKY.mid)},cPink:{value:new THREE.Color(SKY.pink)},cHor:{value:new THREE.Color(SKY.hor)},
-    cCl:{value:new THREE.Color('#ffffff')},cClSh:{value:new THREE.Color('#e8d8e8')},cth:{value:0.58},uStar:{value:0},uSunV:{value:1},
+    cCl:{value:new THREE.Color('#ffffff')},cClSh:{value:new THREE.Color('#e8d8e8')},cth:{value:0.58},uStar:{value:0},uSunV:{value:1},uOut:{value:OUTD?1:0},
     sunDir:{value:new THREE.Vector3(0.55,0.5,0.65).normalize()},moonDir:{value:new THREE.Vector3(-0.5,0.4,-0.3).normalize()},uT:{value:0}};
   const sky=new THREE.Mesh(new THREE.SphereGeometry(1,32,16),new THREE.ShaderMaterial({uniforms:skyU,side:THREE.BackSide,depthWrite:false,depthTest:false,fog:false,toneMapped:false,
     vertexShader:'varying vec3 vD;void main(){vD=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-    fragmentShader:`varying vec3 vD;uniform vec3 cTop,cMid,cPink,cHor,cCl,cClSh,sunDir,moonDir;uniform float uT,cth,uStar,uSunV;
+    fragmentShader:`varying vec3 vD;uniform vec3 cTop,cMid,cPink,cHor,cCl,cClSh,sunDir,moonDir;uniform float uT,cth,uStar,uSunV,uOut;
     float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
     float h31(vec3 p){p=fract(p*0.3183099+vec3(.1,.2,.3));p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
     float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
@@ -839,13 +840,45 @@ ${FRAG_COLOR}
       c+=vec3(st)*uStar*smoothstep(0.03,0.3,h)*up;
       // mặt trời + quầng bậc thang
       float sd=dot(d,normalize(sunDir));
-      c+=vec3(1.0,0.78,0.5)*smoothstep(0.93,0.99,sd)*0.28*uSunV*up;
+      c+=vec3(1.0,0.78,0.5)*(smoothstep(0.93,0.99,sd)*0.28+uOut*(smoothstep(0.6,0.97,sd)*0.12+smoothstep(0.985,0.998,sd)*0.2))*uSunV*up;
       c=mix(c,vec3(1.0,0.97,0.82),smoothstep(0.9975,0.9982,sd)*uSunV*up);
       // mặt trăng
       float md=dot(d,normalize(moonDir));
-      c=mix(c,vec3(0.95,0.96,1.0),smoothstep(0.9988,0.9991,md)*uStar*up);
-      c+=vec3(0.5,0.6,0.9)*smoothstep(0.985,0.9995,md)*0.18*uStar*up;
+      if(uOut<0.5){c=mix(c,vec3(0.95,0.96,1.0),smoothstep(0.9988,0.9991,md)*uStar*up);
+      c+=vec3(0.5,0.6,0.9)*smoothstep(0.985,0.9995,md)*0.18*uStar*up;}
+      else{
+        // trăng stylized: đĩa lớn có miệng hố, bóng khuyết nhẹ, quầng mềm hai lớp
+        vec3 mz=normalize(moonDir),mx=normalize(cross(vec3(0.0,1.0,0.0),mz)),my=cross(mz,mx);
+        vec2 mu=vec2(dot(d,mx),dot(d,my))/0.052;float mr=length(mu);
+        float disc=(1.0-smoothstep(0.93,1.0,mr))*step(0.0,md);
+        float crt=vn(mu*3.1+4.0)*0.55+vn(mu*7.3)*0.3;
+        vec3 mc=mix(vec3(0.99,0.97,0.86),vec3(0.80,0.84,0.93),smoothstep(0.35,0.75,crt));
+        float ph=smoothstep(-0.35,0.55,dot(mu,vec2(-0.6,0.5))+0.35-0.35*(1.0-mr*mr));
+        mc*=mix(0.55,1.0,ph);
+        c=mix(c,mc,disc*smoothstep(-0.02,0.12,h)*max(uStar,0.0));
+        c+=vec3(0.55,0.65,1.0)*(exp(-pow(max(mr-0.9,0.0)*1.3,1.0)*2.2)*0.22+exp(-mr*0.35)*0.10)*uStar*up*step(0.0,md)*(1.0-disc*0.8);
+      }
       // mây khối 2 mức
+      if(uOut>0.5){
+        // mây khối stylized: fbm + dải sáng theo hướng nắng, mép bạc
+        vec2 q=d.xz/(max(h,0.0)+0.32)*1.15+vec2(uT*0.0035,uT*0.0012);
+        q+=vec2(vn(q*0.7+3.0),vn(q*0.7+9.0))*0.55;
+        float f1=vn(q*vec2(1.0,1.7))*0.5+vn(q*vec2(2.1,3.5))*0.28+vn(q*vec2(4.4,7.3))*0.14+vn(q*vec2(8.7,13.0))*0.08;
+        vec2 sl=normalize(sunDir.xz+vec2(0.001))*0.07;
+        vec2 q2=q+sl;
+        float f2=vn(q2*vec2(1.0,1.7))*0.5+vn(q2*vec2(2.1,3.5))*0.28+vn(q2*vec2(4.4,7.3))*0.14+vn(q2*vec2(8.7,13.0))*0.08;
+        float cov=cth-0.02;
+        float body=smoothstep(cov,cov+0.045,f1)*smoothstep(0.015,0.14,h);
+        float lt=smoothstep(-0.05,0.07,f2-f1+0.02);
+        float edge=1.0-smoothstep(cov+0.045,cov+0.11,f1);
+        vec3 sunC=mix(vec3(1.0),vec3(1.0,0.82,0.62),smoothstep(0.5,-0.05,sunDir.y));
+        vec3 cc=mix(cClSh,cCl*sunC,lt);
+        cc+=vec3(1.0,0.86,0.66)*0.30*pow(max(sd,0.0),4.0)*uSunV*edge;
+        cc=mix(cc,cc*vec3(0.78,0.84,1.0),smoothstep(0.0,0.5,0.5-sunDir.y)*0.5);
+        c=mix(c,cc,body*0.96);
+        float hz=smoothstep(0.0,0.05,h)*(1.0-smoothstep(0.05,0.3,h));
+        c=mix(c,cHor,hz*body*0.25);
+      }
       vec2 cp=d.xz/(max(h,0.0)+0.25)*1.4+vec2(uT*0.004,0.0);
       float n=vn(cp*vec2(1.2,2.4))*0.6+vn(cp*vec2(2.4,4.8))*0.4;
       float cl=step(cth,n)*smoothstep(0.02,0.12,h);
@@ -854,8 +887,8 @@ ${FRAG_COLOR}
       float cl2=step(cth+0.09,n2)*smoothstep(0.04,0.2,h)*0.85;
       float lit=step(cth,vn(cp*vec2(1.2,2.4)+vec2(0.05,0.18))*0.6+vn(cp*vec2(2.4,4.8)+vec2(0.1,0.3))*0.4);
       float rimL=pow(max(sd,0.0),5.0)*uSunV;
-      c=mix(c,cClSh*1.05,cl2);
-      c=mix(c,mix(cClSh,cCl,lit)+vec3(1.0,0.75,0.45)*0.22*rimL*lit,cl*0.92);
+      if(uOut<0.5){c=mix(c,cClSh*1.05,cl2);
+      c=mix(c,mix(cClSh,cCl,lit)+vec3(1.0,0.75,0.45)*0.22*rimL*lit,cl*0.92);}
       // sao băng
       float kk=fract(uT*0.045);if(kk<0.05&&uStar>0.2){float u=kk/0.05;vec2 pos=vec2(-0.5+u*0.7,0.78-u*0.33);vec2 dr=normalize(vec2(0.7,-0.33));vec2 r=d.xy-pos;float a=dot(r,dr),bb=abs(dot(r,vec2(-dr.y,dr.x)));
         c+=vec3(1.0,0.95,0.85)*exp(min(a,0.0)*28.0)*(1.0-smoothstep(0.0,0.004,bb))*step(a,0.004)*(1.0-u)*uStar*up*smoothstep(0.1,0.3,h);}
@@ -867,7 +900,7 @@ ${FRAG_COLOR}
   
   let grassCol=null;const grassTex=(()=>{let t=null;const gn=MC.gtex||'Plane001';env.traverse(o=>{if(o.isMesh&&o.name===gn&&o.material.map){t=o.material.map;grassCol=o.material.color.clone()}});return t})();
   const gTex=grassTex?grassTex.clone():null;if(gTex){gTex.channel=0;gTex.wrapS=gTex.wrapT=THREE.RepeatWrapping;gTex.repeat.set(110,110);gTex.needsUpdate=true}
-  const ground=new THREE.Mesh(new THREE.CircleGeometry(650,48),new THREE.MeshStandardMaterial({map:gTex,color:(MC.gtex&&grassCol)||0xffffff,roughness:1,metalness:0}));ground.material.userData.ground=true;toonify(ground);
+  const ground=new THREE.Mesh(new THREE.CircleGeometry(650,48),new THREE.MeshStandardMaterial({map:gTex,color:(MC.gtex&&grassCol)||0xffffff,roughness:1,metalness:0}));ground.material.userData.ground=true;if(OUTD){FU.uGTint.value.setRGB(0.68,0.8,0.52);ground.material.userData.desat=0.95}toonify(ground);
   ground.rotation.x=-Math.PI/2;ground.position.set(0,OUTD?A.L0-0.03:-0.3,0);ground.renderOrder=-999;ground.receiveShadow=OUTD;scene.add(ground);
   if(OUTD){envMeshes.push(ground);FU.uGMap.value=gTex}
 
@@ -1361,7 +1394,7 @@ ${FRAG_COLOR}
     // sương
     scene.fog.color.copy(des(k.fog));scene.fog.near=WC.fn*(OUTD?0.8:1);scene.fog.far=WC.ff*(OUTD?0.55:1);
     // grade
-    GU.uExpo.value=TP.expo*(1-(1-WC.dim)*0.3);GU.uCon.value=TP.con;GU.uSat.value=TP.sat*(1-WC.des*0.35);GU.uTemp.value=TP.temp+k.gt;GU.uVig.value=TP.vig;GU.uTintAmt.value=TP.tintAmt;GU.uFlash.value=flash*0.6;
+    GU.uExpo.value=TP.expo*(1-(1-WC.dim)*0.3);GU.uCon.value=TP.con*(OUTD?0.97:1);GU.uSat.value=TP.sat*(1-WC.des*0.35)*(OUTD?0.9:1);GU.uTemp.value=TP.temp+k.gt;GU.uVig.value=TP.vig;GU.uTintAmt.value=TP.tintAmt;GU.uFlash.value=flash*0.6;
     const hs=h=>{const v=hexV(h);return new THREE.Vector3(v.x,v.y,v.z)};GU.uTintSh.value.copy(hexV(TP.tintSh));GU.uTintHi.value.copy(hexV(TP.tintHi));
     bloomP.strength=TP.bloom*(1+0.8*(1-k.day));bloomP.threshold=TP.bloomTh;bloomP.radius=0.55;
     // light shafts

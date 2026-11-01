@@ -14,11 +14,11 @@ export const LEVELS = {
 };
 // theo loại: tầm nhìn tối đa (m), đường cong mật độ theo khoảng cách (d0 = bắt đầu thưa, d1 = còn tối thiểu), có đổ bóng không
 const CLASS = {
-  grass:  {maxD: 46,  d0: 8,  d1: 40,  min: 0.04, shadow: false, cell: 6,  lod: 0},
-  flower: {maxD: 40,  d0: 6,  d1: 36,  min: 0.03, shadow: false, cell: 7,  lod: 7},
-  bush:   {maxD: 85,  d0: 18, d1: 80,  min: 0.12, shadow: true,  cell: 8,  lod: 16},
-  tree:   {maxD: 210, d0: 40, d1: 200, min: 0.35, shadow: true,  cell: 12, lod: 34},
-  rock:   {maxD: 120, d0: 30, d1: 110, min: 0.25, shadow: true,  cell: 10, lod: 22},
+  grass:  {maxD: 60,  d0: 30, d1: 56,  min: 0.04, shadow: false, cell: 6,  lod: 0},
+  flower: {maxD: 55,  d0: 26, d1: 50,  min: 0.03, shadow: false, cell: 7,  lod: 30},
+  bush:   {maxD: 110, d0: 45, d1: 105, min: 0.12, shadow: true,  cell: 8,  lod: 48},
+  tree:   {maxD: 230, d0: 70, d1: 220, min: 0.35, shadow: true,  cell: 12, lod: 70},
+  rock:   {maxD: 130, d0: 55, d1: 120, min: 0.25, shadow: true,  cell: 10, lod: 55},
 };
 
 const M4 = new THREE.Matrix4(), V3 = new THREE.Vector3(), Q = new THREE.Quaternion(), S3 = new THREE.Vector3(), E = new THREE.Euler();
@@ -116,10 +116,12 @@ export function setupExterior(c) {
       else r.userData.occ = true;                           // bụi/cây cao: mờ dần khi chắn giữa camera và người
       // lá chưa có màu/texture (trắng): tô xanh lá theo palette của các lá có màu trong file
       if (!r.map && r.color.r > 0.95 && r.color.g > 0.95 && r.color.b > 0.95) {
-        if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.map = FOLMAP; r.color.set(0xffffff); }     // bụi: UV trỏ vào gradient xanh của foliage-a → mỗi mảng lá lệch tông nhẹ (như texture mode ở Blender)
+        if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.map = FOLMAP; r.color.setRGB(0.94, 1.0, 1.12); }     // bụi: UV trỏ vào gradient xanh của foliage-a → mỗi mảng lá lệch tông nhẹ (như texture mode ở Blender)
         else r.color.setRGB(0.30, 0.42, 0.04);
       }
     }
+    if (fol && r.map) r.color.multiply(new THREE.Color(0.94, 1.0, 1.1));     // bớt vàng: kéo cây/bụi về xanh lá cùng tông nền
+    r.userData.desat = grass ? 0.95 : (r.userData.squash ? 0.8 : 0.88);     // hoa/bụi/cây bớt rực → tông điện ảnh
     r.metalness = 0; r.roughness = 1;
     toonMat(r); matCache.set(key, r); return r;
   }
@@ -137,7 +139,7 @@ export function setupExterior(c) {
       if (/^M_PathStone/.test(nm) && !tintMats.path.includes(m)) { tintMats.path.push(m); m.color.setRGB(...PATHC); }
       if (/^ROCK$/.test(nm) && !tintMats.rock.includes(m)) { tintMats.rock.push(m); m.color.setRGB(...PATHC); }
       if (m.map && m.map.name === 'foliage-a-v01') FOLMAP = m.map;
-      if (nm === 'Stylized Brick Wall' && !roofMat) roofMat = m;
+      if (m.map && m.map.name === 'roof_tiles_02_color_1k' && !roofMat) roofMat = m;
     }
     // mặt phẳng scatter (không vật liệu, phẳng, rộng) — chỉ dùng để rải cây ở Blender → bỏ
     if (!o.isInstancedMesh && !(o.material && (o.material.name || (Array.isArray(o.material) && o.material.length)))) {
@@ -147,10 +149,66 @@ export function setupExterior(c) {
   });
   dropList.forEach(o => o.removeFromParent());
   // mái ngói hiên cửa chính: file gán nhầm vật liệu bê tông (nhạt) → dùng chung vật liệu ngói với mái nhà
-  if (roofMat) env.traverse(o => {
-    if (!o.isMesh || !/^Entrance_Hood_TileRoof/.test(o.name)) return;
-    if (Array.isArray(o.material)) o.material = o.material.map(m => (/^Stylized Concrete/.test(m.name || '') ? roofMat : m));
-    else if (/^Stylized Concrete/.test(o.material.name || '')) o.material = roofMat;
+  // mật độ texel = diện tích UV / diện tích thế giới của các tam giác dùng roofMat; mái hiên chỉnh UV để mật độ khớp mái chính
+  const uvDensity = (o, only) => {
+    const g = o.geometry, pos = g.attributes.position, uv = g.attributes.uv; if (!uv) return 0;
+    const idx = g.index, n = (idx ? idx.count : pos.count), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    o.updateWorldMatrix(true, false); let wa = 0, ua = 0;
+    const mats = Array.isArray(o.material) ? o.material : null, groups = g.groups.length ? g.groups : [{start: 0, count: n, materialIndex: 0}];
+    for (const gr of groups) {
+      const mm = mats ? mats[gr.materialIndex] : o.material; if (only && !(mm && mm.map === only.map)) continue;
+      for (let t = gr.start; t < Math.min(n, gr.start + gr.count); t += 3) {
+        const i0 = idx ? idx.getX(t) : t, i1 = idx ? idx.getX(t + 1) : t + 1, i2 = idx ? idx.getX(t + 2) : t + 2;
+        a.fromBufferAttribute(pos, i0).applyMatrix4(o.matrixWorld); b.fromBufferAttribute(pos, i1).applyMatrix4(o.matrixWorld); c.fromBufferAttribute(pos, i2).applyMatrix4(o.matrixWorld);
+        wa += b.clone().sub(a).cross(c.clone().sub(a)).length() / 2;
+        const ux = uv.getX(i1) - uv.getX(i0), uy = uv.getY(i1) - uv.getY(i0), vx = uv.getX(i2) - uv.getX(i0), vy = uv.getY(i2) - uv.getY(i0);
+        ua += Math.abs(ux * vy - uy * vx) / 2;
+      }
+    }
+    return wa > 1e-6 ? ua / wa : 0;
+  };
+  if (roofMat) {
+    let dMain = 0, nMain = 0; const hoods = [];
+    env.traverse(o => {
+      if (!o.isMesh || o.isInstancedMesh) return;
+      const ms = [].concat(o.material);
+      if (/^Entrance_Hood_TileRoof/.test(o.name)) { hoods.push(o); return; }
+      if (ms.some(m => m && m.map === roofMat.map)) { const d = uvDensity(o, roofMat); if (d > 0) { dMain += d; nMain++; } }
+    });
+    dMain = nMain ? dMain / nMain : 0;
+    console.log('[ext] porch main', nMain, dMain.toFixed(3), 'hoods', hoods.length);
+    hoods.forEach(o => {
+      const old = [].concat(o.material), isC = m => /^Stylized Concrete/.test((m && m.name) || '');
+      if (!old.some(isC)) return;
+      const swapped = Array.isArray(o.material) ? o.material.map(m => (isC(m) ? roofMat : m)) : roofMat;
+      const prev = o.material; o.material = swapped;
+      const dh = uvDensity(o, roofMat);
+      if (dMain > 0 && dh > 0) {
+        const k = Math.sqrt(dMain / dh), g = o.geometry = o.geometry.clone(), uv = g.attributes.uv, idx = g.index;
+        const n = idx ? idx.count : g.attributes.position.count, groups = g.groups.length ? g.groups : [{start: 0, count: n, materialIndex: 0}];
+        const mats = Array.isArray(swapped) ? swapped : null, seen = new Set();
+        for (const gr of groups) {
+          if ((mats ? mats[gr.materialIndex] : swapped) !== roofMat) continue;
+          for (let t = gr.start; t < Math.min(n, gr.start + gr.count); t++) { const i = idx ? idx.getX(t) : t; if (seen.has(i)) continue; seen.add(i); uv.setXY(i, uv.getX(i) * k, uv.getY(i) * k); }
+        }
+        uv.needsUpdate = true;
+        console.log('[ext] porch roof uv scale', k.toFixed(3), 'main', dMain.toFixed(3), 'hood', dh.toFixed(3));
+      }
+    });
+  }
+  // vật liệu công trình (gạch, hàng rào, tường…) hơi quá bão hoà → giảm rất nhẹ
+  env.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh) return;
+    for (const m of [].concat(o.material)) {
+      if (!m || !m.isMeshStandardMaterial) continue;
+      const nm = m.name || '';
+      if (isFoliageMat(nm) || isGrassMat(nm) || /^M_PathStone|^ROCK$/.test(nm)) continue;
+      m.userData.desat = 0.9;
+      // cân bằng độ nổi giữa các nhóm vật liệu (đá sáng hơn một chút, gỗ/gạch bớt rực) để không món nào lấn át
+      if (/stone|Stone/.test(nm) && m.color) { m.color.multiplyScalar(1.14); m.userData.desat = 0.82; }
+      else if (/wood|Wood/.test(nm)) m.userData.desat = 0.78;
+      else if (/Roof_Tile|Brick/.test(nm)) m.userData.desat = 0.85;
+    }
   });
 
   // ---- 2) gom InstancedMesh lớn ra khỏi env → chia ô ----
@@ -183,7 +241,11 @@ export function setupExterior(c) {
     const ref = set[0]; ref.updateWorldMatrix(true, false);
     const W = ref.matrixWorld; let mats = [];
     const hb = MC.houseBox;
-    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (hb) { V3.setFromMatrixPosition(mm); if (V3.x > hb[0] && V3.x < hb[1] && V3.z > hb[2] && V3.z < hb[3]) continue; } mats.push(mm); }
+    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (hb) { V3.setFromMatrixPosition(mm); if (V3.x > hb[0] && V3.x < hb[1] && V3.z > hb[2]) {
+        // bush: chỉ bỏ phần nằm TRONG nhà (z<0.2), giữ hàng rào cây sát mặt tiền; cây to: bỏ luôn mọi cây mọc sát/xuyên tường nhà (z<4.6)
+        const zc = cls === 'bush' || cls === 'flower' || cls === 'grass' ? 0.2 : (cls === 'tree' ? 4.6 : hb[3]);
+        if (V3.z < zc) continue; } }
+      mats.push(mm); }
     if (!mats.length) { set.forEach(m => m.removeFromParent()); continue; }
     nIn += mats.length;
     templates[cls].push({set, mats});
