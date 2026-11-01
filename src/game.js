@@ -861,19 +861,19 @@ ${FRAG_COLOR}
       // mây khối 2 mức
       if(uOut>0.5){
         // mây khối stylized: fbm + dải sáng theo hướng nắng, mép bạc
-        vec2 q=d.xz/(max(h,0.0)+0.32)*1.9+vec2(uT*0.0035,uT*0.0012);
+        vec2 q=d.xz/(max(h,0.0)+0.32)*1.2+vec2(uT*0.0035,uT*0.0012);
         q+=vec2(vn(q*0.7+3.0),vn(q*0.7+9.0))*0.55;
-        float f1=vn(q*vec2(1.0,1.7))*0.5+vn(q*vec2(2.1,3.5))*0.28+vn(q*vec2(4.4,7.3))*0.14+vn(q*vec2(8.7,13.0))*0.08;
+        float f1=vn(q*vec2(1.0,1.7))*0.5+vn(q*vec2(2.1,3.5))*0.28+vn(q*vec2(4.4,7.3))*0.09+vn(q*vec2(8.7,13.0))*0.03;
         vec2 sl=normalize(sunDir.xz+vec2(0.001))*0.07;
         vec2 q2=q+sl;
-        float f2=vn(q2*vec2(1.0,1.7))*0.5+vn(q2*vec2(2.1,3.5))*0.28+vn(q2*vec2(4.4,7.3))*0.14+vn(q2*vec2(8.7,13.0))*0.08;
-        float cov=cth-0.07;
+        float f2=vn(q2*vec2(1.0,1.7))*0.5+vn(q2*vec2(2.1,3.5))*0.28+vn(q2*vec2(4.4,7.3))*0.09+vn(q2*vec2(8.7,13.0))*0.03;
+        float cov=cth-0.02;
         float body=smoothstep(cov,cov+0.016,f1)*smoothstep(0.015,0.14,h);
         float lt=smoothstep(-0.012,0.014,f2-f1+0.006);
         float edge=1.0-smoothstep(cov+0.016,cov+0.07,f1);
         vec3 sunC=mix(vec3(1.0),vec3(1.0,0.82,0.62),smoothstep(0.5,-0.05,sunDir.y));
-        float thick=smoothstep(cov+0.05,cov+0.16,f1);
-        vec3 cdark=cClSh*vec3(0.6,0.58,0.82);
+        float thick=smoothstep(cov+0.06,cov+0.2,f1);
+        vec3 cdark=cClSh*vec3(0.72,0.7,0.88);
         vec3 cc=mix(mix(cClSh,cdark,thick),cCl*sunC,lt*(1.0-0.55*thick));
         cc+=vec3(1.0,0.86,0.66)*0.30*pow(max(sd,0.0),4.0)*uSunV*edge;
         cc=mix(cc,cc*vec3(0.78,0.84,1.0),smoothstep(0.0,0.5,0.5-sunDir.y)*0.5);
