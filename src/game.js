@@ -761,7 +761,7 @@ ${FRAG_COLOR}
     camera.getWorldDirection(_fv);let fx=_fv.x,fz=_fv.z;const fl=Math.hypot(fx,fz)||1;fx/=fl;fz/=fl;
     const ix=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0),iz=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0);
     let x=fx*iz+(-fz)*ix,z=fz*iz+fx*ix;const m=Math.hypot(x,z);if(m>0){x/=m;z/=m}
-    const inp={x,z,mag:m>0?1:0,run:keys.has('ShiftLeft')||keys.has('ShiftRight'),interact:interactFlag};interactFlag=false;return inp;}
+    const inp={x,z,mag:m>0?1:0,run:runMode.v||keys.has('ShiftLeft')||keys.has('ShiftRight'),interact:interactFlag};interactFlag=false;return inp;}
 
   // input
   const ray=new THREE.Raycaster(),mv=new THREE.Vector2();
@@ -815,7 +815,8 @@ ${FRAG_COLOR}
     {key:'door',icon:'door',label:MC.doorLabel||'Bản đồ',at:()=>doorPt,act:()=>{if(MC.doorTo&&window.__switchMap){window.__switchMap(MC.doorTo);return}const b=$('iMap');if(b)b.click()}}];
    const pn=initPins({camera,items:items.filter(i=>i.at())});pinsUpd=pn.update;api.pins=pn;}
   // phím tắt (src/ui/shortcuts.js) → cùng các lệnh với nút ẩn ở trên
-  {const ACT={walk:'bWalk',run:'bRun',sit:'bSit',type:'bType',off:'bOff',sleep:'bSleep',wake:'bWake'};addEventListener('vy:act',e=>{const b=ACT[e.detail];if(b)$(b).click()})}
+  {const ACT={walk:'bWalk',run:'bRun',sit:'bSit',type:'bType',off:'bOff',sleep:'bSleep',wake:'bWake'};window.__runMode=runMode;addEventListener('vy:act',e=>{let id=e.detail;if(id==='run'&&runMode.v)id='walk';   // R bật/tắt chế độ chạy — dùng chung cho cả WASD lẫn bấm chọn điểm
+      const b=ACT[id];if(b)$(b).click();dispatchEvent(new CustomEvent('vy:mode'))})}
   document.querySelectorAll('input[data-k]').forEach(el=>{const k=el.dataset.k;el.max=Math.max(+el.max,k==='run'?10:k==='walk'?6:3);el.value=CFG[k];$('v'+k).textContent=el.value;el.oninput=()=>{CFG[k]=+el.value;$('v'+k).textContent=el.value;try{localStorage.setItem('vyCfg',JSON.stringify({v:3,walk:CFG.walk,run:CFG.run,walkAnim:CFG.walkAnim,runAnim:CFG.runAnim}))}catch(e){}}});
   try{const sv=JSON.parse(localStorage.getItem('vyCfg')||'null');if(sv&&sv.v===3){['walk','run','walkAnim','runAnim'].forEach(k=>{if(sv[k]!=null){CFG[k]=sv[k];const el=document.querySelector('input[data-k='+k+']');if(el){el.value=sv[k];$('v'+k).textContent=sv[k]}}})}}catch(e){}
 

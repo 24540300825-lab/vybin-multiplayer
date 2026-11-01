@@ -6,6 +6,7 @@ import {mountYtUi} from './ui/music-ui.js';
 import {ic, paintIcons} from './ui/icons.js';
 import {Notify} from './ui/notify.js';
 import {mountShortcuts} from './ui/shortcuts.js';
+import {mountKeyHints} from './ui/keyhints.js';
 import {Fx} from './ui/fx.js';
 // ===== HUD / UI mới (kiểu game) =====
 (function buildHUD(){
@@ -89,7 +90,7 @@ import {Fx} from './ui/fx.js';
     setB('hp','Hp');setB('st','St');setB('fo','Fo');setB('mo','Mo');
     $('rHp').title='Sức khỏe: '+Math.round(S.hp);$('rSt').title='Thể lực: '+Math.round(S.st);$('rFo').title='Tập trung: '+Math.round(S.fo);$('rMo').title='Tâm trạng: '+(S.mo>70?'Vui':S.mo>40?'Ổn':'Buồn')+' ('+Math.round(S.mo)+')';
   },500);
-  mountShortcuts({toast});
+  { const sc = mountShortcuts({toast}); try { mountKeyHints(sc.keys); } catch (e) { console.warn('keyhints', e); } }
   // --- task
   let tasks=load('vyTasks',[{t:'Hoàn thiện storyboard',h:'16:00',d:0},{t:'Render test animation',h:'18:00',d:0},{t:'Chỉnh thiết kế poster',h:'20:00',d:0},{t:'Đọc tài liệu',h:'22:00',d:0},{t:'Uống nước (2L)',h:'15:00',d:1}]);
   function rt(){const L=$('tkList');L.innerHTML='';if(!tasks.length){L.innerHTML='<div class="tk-empty">Chưa có việc nào — bấm + để thêm.</div>';return}tasks.forEach((k,i)=>{const r=document.createElement('div');r.className='tk'+(k.d?' done':'');const c=document.createElement('input');c.type='checkbox';c.checked=!!k.d;c.onchange=()=>{k.d=c.checked?1:0;save('vyTasks',tasks);rt()};
