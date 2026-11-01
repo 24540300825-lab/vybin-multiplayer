@@ -151,8 +151,14 @@ ${FRAG_COLOR}
   // anchors
   const MAPS=MAP_CONFIGS;
   const MC=MAPS[MAPID]||MAPS.studio;const OUTD=!!MC.outdoor;TU.uInHK.value=OUTD?0:1;bindTU(TU);
-  if(OUTD){const sp=MC.spawn.vy;controls.target.set(sp[0],A0y(MC)+1,sp[1]);camera.position.set(sp[0]+12,A0y(MC)+15,sp[1]+19);controls.minDistance=8;controls.maxDistance=46;controls.update();
-    controls.minAzimuthAngle=-Infinity;controls.maxAzimuthAngle=Infinity;controls.minPolarAngle=0.12;controls.maxPolarAngle=1.46;CFG.camPan=Math.PI*2;CFG.camTilt=0.9}
+  if(OUTD){const sp=MC.spawn.vy;controls.target.set(sp[0],A0y(MC)+1,sp[1]);camera.fov=30;camera.updateProjectionMatrix();camera.position.set(sp[0]+7.2,A0y(MC)+9,sp[1]+11.4);controls.minDistance=5;controls.maxDistance=28;controls.update();
+    controls.minAzimuthAngle=-Infinity;controls.maxAzimuthAngle=Infinity;controls.minPolarAngle=0.12;controls.maxPolarAngle=1.5;CFG.camPan=Math.PI*2;CFG.camTilt=0.9}
+  // di chuột (hover) để xoay camera kiểu game 3D: vùng giữa màn hình để yên (bấm chọn điểm chạy), ra gần mép thì camera xoay/ngẩng mượt
+  const hov={x:0,y:0,on:false,drag:false};
+  if(OUTD&&matchMedia('(pointer:fine)').matches){const cv=renderer.domElement;
+    cv.addEventListener('pointermove',e=>{if(e.pointerType!=='mouse')return;hov.x=(e.clientX/innerWidth)*2-1;hov.y=(e.clientY/innerHeight)*2-1;hov.on=true;hov.drag=e.buttons!==0});
+    cv.addEventListener('pointerleave',()=>{hov.on=false});cv.addEventListener('pointerdown',()=>{hov.drag=true});addEventListener('pointerup',()=>{hov.drag=false});
+    addEventListener('blur',()=>{hov.on=false})}
   function A0y(c){return c.floorY||0}
   if(MC.tint)env.traverse(o=>{if(o.isMesh&&o.material&&MC.tint[o.material.name]!=null)o.material.color.set(MC.tint[o.material.name])});
   if(MC.hideFlat)env.traverse(o=>{if(o.isMesh&&!(o.material&&o.material.name)){const b=new THREE.Box3().setFromObject(o);if((b.max.x-b.min.x)*(b.max.z-b.min.z)>20&&b.max.y-b.min.y<1.2)o.visible=false}});
@@ -1457,8 +1463,13 @@ ${FRAG_COLOR}
     if(api.sendInput)api.sendInput(inp);if(api.onTick)api.onTick(dt);
     {const f=local;tmp.set(f.char.position.x,f.char.position.y+0.7,f.char.position.z);
       tmp2.copy(tmp).sub(controls.target).multiplyScalar(Math.min(1,dt*3));controls.target.add(tmp2);camera.position.add(tmp2);}
+    if(OUTD&&hov.on&&!hov.drag){
+      const dz=0.4,f=v=>{const a=Math.max(0,(Math.abs(v)-dz)/(1-dz));return Math.sign(v)*a*a*(3-2*a)};
+      const ax=f(hov.x),ay=f(hov.y);
+      if(ax||ay){const off=camera.position.clone().sub(controls.target),sp2=new THREE.Spherical().setFromVector3(off);
+        sp2.theta-=ax*1.7*dt;sp2.phi=clamp(sp2.phi-ay*0.9*dt,controls.minPolarAngle+1e-3,controls.maxPolarAngle-1e-3);sp2.makeSafe();
+        off.setFromSpherical(sp2);camera.position.copy(controls.target).add(off)}}
     controls.update();
-    if(OUTD){const pol=controls.getPolarAngle(),e=clamp((pol-0.95)/0.5,0,1),f=18+22*e*e*(3-2*e);if(Math.abs(camera.fov-f)>0.05){camera.fov=f;camera.updateProjectionMatrix()}}   // camera vẫn ghim vào nhân vật; hạ góc nhìn thì mở rộng FOV để thấy trời & mây
     if(OUTD){const lp=local.char.position;FU.uPl.value[0].set(lp.x,lp.y,lp.z);if(remote&&remote.char.visible){const rp=remote.char.position;FU.uPl.value[1].set(rp.x,rp.y,rp.z)}else FU.uPl.value[1].set(1e5,0,1e5);
       FU.uOcc.value.set(camera.position.x,camera.position.y,camera.position.z,1);FU.uOccPl.value.set(lp.x,lp.y+0.9,lp.z)}
     {const t=controls.target,cb=OUTD?MC.camBox:[0.5,9.5,-7.6,0.3],cx=clamp(t.x,cb[0],cb[1]),cy=clamp(t.y,OUTD?A.L0:0.3,OUTD?A.L0+4:5.5),cz=clamp(t.z,cb[2],cb[3]);
