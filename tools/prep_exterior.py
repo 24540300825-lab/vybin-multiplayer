@@ -52,7 +52,7 @@ def main():
     tmp = tempfile.mktemp(suffix='.glb')
     save(tmp, j, binc)
     here = os.path.dirname(os.path.abspath(__file__))
-    subprocess.check_call([sys.executable, os.path.join(here, 'optimize_glb.py'), tmp, dst, '--max', mx])
+    subprocess.check_call([sys.executable, os.path.join(here, 'optimize_glb.py'), tmp, dst, '--max', mx, '--min-bytes', '90000', '--q', '84'])
     os.unlink(tmp)
     print('→', dst, os.path.getsize(dst) // 1024, 'KB')
 

@@ -32,6 +32,7 @@ for im in j.get('images', []):
     if len(raw) < a.min_bytes: continue
     img = Image.open(io.BytesIO(raw))
     has_a = img.mode in ('RGBA', 'LA', 'P') and ('A' in img.getbands() or 'transparency' in img.info)
+    if has_a and 'A' in img.convert('RGBA').getbands() and img.convert('RGBA').getchannel('A').getextrema()[0] == 255: has_a = False   # alpha toàn 255 = ảnh đặc → JPEG
     w, h = img.size
     s = min(1.0, a.max / max(w, h))
     if s < 1: img = img.resize((max(1, round(w * s)), max(1, round(h * s))), Image.LANCZOS)

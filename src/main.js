@@ -4,6 +4,7 @@ import * as Assets from './assets.js';
 import {MAP_LIST, DEFAULT_MAP, isMap, goToMap, prefetchMap} from './maps.js';
 import {FILES} from './manifest.js';
 import {SFX} from './sfx.js';
+import {MAP_CONFIGS} from './map-configs.js';
 window.SFX = SFX; SFX.init();
 
 const $ = id => document.getElementById(id);
@@ -74,7 +75,7 @@ async function boot() {
   eng.init({env: files[mapKey], tree: files['tree'] || null, localGlb: files['char-' + slot], localSlot: slot, mapId});
   const api = eng.api;
   LB(88, 'Biên dịch shader...');
-  try { await Promise.race([api.warm(), new Promise(r => setTimeout(r, 4000))]); } catch (e) { console.warn('warm', e); }
+  try { await Promise.race([api.warm(), new Promise(r => setTimeout(r, 2200))]); } catch (e) { console.warn('warm', e); }
   if (CONFIG.perf) window.VY.Perf.toggle(true);
 
   // ---------- 3) chuyển map (có fade + loading; ĐỘC LẬP từng người, không kéo người kia theo) ----------
@@ -125,5 +126,7 @@ async function boot() {
     FEATURES.forEach(load => load().then(m => host.register(m.default)).catch(e => console.warn('[features] không nạp được', e)));
   } catch (e) { console.warn('[features]', e); }
   LB(100, 'Xong!'); setTimeout(reveal, 250);
+  // tải nền sẵn map mà cửa/cổng của map này dẫn tới (HTTP cache) → lúc bấm chuyển map chỉ còn dựng cảnh, vào nhanh
+  setTimeout(() => { const t = (MAP_CONFIGS[mapId] || {}).doorTo; if (t) prefetchMap(t); }, 1200);
 }
 boot().catch(fail);

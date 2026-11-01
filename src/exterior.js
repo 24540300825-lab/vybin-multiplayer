@@ -115,15 +115,43 @@ export function setupExterior(c) {
       if (gi.h < 0.9) r.userData.squash = true;             // hoa thấp: cúi xuống quanh chân người chơi
       else r.userData.occ = true;                           // bụi/cây cao: mờ dần khi chắn giữa camera và người
       // lá chưa có màu/texture (trắng): tô xanh lá theo palette của các lá có màu trong file
-      if (!r.map && r.color.r > 0.95 && r.color.g > 0.95 && r.color.b > 0.95) r.color.setRGB(0.30, 0.42, 0.04);
+      if (!r.map && r.color.r > 0.95 && r.color.g > 0.95 && r.color.b > 0.95) {
+        if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.map = FOLMAP; r.color.set(0xffffff); }     // bụi: UV trỏ vào gradient xanh của foliage-a → mỗi mảng lá lệch tông nhẹ (như texture mode ở Blender)
+        else r.color.setRGB(0.30, 0.42, 0.04);
+      }
     }
     r.metalness = 0; r.roughness = 1;
     toonMat(r); matCache.set(key, r); return r;
   }
 
-  // đá dẫn đường: màu gốc trong file vàng đậm (1, .86, .29) → giảm bão hoà về kem trắng
-  const pathDone = new Set();
-  env.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) if (m && /^M_PathStone/.test(m.name || '') && !pathDone.has(m)) { pathDone.add(m); m.color.setRGB(0.86, 0.84, 0.74); } });
+  // ---- vật liệu & dọn dẹp theo feedback ----
+  const tintMats = {rock: [], path: []};
+  const PATHC = [0.86, 0.84, 0.74];      // đá dẫn đường: kem trắng (file gốc vàng đậm) — đá rời lấy cùng màu
+  let FOLMAP = null, roofMat = null;
+  const dropList = [];
+  env.traverse(o => {
+    if (!o.isMesh) return;
+    for (const m of [].concat(o.material)) {
+      if (!m) continue;
+      const nm = m.name || '';
+      if (/^M_PathStone/.test(nm) && !tintMats.path.includes(m)) { tintMats.path.push(m); m.color.setRGB(...PATHC); }
+      if (/^ROCK$/.test(nm) && !tintMats.rock.includes(m)) { tintMats.rock.push(m); m.color.setRGB(...PATHC); }
+      if (m.map && m.map.name === 'foliage-a-v01') FOLMAP = m.map;
+      if (nm === 'Stylized Brick Wall' && !roofMat) roofMat = m;
+    }
+    // mặt phẳng scatter (không vật liệu, phẳng, rộng) — chỉ dùng để rải cây ở Blender → bỏ
+    if (!o.isInstancedMesh && !(o.material && (o.material.name || (Array.isArray(o.material) && o.material.length)))) {
+      const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(new THREE.Vector3());
+      if (sz.y < 0.2 && sz.x * sz.z > 4) dropList.push(o);
+    }
+  });
+  dropList.forEach(o => o.removeFromParent());
+  // mái ngói hiên cửa chính: file gán nhầm vật liệu bê tông (nhạt) → dùng chung vật liệu ngói với mái nhà
+  if (roofMat) env.traverse(o => {
+    if (!o.isMesh || !/^Entrance_Hood_TileRoof/.test(o.name)) return;
+    if (Array.isArray(o.material)) o.material = o.material.map(m => (/^Stylized Concrete/.test(m.name || '') ? roofMat : m));
+    else if (/^Stylized Concrete/.test(o.material.name || '')) o.material = roofMat;
+  });
 
   // ---- 2) gom InstancedMesh lớn ra khỏi env → chia ô ----
   const lst = [];
@@ -153,8 +181,10 @@ export function setupExterior(c) {
     const CL = CLASS[cls];
     // ma trận thế giới của mọi bản thể (dùng bản của mesh đầu để đặt vị trí; các primitive cùng nút có chung ma trận)
     const ref = set[0]; ref.updateWorldMatrix(true, false);
-    const W = ref.matrixWorld, mats = [];
-    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); mats.push(tmpM.clone().premultiply(W)); }
+    const W = ref.matrixWorld; let mats = [];
+    const hb = MC.houseBox;
+    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (hb) { V3.setFromMatrixPosition(mm); if (V3.x > hb[0] && V3.x < hb[1] && V3.z > hb[2] && V3.z < hb[3]) continue; } mats.push(mm); }
+    if (!mats.length) { set.forEach(m => m.removeFromParent()); continue; }
     nIn += mats.length;
     templates[cls].push({set, mats});
     // vật cản: thân cây / đá
@@ -285,5 +315,5 @@ export function setupExterior(c) {
     }
     for (const h of hazes) { h.position.x = target.x; h.position.z = target.z; if (fogColor) h.material.uniforms.uCol.value.copy(fogColor);  }
   }
-  return {colliders, update, setLevel, getLevel: () => level, cells, hazes, group, depthMat};
+  return {tintMats, colliders, update, setLevel, getLevel: () => level, cells, hazes, group, depthMat};
 }

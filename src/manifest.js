@@ -17,8 +17,8 @@ export const FILES = {
  },
  "map-exterior": {
   "file": "map-exterior.glb",
-  "v": "c23814c0",
-  "size": 8952696
+  "v": "0e9de476",
+  "size": 6817120
  },
  "map-house": {
   "file": "map-house.glb",

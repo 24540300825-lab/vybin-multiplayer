@@ -74,7 +74,7 @@ export function init(ctx){
            _p=instanceMatrix*_p;
           #endif
           vWP=(modelMatrix*_p).xyz;}`);
-        if(F2||GB){sh.uniforms.uCenter={value:m.userData.center||new THREE.Vector3(0,0.65,0)};sh.uniforms.uHInv={value:m.userData.hInv||0.66};sh.uniforms.uWindDir=FU.uWindDir;sh.uniforms.uHybrid=FU.uHybrid;sh.uniforms.uBaseShade=FU.uBaseShade;sh.uniforms.uFolEmi=FU.uFolEmi;sh.uniforms.uGMap=FU.uGMap;sh.uniforms.uGK=FU.uGK;sh.uniforms.uPl=FU.uPl;sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}
+        if(F2||GB){sh.uniforms.uCenter={value:m.userData.center||new THREE.Vector3(0,0.65,0)};sh.uniforms.uHInv={value:m.userData.hInv||0.66};sh.uniforms.uWindDir=FU.uWindDir;sh.uniforms.uHybrid=FU.uHybrid;sh.uniforms.uBaseShade=FU.uBaseShade;sh.uniforms.uFolEmi=FU.uFolEmi;sh.uniforms.uGMap=FU.uGMap;sh.uniforms.uGK=FU.uGK;sh.uniforms.uPl=FU.uPl;sh.uniforms.uFolTint=FU.uFolTint;sh.uniforms.uFolVar=FU.uFolVar;sh.uniforms.uGrTint=FU.uGrTint;sh.uniforms.uGrVar=FU.uGrVar;sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}
         sh.vertexShader=(SW?'#define SWAYX\n':'')+'varying vec3 vWP;uniform float uWindT,uWindA;\n'+VS0;
         sh.fragmentShader=(FOL?'#define FOLIAGE\n':'')+(F2?'#define FOL2\n':'')+(GB?'#define GRASSB\n':'')+(GRD?'#define GROUNDX\n':'')+((F2||GB)?FRAG_PARS:'')+'uniform float uInHK;uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <normal_fragment_begin>',(F2||GB)?'#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\nnormal*=(gl_FrontFacing?1.0:-1.0);\n#endif\n'+(m.userData.occ?OCC_GLSL:''):'#include <normal_fragment_begin>').replace('#include <opaque_fragment>',`
         {float I=1.0,Ih=1.0,vis=1.0,Ig=0.0;
@@ -158,7 +158,7 @@ ${FRAG_COLOR}
   if(MC.hide)env.traverse(o=>{if(MC.hide.test(o.name)||(o.isMesh&&o.material&&MC.hide.test(o.material.name||'')))o.visible=false});
   env.updateMatrixWorld(true);
   let EXT=null;
-  if(OUTD){EXT=setupExterior({scene,env,MC,toonMat});for(let i=envMeshes.length-1;i>=0;i--)if(!envMeshes[i].parent)envMeshes.splice(i,1);
+  if(OUTD){const _t0=performance.now();EXT=setupExterior({scene,env,MC,toonMat});console.log('[ext] setup '+Math.round(performance.now()-_t0)+'ms');if(/[?&]tune\b/.test(location.search))import('./tune.js').then(m=>m.mountTune(EXT,FU));for(let i=envMeshes.length-1;i>=0;i--)if(!envMeshes[i].parent)envMeshes.splice(i,1);
     env.traverse(o=>{if(o.isMesh&&/^Stylized Grass$/.test((o.material&&o.material.name)||''))o.visible=false;if(o.isMesh&&/^\.SF_/.test(o.name))o.visible=false});env.updateMatrixWorld(true)}
   const A={};A.L0=OUTD?(MC.floorY||0):0;A.L1=OUTD?A.L0+3:box(MC.mezz[0]).max.y;
   // cầu thang: gom thành danh sách; profile độ cao lấy bằng raycast rồi làm mượt
@@ -937,7 +937,8 @@ ${FRAG_COLOR}
     if(MC.lift){const LIFT=MC.lift;env.children.forEach(c=>{if(/^(Plane|tree|bush|SF_)/.test(c.name))c.position.y+=LIFT});env.updateMatrixWorld(true)}
     const keep=new Set();doorList.forEach(d=>keep.add(d.node));if(CHAIR)keep.add(CHAIR);if(byName['Bed'])keep.add(byName['Bed']);
     envG.animations.forEach(c=>c.tracks.forEach(t=>{const pn=THREE.PropertyBinding.parseTrackName(t.name);const n=THREE.PropertyBinding.findNode(env,pn.nodeName);if(n)keep.add(n)}));
-    const prot=o=>{for(let p=o;p;p=p.parent)if(keep.has(p))return true;return false};
+    const keepAnc=new Set();keep.forEach(n=>{for(let p=n.parent;p;p=p.parent)keepAnc.add(p)});   // cha của cánh cửa/vật animation (vd Door_Main là mesh có con = 2 cánh) cũng không được gộp, nếu không cả cây con bị gỡ khỏi cảnh
+    const prot=o=>{if(keepAnc.has(o))return true;for(let p=o;p;p=p.parent)if(keep.has(p))return true;return false};
     const OUT=MC.out;
     const outsideRoot=o=>{for(let p=o;p&&p!==env;p=p.parent)if(OUT.test(p.name))return true;return false};
     // texture: anisotropy cao để cảnh ngoài cửa sổ không bị sạn/nhấp nháy

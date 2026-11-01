@@ -11,6 +11,10 @@ export const FU = {
   uFolEmi: {value: 0.16},      // phần "phát sáng": cộng lại màu gốc để vùng bóng vẫn rực, không xám
   uGMap: {value: null},        // texture nền (cỏ lấy màu theo đúng điểm nền nó đứng)
   uGK: {value: 0.0846},        // 110 / 1300: bước lặp texture nền theo mét (khớp CircleGeometry bán kính 650 với repeat 110)
+  uFolTint: {value: new THREE.Color(1, 1, 1)},   // nhân vào màu nền lá/cây/hoa (panel ?tune)
+  uFolVar: {value: new THREE.Vector2(0.05, 0.14)},   // biến thiên ngẫu nhiên theo từng cây/bụi: x = lệch hue (vòng), y = lệch sáng
+  uGrTint: {value: new THREE.Color(1, 1, 1)},    // nhân vào màu cỏ (cỏ vốn lấy màu theo nền)
+  uGrVar: {value: new THREE.Vector2(0.04, 0.10)},
   uPl: {value: [new THREE.Vector3(1e5, 0, 1e5), new THREE.Vector3(1e5, 0, 1e5)]},   // vị trí 2 người chơi: cỏ/hoa quanh chân bị "đạp" thấp xuống để thấy nhân vật
   uOcc: {value: new THREE.Vector4(0, 0, 0, 0)},   // camera (xyz) + bật/tắt
   uOccPl: {value: new THREE.Vector3()},           // điểm ngắm trên người (cây/bụi nằm chắn giữa camera và người sẽ mờ dần kiểu dither)
@@ -69,11 +73,18 @@ export function vertFol2(vs, withCloud, noise, squash) {
 }
 
 // phần cộng thêm vào fragment (đặt ngay trước tính tông toon): chỉnh diffuseColor
-export const FRAG_PARS = 'uniform vec4 uOcc;uniform vec3 uOccPl;uniform float uBaseShade,uFolEmi,uGK;uniform sampler2D uGMap;varying float vLeafH,vHash,vCS;varying vec2 vRoot;\n';
+export const FRAG_PARS = 'uniform vec3 uFolTint,uGrTint;uniform vec2 uFolVar,uGrVar;\n' + `vec3 varyCol( vec3 c, float h, vec2 v ) {
+  float a = ( h - 0.5 ) * 12.566371 * v.x; float cs = cos( a ), sn = sin( a );
+  float y = dot( c, vec3( 0.299, 0.587, 0.114 ) ), i = dot( c, vec3( 0.596, -0.274, -0.322 ) ), q = dot( c, vec3( 0.211, -0.523, 0.312 ) );
+  float i2 = i * cs - q * sn, q2 = i * sn + q * cs;
+  c = vec3( y + 0.956 * i2 + 0.621 * q2, y - 0.272 * i2 - 0.647 * q2, y - 1.106 * i2 + 1.703 * q2 );
+  return max( c * ( 1.0 + ( fract( h * 13.7 ) - 0.5 ) * 2.0 * v.y ), 0.0 );
+}
+` + 'uniform vec4 uOcc;uniform vec3 uOccPl;uniform float uBaseShade,uFolEmi,uGK;uniform sampler2D uGMap;varying float vLeafH,vHash,vCS;varying vec2 vRoot;\n';
 export const FRAG_COLOR = `
 #ifdef FOL2
  { diffuseColor.rgb *= mix( uBaseShade, 1.0, smoothstep( 0.0, 0.85, vLeafH ) );
-   diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3( 1.10, 1.03, 0.82 ), vHash * 0.55 ); }
+   diffuseColor.rgb = varyCol( diffuseColor.rgb * uFolTint, vHash, uFolVar ); }
 #endif
 #ifdef GRASSB
  { vec3 gt = texture2D( uGMap, vec2( 55.0 + vRoot.x * uGK, 55.0 - vRoot.y * uGK ) ).rgb;
@@ -81,7 +92,7 @@ export const FRAG_COLOR = `
    vec3 gc = mix( gt, mix( uGrassA, uGrassB, smoothstep( 0.08, 0.6, glm ) ), 0.75 );
    vec3 tip = gc * vec3( 1.06, 1.05, 0.92 );
    vec3 c = mix( gc * 0.74, tip, smoothstep( 0.0, 0.9, vLeafH ) );
-   diffuseColor.rgb = mix( c, c * vec3( 1.08, 1.03, 0.86 ), vHash * 0.5 ); }
+   diffuseColor.rgb = varyCol( c * uGrTint, vHash, uGrVar ); }
 #endif
 `;
 
