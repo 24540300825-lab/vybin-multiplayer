@@ -15,7 +15,7 @@ export function parseSource(text) {
   const s = String(text || '').trim(); if (!s) return null;
   const y = parseYouTube(s); if (y && y.v) return {type: 'yt', id: y.v};
   let u; try { u = new URL(/^https?:\/\//i.test(s) ? s : 'https://' + s); } catch (e) { return null; }
-  if (!/^https?:$/.test(u.protocol) || !u.hostname.includes('.')) return null;
+  if (!/^https?:$/.test(u.protocol) || !(u.hostname.includes('.') || u.hostname === 'localhost')) return null;
   const h = u.hostname.replace(/^(www|m|mobile)\./, ''), path = u.pathname;
   let m;
   if (h === 'vimeo.com' || h === 'player.vimeo.com') { m = path.match(/(?:\/video)?\/(\d{5,})/); if (m) return {type: 'vimeo', id: m[1]}; }

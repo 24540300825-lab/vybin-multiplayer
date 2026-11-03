@@ -813,7 +813,7 @@ html.shell,html.shell body{margin:0;width:100%;height:100%;overflow:hidden;backg
 #cine .cAsk{position:absolute;left:50%;top:5.25rem;transform:translateX(-50%);display:flex;align-items:center;gap:.75rem;padding:.625rem .75rem;border-radius:1.25rem;background:var(--panel);border:1px solid var(--line);z-index:4;box-shadow:0 .75rem 2rem rgba(0,0,0,.5)}
 #cine .cAsk img{width:2.5rem;height:2.5rem;border-radius:50%}#cine .cAsk div{display:flex;flex-direction:column}#cine .cAsk small{color:var(--ink2);font-size:var(--t0)}
 /* tạm rời: khung nhỏ góc dưới trái, trên HUD (không che 3D) */
-#cine.mini{inset:auto auto 1rem 1rem;width:min(22rem,calc(100vw - 2rem));pointer-events:none}
+#cine.mini{inset:auto auto 7.5rem 1rem;width:min(22rem,calc(100vw - 2rem));pointer-events:none}
 #cine.mini .cBack,#cine.mini .cTop,#cine.mini .cBar,#cine.mini .cLib,#cine.mini .cAsk{display:none}
 #cine.mini .cStage{position:static;padding:0;display:block}
 #cine.mini .cScreen{width:100%;border-radius:1rem;pointer-events:auto;box-shadow:0 .75rem 2rem rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.12)}

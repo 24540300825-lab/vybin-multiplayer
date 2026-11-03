@@ -2,13 +2,13 @@
 export const FILES = {
  "char-bin": {
   "file": "char-bin.glb",
-  "v": "2bb9a9ff",
-  "size": 6322916
+  "v": "ef44bec2",
+  "size": 6372848
  },
  "char-vy": {
   "file": "char-vy.glb",
-  "v": "69ed7293",
-  "size": 6187732
+  "v": "22675d3b",
+  "size": 6215660
  },
  "grass-mask": {
   "file": "grass-mask.png",
