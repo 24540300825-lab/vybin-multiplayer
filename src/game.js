@@ -40,13 +40,13 @@ export function init(ctx){
   document.body.appendChild(renderer.domElement);
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x1a2030);
   const camera=new THREE.PerspectiveCamera(18,innerWidth/innerHeight,1,900);
-  camera.position.set((MAP_CONFIGS[window.MAPID]||{}).camMirror?-7:17,16,23);   // camMirror: nhìn từ bên trái (phòng Bin: cánh nhà bên phải sẽ che nếu nhìn từ phải)
+  camera.position.set((MAP_CONFIGS[window.MAPID]||{}).camMirror?2:17,16,23);   // camMirror: nhìn từ bên trái (phòng Bin: cánh nhà bên phải sẽ che nếu nhìn từ phải)
   const controls=new OrbitControls(camera,renderer.domElement);
   controls.target.set(5,2,-4);controls.enableDamping=true;controls.minDistance=14;controls.maxDistance=38;controls.enablePan=true;controls.screenSpacePanning=false;controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.PAN};controls.update();
   {const az=controls.getAzimuthalAngle(),po=controls.getPolarAngle();controls.minAzimuthAngle=az-CFG.camPan;controls.maxAzimuthAngle=az+CFG.camPan;controls.minPolarAngle=po-CFG.camTilt;controls.maxPolarAngle=po+CFG.camTilt;}
   // phòng Vy / phòng Bin nằm sát cánh nhà bên cạnh (Vy: bên trái, Bin: bên phải): không cho xoay camera vòng sang phía đó
   // — xoay sang là tường nhà bên chắn ngang cầu thang (nhân vật bị khoét/nhấp nháy trong tường, trông như đi xuyên)
-  {const mc=MAP_CONFIGS[window.MAPID]||{},dx=mc.ext&&mc.ext.dx;if(dx){const az=controls.getAzimuthalAngle();if(dx<0)controls.minAzimuthAngle=az-0.06;else controls.maxAzimuthAngle=az+0.06}}
+  {const mc=MAP_CONFIGS[window.MAPID]||{},dx=mc.ext&&mc.ext.dx;if(dx){const az=controls.getAzimuthalAngle();if(dx<0)controls.minAzimuthAngle=az-0.06;else{controls.maxAzimuthAngle=az+0.06;controls.minAzimuthAngle=Math.max(controls.minAzimuthAngle,az-0.3)}}}   // phòng Bin: nhìn gần chính diện (xoay trái nhiều là thấy mặt ngoài tường hông)
 
   // lights
   const hemi=new THREE.HemisphereLight(0xdfe8ff,0x8a7f73,0.9);scene.add(hemi);
@@ -192,7 +192,9 @@ ${FRAG_COLOR}
     if(X.roofX!=null){const c=new THREE.Vector3(),M=new THREE.Matrix4();extG.traverse(o=>{if(!o.isInstancedMesh)return;let p=o.parent,inHouse=false;for(;p;p=p.parent)if(/^HOUSE_L1/.test(p.name))inHouse=true;if(!inHouse)return;
       o.geometry.computeBoundingBox();const gc=o.geometry.boundingBox.getCenter(new THREE.Vector3());
       for(let i=0;i<o.count;i++){o.getMatrixAt(i,M);c.copy(gc).applyMatrix4(M).applyMatrix4(o.matrixWorld);if(Math.abs(c.x-(X.roofX+(X.dx||0)))<3){M.makeScale(0,0,0);o.setMatrixAt(i,M);o.instanceMatrix.needsUpdate=true}}})}
-    extG.traverse(o=>{if(!o.isMesh||!o.visible)return;let p=o.parent,inHouse=false;for(;p;p=p.parent)if(/^HOUSE_L1/.test(p.name))inHouse=true;if(inHouse)[].concat(o.material).forEach(mm=>{if(mm)mm.userData.occW=true})});
+    // chỉ khoét TƯỜNG khi chắn camera — mái ngói (instancing / tên Roof) luôn giữ nguyên: khoét mái lộ ra bên trong rỗng, rất xấu
+    extG.traverse(o=>{if(!o.isMesh||!o.visible||o.isInstancedMesh)return;let p=o.parent,inHouse=false,roof=/Roof|Tile/i.test(o.name);for(;p;p=p.parent){if(/^HOUSE_L1/.test(p.name))inHouse=true;if(/Roof|Tile/i.test(p.name))roof=true}
+      if(inHouse&&!roof)[].concat(o.material).forEach(mm=>{if(mm&&!/Roof|Tile/i.test(mm.name||''))mm.userData.occW=true})});
     toonify(extG);scene.add(extG);extG.updateMatrixWorld(true);
     const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
     const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null};
@@ -222,20 +224,25 @@ ${FRAG_COLOR}
   const inStair=(x,z)=>!!stairAt(x,z);
   const stairY=(S,z)=>Math.min(S.top,Math.max(0,S.a+S.b*(S.z1-z)));
   const heightAt=(x,z,lv)=>{const S=stairAt(x,z);if(S)return stairY(S,z);
-    if(!lv)for(const T of stairs){if(x>T.x0&&x<T.x1&&z>=T.z1&&z<T.z1+0.34)return stairY(T,T.z1)*(1-(z-T.z1)/0.34);
-      if(T.side&&z>T.z1-0.7&&z<T.z1){const d=T.side.dir<0?T.x0-x:x-T.x1;if(d>=0&&d<0.3)return stairY(T,z)*(1-d/0.3)}}   // chân chạm bậc đầu êm trước khi vào cầu thang
+    if(!lv)for(const T of stairs){if(x>T.x0&&x<T.x1&&z>=T.z1&&z<T.z1+0.34)return stairY(T,T.z1)*(1-(z-T.z1)/0.34)}   // chân chạm bậc đầu êm trước khi vào cầu thang
     if(!lv&&EXT){const y=EXT.walkHeight(x,z);if(y!=null)return y}
     return lv?A.L1:A.L0};
   A.stairs=stairs;
   const pickStair=(x0,z0,x1,z1,up)=>{let best=stairs[0],bd=1e9;for(const S of stairs){const a=up?S.botZ:S.topZ,b=up?S.topZ:S.botZ,d=Math.hypot(x0-S.cx,z0-a)+Math.hypot(S.cx-x1,b-z1);if(d<bd){bd=d;best=S}}return best};
   // ===== đèn trong nhà → các "vũng sáng" cục bộ (đèn thả bếp, đèn sàn, đèn bàn…): gần đèn sáng ấm, xa đèn tối dần =====
   const LAMPS=[];
-  {env.updateMatrixWorld(true);const pend=[],other=[];
+  {env.updateMatrixWorld(true);const pend=[],other=[],studioP=[],studioO=[];
    env.traverse(o=>{const n=o.name||'';
      if(/^Pendant_(?:[A-Za-z0-9]+_)?Bulb(?:\.?\d+)?$/.test(n))pend.push(o);
-     else if(/^(FloorLamp_Shade|SideLamp_Shade|BedsideLamp_Shade(?:\.?\d+)?|Bedside_Lamp_Shade|DeskLamp_Head)$/.test(n))other.push(o)});
+     else if(/^(FloorLamp_Shade|SideLamp_Shade|BedsideLamp_Shade(?:\.?\d+)?|Bedside_Lamp_Shade|DeskLamp_Head)$/.test(n))other.push(o);
+     // phòng Vy / Bin: đèn liền khối (dây + chao + bóng) → lấy đáy chao làm bóng đèn
+     else if(/^Pendant_(?:L\d+|\d+|Bar_?\d+)$/.test(n))studioP.push(o);
+     else if(/^(Floor_Lamp|Bedside_Lamp(?:_\d)?|Bedside_\d)$/.test(n))studioO.push(o)});
    const add=(o,r)=>{const b=new THREE.Box3().setFromObject(o);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3());LAMPS.push(new THREE.Vector4(c.x,c.y-0.05,c.z,r))};
    pend.forEach(o=>add(o,2.4));other.forEach(o=>add(o,/Floor|Side/.test(o.name)?2.0:1.3));
+   const addAt=(o,r,f)=>{const b=new THREE.Box3().setFromObject(o);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3());LAMPS.push(new THREE.Vector4(c.x,f(b),c.z,r))};
+   studioP.forEach(o=>addAt(o,/Bar/.test(o.name)?1.6:2.4,b=>b.min.y+0.12));
+   studioO.forEach(o=>addAt(o,/Floor/.test(o.name)?2.0:1.3,b=>b.max.y-0.15));
    LAMPS.length=Math.min(LAMPS.length,10);
    LAMPS.forEach((v,i)=>TU.uLP.value[i].copy(v));TU.uLN.value=LAMPS.length;window.__LAMPS=LAMPS}
   const seat=OUTD?null:box(MC.seat);A.seatC=seat?seat.getCenter(new THREE.Vector3()):null;A.seatTop=seat?seat.max.y:0;
@@ -250,8 +257,22 @@ ${FRAG_COLOR}
   const G=OUTD?{...MC.grid,R:0.13}:{x0:-1,z0:-9,c:0.1,W:125,H:100,R:0.13};
   const blocked=[new Uint8Array(G.W*G.H),new Uint8Array(G.W*G.H)],cols=[[],[]];
   if(OUTD){for(const b of EXT.colliders.boxes)cols[0].push(b)}
+  // MC.triCol (phòng Vy/Bin): đồ đạc trong file bị GỘP thành khối lớn (vd. cột + dầm mép gác chung 1 mesh) → hộp bao chặn oan cả dải phòng.
+  // Thay bằng quét đúng tam giác thật nằm trong dải cao chân→hông (0.12–0.9 m trên mặt sàn) rồi nở ra bằng bán kính nhân vật.
+  const triRaw=MC.triCol?[new Uint8Array(G.W*G.H),new Uint8Array(G.W*G.H)]:null;
+  function rasterMesh(m){const g=m.geometry,pa=g&&g.attributes.position;if(!pa)return;const idx=g.index,n=idx?idx.count:pa.count,M=m.matrixWorld;
+    const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),p=new THREE.Vector3();
+    for(let t=0;t<n;t+=3){const ia=idx?idx.getX(t):t,ib=idx?idx.getX(t+1):t+1,ic=idx?idx.getX(t+2):t+2;
+      a.fromBufferAttribute(pa,ia).applyMatrix4(M);b.fromBufferAttribute(pa,ib).applyMatrix4(M);c.fromBufferAttribute(pa,ic).applyMatrix4(M);
+      const y0=Math.min(a.y,b.y,c.y),y1=Math.max(a.y,b.y,c.y);
+      [A.L0,A.L1].forEach((fy,lv)=>{const lo=fy+0.12,hi=fy+0.9;if(y1<lo||y0>hi)return;
+        const e=Math.max(a.distanceTo(b),b.distanceTo(c),c.distanceTo(a)),k=Math.max(1,Math.ceil(e/0.05));
+        for(let i=0;i<=k;i++)for(let j=0;j<=k-i;j++){const u=i/k,v=j/k,w=1-u-v;p.set(a.x*w+b.x*u+c.x*v,a.y*w+b.y*u+c.y*v,a.z*w+b.z*u+c.z*v);
+          if(p.y<lo||p.y>hi)continue;const ci=Math.floor((p.x-G.x0)/G.c),cj=Math.floor((p.z-G.z0)/G.c);if(ci>=0&&cj>=0&&ci<G.W&&cj<G.H)triRaw[lv][cj*G.W+ci]=1}})}}
+  if(triRaw)env.updateMatrixWorld(true);
   for(const m of (OUTD?[]:envMeshes)){
     if(/^Stair/.test(m.name)||isUnder(m,CHAIR.name))continue;
+    if(triRaw){if(!m.isInstancedMesh&&!/^Stair/.test((m.parent&&m.parent.name)||''))rasterMesh(m);continue}
     if(m.isInstancedMesh)continue;      // cây/cỏ instancing: Box3 chỉ tính bản mẫu ở gốc toạ độ (0,0,0) → vật cản "ma" chặn nhầm miệng cầu thang trái (các bản thật nằm ngoài nhà)
     const b=new THREE.Box3().setFromObject(m);if(b.isEmpty())continue;
     if((b.max.x-b.min.x)*(b.max.z-b.min.z)>14)continue;
@@ -262,6 +283,8 @@ ${FRAG_COLOR}
     const i0=cl(Math.floor((b.min.x-G.R-G.x0)/G.c),0,G.W-1),i1=cl(Math.floor((b.max.x+G.R-G.x0)/G.c),0,G.W-1);
     const j0=cl(Math.floor((b.min.z-G.R-G.z0)/G.c),0,G.H-1),j1=cl(Math.floor((b.max.z+G.R-G.z0)/G.c),0,G.H-1);
     for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++)blocked[lv][j*G.W+i]=1;}});
+  if(triRaw){const r=Math.ceil(G.R/G.c);for(let lv=0;lv<2;lv++){const R0=triRaw[lv];for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){if(!R0[j*G.W+i])continue;
+      for(let dj=-r;dj<=r;dj++)for(let di=-r;di<=r;di++){if(di*di+dj*dj>r*r+1)continue;const x=i+di,z=j+dj;if(x>=0&&z>=0&&x<G.W&&z<G.H)blocked[lv][z*G.W+x]=1}}}}
   if(OUTD){for(const cc of EXT.colliders.circles){const rr=cc.r+G.R,i0=cl(Math.floor((cc.x-rr-G.x0)/G.c),0,G.W-1),i1=cl(Math.floor((cc.x+rr-G.x0)/G.c),0,G.W-1),j0=cl(Math.floor((cc.z-rr-G.z0)/G.c),0,G.H-1),j1=cl(Math.floor((cc.z+rr-G.z0)/G.c),0,G.H-1);
       for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;if((x-cc.x)**2+(z-cc.z)**2<=rr*rr)blocked[0][j*G.W+i]=1}
       cols[0].push(new THREE.Box3(new THREE.Vector3(cc.x-cc.r,A.L0,cc.z-cc.r),new THREE.Vector3(cc.x+cc.r,A.L0+1,cc.z+cc.r)))}
@@ -284,14 +307,14 @@ ${FRAG_COLOR}
   $('cCol').onchange=e=>colGroup.visible=e.target.checked;
   const cell=(x,z)=>[Math.floor((x-G.x0)/G.c),Math.floor((z-G.z0)/G.c)];
   const free=(lv,i,j)=>i>=0&&j>=0&&i<G.W&&j<G.H&&!blocked[lv][j*G.W+i];
-  // Cầu thang sát tường trước (phòng Vy / phòng Bin): không có chỗ đứng trước chân cầu thang → bước lên từ BÊN HÔNG ở bậc thấp nhất.
-  // Tự nhận ra: ô trước chân cầu thang bị chặn → chọn phía hông còn trống (cách chân cầu thang ~0.35 m, ngang bậc 1).
-  stairs.forEach(S=>{const c=cell(S.cx,S.botZ);if(free(0,c[0],c[1]))return;const sz=S.z1-0.35;
-    for(const sx of [S.x0-0.32,S.x1+0.32]){const k=cell(sx,sz);if(free(0,k[0],k[1])){S.side={x:sx,z:sz,dir:sx<S.cx?-1:1};break}}
-    if(!S.side)return;console.log('[stair] bước lên từ hông',JSON.stringify(S.side));
-    // mở vành đệm dọc hông ở đoạn bậc thấp để bước vào/ra ngang được (cả WASD lẫn click-đi)
-    for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;
-      if(z>S.z1-0.7&&z<S.z1+0.02&&(S.side.dir<0?x>S.side.x-0.1&&x<S.x0+0.02:x<S.side.x+0.1&&x>S.x1-0.02)){const c2=cell(x,z);const hit=cols[0].some(b=>x>b.min.x-0.05&&x<b.max.x+0.05&&z>b.min.z-0.05&&z<b.max.z+0.05);if(!hit)blocked[0][j*G.W+i]=0}}});
+  // Cầu thang sát tường trước (phòng Vy / phòng Bin): trước chân thang không có chỗ đứng thẳng trục → đi DỌC MÉP TRƯỚC tới đúng
+  // trục cầu thang rồi mới quay lên (đường xanh). Không bao giờ bước chéo/ngang vào thân thang (đường đỏ = dễ glitch).
+  stairs.forEach(S=>{const zF=Math.min(S.botZ,MC.walk0[3]-0.04);let room=0;for(let d=0.1;d<=0.5;d+=0.1){const c=cell(S.cx,zF+d);if(free(0,c[0],c[1])&&zF+d<MC.walk0[3]-0.04)room=d;else break}
+    if(room>=0.3)return;const dir=S.cx<(MC.walk0[0]+MC.walk0[1])/2?1:-1;let lx=null;
+    for(let d=0.7;d<=1.6;d+=0.1){const x=S.cx+dir*d,c=cell(x,zF);if(free(0,c[0],c[1])){lx=x;break}}
+    if(lx==null)return;S.front={zF,lx};
+    for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;if(Math.abs(z-zF)<0.1&&(x-S.cx)*dir>=-0.05&&(x-lx)*dir<=0.05)blocked[0][j*G.W+i]=0}
+    console.log('[stair] chân thang sát tường → đi dọc mép trước',JSON.stringify(S.front))});
   function los(lv,x0,z0,x1,z1,skipA,skipB){const d=Math.hypot(x1-x0,z1-z0),n=Math.max(1,Math.ceil(d/0.05));
     for(let k=0;k<=n;k++){const t=k/n,dd=t*d;if((skipA&&dd<0.25)||(skipB&&d-dd<0.25))continue;const [i,j]=cell(x0+(x1-x0)*t,z0+(z1-z0)*t);if(!free(lv,i,j))return false}return true}
   function findPath(x0,z0,x1,z1,lv,exact){
@@ -372,10 +395,17 @@ ${FRAG_COLOR}
 
 
   // ===== SOFA (xem TV): 2 đệm ngồi Sofa_Seat / Sofa_Seat001, hướng nhìn = từ sofa về phía màn TV =====
-  const SOFA=(()=>{if(OUTD)return null;const seats=['Sofa_Seat','Sofa_Seat001'].map(n=>byName[n]).filter(Boolean),tv=byName['TV_Screen']||byName['TV_Panel'];
-    if(!seats.length||!tv)return null;env.updateMatrixWorld(true);
-    const tb=new THREE.Box3().setFromObject(tv),tc=tb.getCenter(new THREE.Vector3());
-    const S=seats.map(o=>{const b=new THREE.Box3().setFromObject(o);return{c:b.getCenter(new THREE.Vector3()),top:b.max.y}});
+  // mặt màn TV: TV_Screen (phòng khách) hoặc MC.tv {node, mat}: mesh con có vật liệu mat (TV liền khối với kệ)
+  const tvScreenMeshes=(()=>{if(OUTD)return [];const o=byName['TV_Screen']||byName['TV_Panel']||(MC.tv&&byName[MC.tv.node]);if(!o)return [];const ms=[];
+    o.traverse(m=>{if(m.isMesh&&(!MC.tv||!MC.tv.mat||[].concat(m.material).some(x=>x&&x.name===MC.tv.mat)))ms.push(m)});return ms})();
+  const SOFA=(()=>{if(OUTD||!tvScreenMeshes.length)return null;env.updateMatrixWorld(true);
+    const tb=new THREE.Box3();tvScreenMeshes.forEach(m=>tb.union(new THREE.Box3().setFromObject(m)));const tc=tb.getCenter(new THREE.Vector3());
+    let S=['Sofa_Seat','Sofa_Seat001'].map(n=>byName[n]).filter(Boolean).map(o=>{const b=new THREE.Box3().setFromObject(o);return{c:b.getCenter(new THREE.Vector3()),top:b.max.y}});
+    if(!S.length&&MC.sofa&&byName[MC.sofa.node]){      // sofa liền khối: chia đôi theo chiều dài; tâm đệm lệch về mép trước (phía TV) ~40% bề sâu
+      const b=new THREE.Box3().setFromObject(byName[MC.sofa.node]),sz=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3()),longX=sz.x>sz.z;
+      const front=longX?Math.sign(tc.z-c.z):Math.sign(tc.x-c.x),depth=longX?sz.z:sz.x,len=(longX?sz.x:sz.z)-0.4;
+      S=[-1,1].map(k=>{const p=c.clone();if(longX){p.x+=k*len/4;p.z+=front*depth*0.1}else{p.z+=k*len/4;p.x+=front*depth*0.1}p.y=b.min.y+(MC.sofa.seatY||0.45);return{c:p,top:p.y}})}
+    if(!S.length)return null;
     const sc=S.reduce((a,x)=>a.add(x.c),new THREE.Vector3()).multiplyScalar(1/S.length);
     const yaw=Math.atan2(tc.x-sc.x,tc.z-sc.z),fwd=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
     // chừa ô đứng trước mỗi đệm (lưới va chạm bơm phồng quanh sofa chặn mất chỗ đứng để ngồi xuống)
@@ -626,10 +656,10 @@ ${FRAG_COLOR}
   function route(x,z,lv,run,exact){const it=[],s=startPos();let L=P.level,x0=s.x,z0=s.z;
     const add=pts=>pts.forEach(p=>it.push(wp(p.x,p.z,null,run)));
     if(L===0&&lv===1){const S=pickStair(x0,z0,x,z,true),cx=S.cx;
-      if(S.side){add(findPath(x0,z0,S.side.x,S.side.z,0,true));it.slice(-1).forEach(w=>w.strict=1);it.push(wp(cx,S.side.z,null,run,1),wp(cx,S.midZ,1,run),wp(cx,S.topZ,null,run));x0=cx;z0=S.topZ}
-      else{const ap=approachZ(cx,S.botZ,1,0);add(findPath(x0,z0,cx,ap,0,true));it.slice(-2).forEach(w=>w.strict=1);it.push(wp(cx,S.botZ,null,run,1),wp(cx,S.midZ,1,run),wp(cx,S.topZ,null,run));x0=cx;z0=S.topZ}}      // tới thẳng trục chân cầu thang rồi mới leo (không cắt góc từ bên hông)
+      if(S.front){const F=S.front;add(findPath(x0,z0,F.lx,F.zF,0,true));it.slice(-1).forEach(w=>w.strict=1);it.push(wp(cx,F.zF,null,run,1),wp(cx,S.z1-0.05,null,run,1),wp(cx,S.midZ,1,run),wp(cx,S.topZ,null,run));x0=cx;z0=S.topZ}
+      else{const ap=approachZ(cx,S.botZ,1,0);add(findPath(x0,z0,cx,ap,0,true));it.slice(-2).forEach(w=>w.strict=1);it.push(wp(cx,S.botZ,null,run,1),wp(cx,S.midZ,1,run),wp(cx,S.topZ,null,run));x0=cx;z0=S.topZ}}
     else if(L===1&&lv===0){const S=pickStair(x0,z0,x,z,false),cx=S.cx,ok=approachZ(cx,S.topZ,-1,1);add(findPath(x0,z0,cx,ok,1,true));it.slice(-2).forEach(w=>w.strict=1);
-      if(S.side){it.push(wp(cx,S.topZ,null,run,1),wp(cx,S.midZ,0,run),wp(cx,S.side.z,null,run,1),wp(S.side.x,S.side.z,null,run,1));x0=S.side.x;z0=S.side.z}
+      if(S.front){const F=S.front;it.push(wp(cx,S.topZ,null,run,1),wp(cx,S.midZ,0,run),wp(cx,F.zF,null,run,1),wp(F.lx,F.zF,null,run,1));x0=F.lx;z0=F.zF}
       else{it.push(wp(cx,S.topZ,null,run,1),wp(cx,S.midZ,0,run),wp(cx,S.botZ,null,run),wp(cx,approachZ(cx,S.botZ,1,0),null,run,1));x0=cx;z0=approachZ(cx,S.botZ,1,0)}}
     add(findPath(x0,z0,x,z,lv,exact));return it;}
   const leave=()=>{const k=busy&&busy.kind;return (P.mode==='bed'||k==='climbBed')?[{t:'offBed'}]:(P.mode==='sit'||P.mode==='type'||k==='climbChair')?[{t:'offChair'}]:(P.mode==='watch'||k==='climbWatch')?[{t:'offWatch'}]:[]};
@@ -766,19 +796,26 @@ ${FRAG_COLOR}
   function walkable(ox,oz,x,z){
     const S=stairAt(x,z),W=stairAt(ox,oz),ins=!!S,was=!!W,lv=(was&&!ins)?(z<W.midZ?1:0):P.level;
     if(ins){
-      if((x<S.x0+0.1||x>S.x1-0.1)&&!(S.side&&z>S.z1-0.7))return false;
+      if(x<S.x0+0.1||x>S.x1-0.1)return false;
       if(was&&W!==S)return false;
-      if(!was){const fromBottom=P.level===0&&oz>=S.z1-0.03&&z<oz,fromTop=P.level===1&&oz<=S.z0+0.08&&z>oz,
-        fromSide=!!S.side&&P.level===0&&z>S.z1-0.7&&(S.side.dir<0?ox<=S.x0+0.1&&x>ox:ox>=S.x1-0.1&&x<ox);if(!fromBottom&&!fromTop&&!fromSide)return false;}
+      if(!was){const fromBottom=P.level===0&&oz>=S.z1-0.03&&z<oz,fromTop=P.level===1&&oz<=S.z0+0.08&&z>oz;
+        // chỉ vào thang ở dải giữa (không lách từ mép/tay vịn)
+        if(!fromBottom&&!fromTop)return false;if(Math.abs(x-S.cx)>(S.x1-S.x0)/2-0.18)return false;}
       return true;}
-    if(was&&!ins){const atBot=z>=W.z1&&oz<W.z1,atTop=z<=W.z0&&oz>W.z0,atSide=!!W.side&&oz>W.z1-0.7&&(W.side.dir<0?x<W.x0-0.05:x>W.x1+0.05);
-      if(atSide)return free(0,...cell(x,z));
+    if(was&&!ins){const atBot=z>=W.z1&&oz<W.z1,atTop=z<=W.z0&&oz>W.z0;
       if((!atBot&&!atTop)||x<W.x0+0.02||x>W.x1-0.02)return false}   // đang ở trên cầu thang: chỉ được ra ở chân/đỉnh, đúng bề ngang bậc
     if(lv===0){const w=MC.walk0;if(x<w[0]||x>w[1]||z<w[2]||z>w[3])return false}
     else{const w=MC.l1;if(x<w[0]||x>w[1]||z<w[2]||z>(w[3]==null?stairs[0].z0+0.02:w[3]))return false}
     if(lv===A.chairL&&CHB&&x>CHB[0]&&x<CHB[2]&&z>CHB[1]&&z<CHB[3]&&!(ox>CHB[0]&&ox<CHB[2]&&oz>CHB[1]&&oz<CHB[3]))return false;
     const c=cell(x,z);return free(lv,c[0],c[1]);}
   function stepMove(dx,dz){
+    // ĐANG Ở TRÊN CẦU THANG (WASD): chỉ đi DỌC trục thang (lên/xuống), thành phần ngang bị bỏ, nhân vật tự trượt về giữa bậc.
+    // → không thể lạng sang tay vịn / tường / mép (vùng hay glitch); ra khỏi thang chỉ ở chân hoặc đỉnh.
+    {const W0=stairAt(P.pos.x,P.pos.z);if(W0){const ox=P.pos.x,oz=P.pos.z,mv=Math.hypot(dx,dz),along=Math.abs(dz)>=Math.abs(dx)*0.35?Math.sign(dz)*mv:0;
+      const nx=ox+(W0.cx-ox)*Math.min(1,0.35+mv*4),nz=oz+along;
+      if(along&&walkable(ox,oz,nx,nz)){P.pos.x=nx;P.pos.z=nz;P.yaw+=angDiff(along<0?Math.PI:0,P.yaw)*0.35;return}
+      if(along&&walkable(ox,oz,W0.cx,nz)){P.pos.x=W0.cx;P.pos.z=nz;P.yaw+=angDiff(along<0?Math.PI:0,P.yaw)*0.35;return}
+      P.sp*=0.5;return}}
     const ox=P.pos.x,oz=P.pos.z,nx=ox+dx,nz=oz+dz,W=stairAt(ox,oz),M=0.2;
     // phễu cầu thang: vào/ở trong cầu thang thì tự căn giữa (cách mép/tay vịn M), không bị kẹt
     // chỉ được vào cầu thang qua ĐẦU dưới (đang ở tầng 0, đi lên) hoặc ĐỈNH (đang ở tầng 1, đi xuống). Hông cầu thang đặc hoàn toàn.
@@ -953,7 +990,7 @@ ${FRAG_COLOR}
   // ===== nút tương tác ghim 3D: ghế / giường / TV / cửa (src/ui/pins.js; thông số Figma trong docs/UI.md) =====
   {const ctr=n=>{const o=byName[n];if(!o)return null;env.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(o);return b.isEmpty()?null:b};
    const mid=(b,dy)=>b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+dy,(b.min.z+b.max.z)/2):null;
-   const sofaB=ctr('Sofa'),bedB=ctr('Bed'),tvB=ctr('TV_Screen')||ctr('TV_Panel'),doorB=OUTD?ctr('Door_Main'):(ctr('Doormat')||ctr('Landing_Doormat')||ctr('Door_Entrance_Leaf')||ctr('GD_Door_Entrance_Leaf'));
+   const sofaB=ctr('Sofa'),bedB=ctr('Bed'),tvB=ctr('TV_Screen')||ctr('TV_Panel')||(MC.tv?ctr(MC.tv.node):null),doorB=OUTD?ctr('Door_Main'):(ctr('Doormat')||ctr('Landing_Doormat')||ctr('Door_Entrance_Leaf')||ctr('GD_Door_Entrance_Leaf'));
    const chairPt=A.seatC?new THREE.Vector3(A.seatC.x,A.seatTop+0.62,A.seatC.z):null;
    const bedPt=mid(bedB,0.25),tvPt=mid(tvB,0.35);
    const doorPt=doorB?new THREE.Vector3((doorB.min.x+doorB.max.x)/2,doorB.max.y+(doorB.max.y-doorB.min.y>0.5?-0.8:0.15),(doorB.min.z+doorB.max.z)/2):null;
@@ -1135,7 +1172,7 @@ ${FRAG_COLOR}
        if(g){o.geometry=g;nf++}});
      console.log('flat-shaded meshes: '+nf)}
     if(MC.lift){const LIFT=MC.lift;env.children.forEach(c=>{if(/^(Plane|tree|bush|SF_)/.test(c.name))c.position.y+=LIFT});env.updateMatrixWorld(true)}
-    const keep=new Set();doorList.forEach(d=>keep.add(d.node));if(CHAIR)keep.add(CHAIR);if(byName['Bed'])keep.add(byName['Bed']);
+    const keep=new Set();doorList.forEach(d=>keep.add(d.node));if(CHAIR)keep.add(CHAIR);if(byName['Bed'])keep.add(byName['Bed']);tvScreenMeshes.forEach(m=>keep.add(m));
     envG.animations.forEach(c=>c.tracks.forEach(t=>{const pn=THREE.PropertyBinding.parseTrackName(t.name);const n=THREE.PropertyBinding.findNode(env,pn.nodeName);if(n)keep.add(n)}));
     const keepAnc=new Set();keep.forEach(n=>{for(let p=n.parent;p;p=p.parent)keepAnc.add(p)});   // cha của cánh cửa/vật animation (vd Door_Main là mesh có con = 2 cánh) cũng không được gộp, nếu không cả cây con bị gỡ khỏi cảnh
     const prot=o=>{if(keepAnc.has(o))return true;for(let p=o;p;p=p.parent)if(keep.has(p))return true;return false};
@@ -1449,7 +1486,9 @@ ${FRAG_COLOR}
     void main(){float f=pow(clamp(1.0-vS,0.0,1.0),1.4)*smoothstep(0.0,0.07,vS);
       float n=vn3(vWp*vec3(2.6,1.0,2.6)+vec3(uT*0.06,uT*0.02,uT*0.045));
       float a=f*(0.35+1.0*n)*uI;gl_FragColor=vec4(uCol*a,a);}`;
-  env.traverse(o=>{if(!o.isMesh||!/^Win_\w+_Glass$/.test(o.name))return;
+  // cửa kính: Win_*_Glass (phòng khách) hoặc mesh kính (vật liệu *glass*) nằm trong node Win_* (phòng Vy/Bin: khung + kính liền 1 node)
+  const isWinGlass=o=>{if(/^Win_\w+_Glass$/.test(o.name))return true;if(!o.isMesh||![].concat(o.material).some(m=>m&&/(^|_)glass$/i.test(m.name||'')))return false;for(let p=o;p&&p!==env;p=p.parent)if(/^Win_/.test(p.name))return true;return false};
+  env.traverse(o=>{if(!o.isMesh||!isWinGlass(o))return;
     const b=new THREE.Box3().setFromObject(o),sz=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3());
     const ax=sz.x<sz.y&&sz.x<sz.z?0:(sz.z<sz.y?2:1);if(ax===1)return;
     const hc=new THREE.Vector3(5,2.5,-4);const sg=Math.sign(c.getComponent(ax)-hc.getComponent(ax))||1;
@@ -1662,12 +1701,13 @@ ${FRAG_COLOR}
   api.cineActive=()=>CINE.active;
   // ===== màn TV: tối khi tắt; bật thì sáng dịu, màu chuyển chậm (không vẽ nội dung video lên TV để khỏi tốn GPU) =====
   // TV: mesh TV_Screen = viền/khung (luôn đen). Mặt màn bên trong = tấm phẳng riêng, lùi vào 3 cm so với khung: tắt = đen bóng, bật = phát sáng.
-  const TVS=(()=>{const o=byName['TV_Screen']||byName['TV_Panel'];if(!o||!SOFA)return null;
+  const TVS=(()=>{if(!SOFA||!tvScreenMeshes.length)return null;
     const black=new THREE.MeshStandardMaterial({color:0x0b0b0d,roughness:0.55,metalness:0.1});toonMat(black);
-    o.traverse(m=>{if(m.isMesh){m.material=black}});
+    tvScreenMeshes.forEach(m=>{if(Array.isArray(m.material))m.material=m.material.map(x=>(!MC.tv||!MC.tv.mat||x.name===MC.tv.mat)?black:x);else m.material=black});
+    const INS=MC.tv&&MC.tv.inset!=null?MC.tv.inset:0.03;
     const b=SOFA.tvBox,sz=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3());
     const alongX=sz.x<sz.z,depth=alongX?sz.x:sz.z,face=alongX?(SOFA.center.x>c.x?1:-1):(SOFA.center.z>c.z?1:-1);
-    const W=(alongX?sz.z:sz.x)-0.06,H=sz.y-0.06;
+    const W=(alongX?sz.z:sz.x)-2*INS,H=sz.y-2*INS;
     const off=new THREE.MeshBasicMaterial({color:0x060608});
     const on=new THREE.ShaderMaterial({uniforms:{uT:{value:0},uI:{value:0}},toneMapped:false,
       vertexShader:'varying vec2 vU;void main(){vU=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
