@@ -257,7 +257,7 @@ export function setupExterior(c) {
     const ref = set[0]; ref.updateWorldMatrix(true, false);
     const W = ref.matrixWorld; let mats = [];
     const dt = MC.dropTrees;
-    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (dt && cls === 'tree') { V3.setFromMatrixPosition(mm); if (dt.some(q => Math.hypot(V3.x - q[0], V3.z - q[1]) < 1.6)) continue; } if (MC.noPlant) { V3.setFromMatrixPosition(mm); if (MC.noPlant.some(b => V3.x > b[0] && V3.x < b[1] && V3.z > b[2] && V3.z < b[3])) continue; }   // không mọc cây/cỏ trong lòng nhà (lộ ra ở các phòng mặt cắt) 
+    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (dt && cls === 'tree') { V3.setFromMatrixPosition(mm); if (dt.some(q => Math.hypot(V3.x - q[0], V3.z - q[1]) < 1.6)) continue; } if (MC.noPlant) { V3.setFromMatrixPosition(mm); const pd = cls === 'tree' ? 2.6 : cls === 'bush' ? 0.5 : 0; if (MC.noPlant.some(b => V3.x > b[0] - pd && V3.x < b[1] + pd && V3.z > b[2] - pd && V3.z < b[3] + pd)) continue; }   // cây to: chừa thêm 2.6 m quanh tường để tán không đâm xuyên vào phòng   // không mọc cây/cỏ trong lòng nhà (lộ ra ở các phòng mặt cắt) 
       mats.push(mm); }
     if (!mats.length) { set.forEach(m => m.removeFromParent()); continue; }
     nIn += mats.length;
@@ -365,6 +365,12 @@ export function setupExterior(c) {
     m.position.y = (MC.floorY || 0) + h / 2 - 1.5; m.renderOrder = 4 + i; m.frustumCulled = false; m.raycast = () => {}; scene.add(m); hazes.push(m);
   });
 
+  // cây/bụi lẻ (không instancing) sát tường nhà: tán cây đâm xuyên vào phòng → bỏ
+  if (MC.noPlant) { const sp = new THREE.Sphere(); let nRm = 0; env.updateMatrixWorld(true);
+    env.traverse(o => { if (!o.isMesh || o.isInstancedMesh || !o.visible) return; if (![].concat(o.material).some(m => m && /^Poly(Foliage|Shader)/i.test(m.name || ''))) return;
+      const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); sp.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); if (sp.radius > 12) return;
+      const pd = Math.min(3, sp.radius); if (MC.noPlant.some(b => sp.center.x > b[0] - pd && sp.center.x < b[1] + pd && sp.center.z > b[2] - pd && sp.center.z < b[3] + pd)) { let t = o; for (let q = o.parent; q && q !== env; q = q.parent) if (/^SF_|tree|bush/i.test(q.name)) t = q; t.visible = false; nRm++; } });   // ẩn cả cây (thân + cành + tán), không chỉ phần lá
+    if (nRm) console.log('exterior: bỏ ' + nRm + ' cây/bụi lẻ sát tường nhà'); }
   console.log('exterior: instanced in GLB ' + nIn + ' → ' + cells.length + ' ô; rải ngoài ' + JSON.stringify(farN) + '; vật cản tròn ' + colliders.circles.length + ', hộp ' + colliders.boxes.length);
 
   // ---- 6) cập nhật mỗi vài khung: LOD theo khoảng cách tới tâm nhìn + chất lượng ----

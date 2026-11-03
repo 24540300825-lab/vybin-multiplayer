@@ -162,6 +162,17 @@ ${FRAG_COLOR}
         #include <opaque_fragment>`)};
       m.customProgramCacheKey=()=>'vytoon9'+(m.userData.occW?'W':'')+(m.userData.fol2?'F':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
 
+  // mái ngói cánh Vy/Bin: GLB ngoại cảnh chỉ có mái cánh phòng khách (Roof_Living) → nhân bản sang 2 cánh kia
+  // (khớp kích thước mái gốc Roof_Vy/Roof_Bin trong LIVING_ROOM.glb: rộng 10.85, lệch tâm ±0.425, cao 6.4). skipX = x tâm cánh đang ở (giữ hở để nhìn vào)
+  function addWingRoofs(root,skipX){const L=root.getObjectByName('Roof_Living');if(!L)return;
+    const fit={WING_VY:[0.425,15],WING_BIN:[-0.425,-5]};
+    for(const w in fit){const W=root.getObjectByName(w);if(!W||W.getObjectByName('Roof_'+w.slice(5,6)+w.slice(6).toLowerCase()))continue;if(skipX!=null&&Math.abs(fit[w][1]-skipX)<3)continue;
+      const R=new THREE.Group();R.name='Roof_'+w.slice(5,6)+w.slice(6).toLowerCase();R.position.set(fit[w][0],6.4,0.015);R.scale.set(10.85/11,1,1);
+      const parts=L.isMesh?[L]:L.children.filter(c=>c.isMesh&&!/Gable/i.test(c.name));
+      parts.forEach(m=>{const c=new THREE.Mesh(m.geometry,m.material);c.name=R.name+'_'+m.name.split('_').pop();c.position.copy(m.position);c.quaternion.copy(m.quaternion);c.scale.copy(m.scale);c.castShadow=m.castShadow;c.receiveShadow=m.receiveShadow;R.add(c)});
+      W.add(R)}
+    root.updateMatrixWorld(true)}
+  if(MAP_CONFIGS[MAPID]&&MAP_CONFIGS[MAPID].outdoor)addWingRoofs(envG.scene,null);
   // env
   const env=envG.scene;toonify(env);scene.add(env);env.updateMatrixWorld(true);
   const envMeshes=[];const byName={};
@@ -188,13 +199,18 @@ ${FRAG_COLOR}
   let EXTV=null,extG=null;
   if(!OUTD&&MC.ext&&ctx.ext){const X=MC.ext,_t0=performance.now();extG=ctx.ext.scene;extG.name='__EXTERIOR__';
     extG.traverse(o=>{if((X.hide&&X.hide.test(o.name))||/^Interior_(Bin|Living|Vy)/.test(o.name))o.visible=false});   // hộp tối giả nội thất sau cửa sổ: kính đã đặc nên không cần, và để chỗ 'khoét' tường hàng xóm không lộ mảng đen
+    addWingRoofs(extG,X.roofX);
     extG.position.set(X.dx||0,0,X.dz||0);extG.updateMatrixWorld(true);
     if(X.roofX!=null){const c=new THREE.Vector3(),M=new THREE.Matrix4();extG.traverse(o=>{if(!o.isInstancedMesh)return;let p=o.parent,inHouse=false;for(;p;p=p.parent)if(/^HOUSE_L1/.test(p.name))inHouse=true;if(!inHouse)return;
       o.geometry.computeBoundingBox();const gc=o.geometry.boundingBox.getCenter(new THREE.Vector3());
       for(let i=0;i<o.count;i++){o.getMatrixAt(i,M);c.copy(gc).applyMatrix4(M).applyMatrix4(o.matrixWorld);if(Math.abs(c.x-(X.roofX+(X.dx||0)))<3){M.makeScale(0,0,0);o.setMatrixAt(i,M);o.instanceMatrix.needsUpdate=true}}})}
     // chỉ khoét TƯỜNG khi chắn camera — mái ngói (instancing / tên Roof) luôn giữ nguyên: khoét mái lộ ra bên trong rỗng, rất xấu
+    // vật liệu mái dùng CHUNG với tường (vd 'Stylized  wood') → nhân bản riêng cho mái (instancing + node Roof*) để cờ khoét không lan sang mái
+    {const cl=new Map(),isRoof=o=>{if(o.isInstancedMesh)return true;for(let p=o;p;p=p.parent)if(/Roof/i.test(p.name))return true;return false};
+     extG.traverse(o=>{if(!o.isMesh)return;let inHouse=false;for(let p=o.parent;p;p=p.parent)if(/^HOUSE_L1/.test(p.name))inHouse=true;if(!inHouse||!isRoof(o))return;
+       const f=m=>{if(!m)return m;let c=cl.get(m);if(!c){c=m.clone();c.userData={...m.userData,noOcc:true};cl.set(m,c)}return c};o.material=Array.isArray(o.material)?o.material.map(f):f(o.material)})}
     extG.traverse(o=>{if(!o.isMesh||!o.visible||o.isInstancedMesh)return;let p=o.parent,inHouse=false,roof=/Roof|Tile/i.test(o.name);for(;p;p=p.parent){if(/^HOUSE_L1/.test(p.name))inHouse=true;if(/Roof|Tile/i.test(p.name))roof=true}
-      if(inHouse&&!roof)[].concat(o.material).forEach(mm=>{if(mm&&!/Roof|Tile/i.test(mm.name||''))mm.userData.occW=true})});
+      if(inHouse&&!roof)[].concat(o.material).forEach(mm=>{if(mm&&!mm.userData.noOcc&&!/Roof|Tile/i.test(mm.name||''))mm.userData.occW=true})});
     toonify(extG);scene.add(extG);extG.updateMatrixWorld(true);
     const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
     const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null,indoor:true};
