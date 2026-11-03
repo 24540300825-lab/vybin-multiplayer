@@ -33,6 +33,16 @@ Lỗi trong 1 tính năng chỉ làm **tính năng đó** tắt, game vẫn ch�
 6. Thử `?solo&as=bin#map=xxx`, rồi chơi thử 2 người.
 Mẹo cầu thang: đặt các bậc có tên đúng mẫu, mỗi cầu thang 1 nhóm mesh; game tự đo độ cao bậc bằng tia ray nên không cần số liệu tay.
 
+### Phòng trong nhà dùng chung ngoại cảnh (living / vy / bin)
+- Mỗi phòng chỉ chứa NỘI THẤT (toạ độ x 0..10, z -8..0). Vỏ nhà + vườn lấy từ `map-exterior` (đúng bản đang chạy), dời bằng `MC.ext.dx/dz`.
+- `MC.ext.hide`: regex các mảng vỏ của chính cánh nhà đang đứng (bị cắt để nhìn vào); `roofX`: tâm mái (instancing) cần ẩn.
+- Tường/mái hàng xóm chắn giữa camera và nhân vật được "khoét" dither (`OCCW_GLSL`, cờ `material.userData.occW`).
+- `MC.doors` = ghim chuyển map; `MC.spawnFrom[mapVừaRời]` = [x,z,yaw,tầng]; `camMirror` = camera nhìn từ bên trái.
+- Cây cỏ ngoài vườn không mọc trong lòng nhà: `MAP_CONFIGS.exterior.noPlant` (hộp x0,x1,z0,z1 theo toạ độ vườn).
+- Chuẩn bị file phòng mới: `tools/prune_glb.py file.glb out.glb --keep TÊN_ROOT --rename '^GD_='` → `quantize_normals.py` → `optimize_anim.py` → `build_manifest.py`.
+  Cần các tên: `Stair` (cầu thang), `Mezzanine` (sàn gác), `Desk_Chair` + `Desk` (ghế quay về bàn), `Bed`, `Door_Entrance_Leaf` (cửa sang phòng khác).
+- Ghép clip mở cửa từ file khác (tự đổi tâm xoay bản lề): `tools/graft_anim.py`.
+
 ### Tối ưu asset trước khi đưa vào `assets/`
 - Nhân vật: `python3 tools/optimize_anim.py in.glb out.glb --rot 0.001 --pos 0.0003 --qrot` (bỏ khoá animation thừa + góc xoay int16; sai lệch < 1°).
 - Map: `python3 tools/quantize_normals.py in.glb q.glb && python3 tools/optimize_anim.py q.glb out.glb` (normal int8; `src/assets.js` tự đổi lại Float32 sau khi parse).

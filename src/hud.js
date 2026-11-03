@@ -25,7 +25,7 @@ import {Fx} from './ui/fx.js';
 
   $('sWho').textContent=(window.LOCAL_SLOT==='bin')?'Bin':'Vy';
   $('sChg').onclick=()=>{if(!confirm('Đổi nhân vật? Trang sẽ tải lại và hiện màn chọn Bin / Vy.'))return;try{localStorage.removeItem('vyChar')}catch(e){}const u=new URL(location.href);u.searchParams.delete('as');location.href=u.toString()};
-  {const MAPID=window.MAPID,MI={studio:['building','Studio (cũ)','Gác lửng 1 cầu thang, vườn cây'],house:['home','Nhà 2 tầng (mới)','2 cầu thang, giường & bàn làm việc'],exterior:['building','Vườn ngoài nhà','Sân vườn quanh nhà, cổng & hàng rào']};
+  {const MAPID=window.MAPID,MI={living:['home','Phòng khách','Phòng khách 2 tầng, cửa sang phòng Vy & Bin'],vy:['home','Phòng Vy','Studio của Vy (gác lửng)'],bin:['home','Phòng Bin','Studio của Bin (gác lửng)'],exterior:['building','Vườn ngoài nhà','Sân vườn quanh nhà, cổng & hàng rào']};
    $('mpList').innerHTML=Object.keys(MI).map(k=>`<div class="mapc${k===MAPID?' cur':''}" data-m="${k}"><span class="ic">${ic(MI[k][0])}</span><div><b>${MI[k][1]}${k===MAPID?' · đang ở':''}</b><small>${MI[k][2]}</small></div></div>`).join('');
    $('iMap').onclick=()=>$('hMap').classList.add('on');$('mX').onclick=()=>$('hMap').classList.remove('on');$('hMap').onclick=e=>{if(e.target.id==='hMap')$('hMap').classList.remove('on')};
    $('mpList').onclick=e=>{const c=e.target.closest('.mapc');if(!c||c.classList.contains('cur'))return;const m=c.dataset.m;$('hMap').classList.remove('on');window.__switchMap&&window.__switchMap(m)}

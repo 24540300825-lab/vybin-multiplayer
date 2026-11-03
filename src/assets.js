@@ -12,10 +12,10 @@ const def = (id, o = {}) => {
     size: f.size, refs: 0, state: 'unloaded', value: null, promise: null, ...o});
 };
 // owner = map sở hữu; null = dùng chung (nhân vật). priority nhỏ = nạp trước.
-def('map-studio', {owner: 'studio', deps: ['tree'], priority: 1});
-def('map-house', {owner: 'house', priority: 1});
-def('map-exterior', {owner: 'exterior', priority: 1});
-def('tree', {owner: 'studio', priority: 3});
+def('map-living', {owner: 'living', priority: 1});
+def('map-vy', {owner: 'vy', priority: 1});
+def('map-bin', {owner: 'bin', priority: 1});
+def('map-exterior', {owner: null, priority: 1});     // dùng chung: map vườn + ngoại cảnh của 3 phòng
 def('char-vy', {owner: null, priority: 2});
 def('char-bin', {owner: null, priority: 2});
 

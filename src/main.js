@@ -80,7 +80,7 @@ async function boot() {
   LB(75, 'Dựng cảnh...');
   await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
   const mapKey = 'map-' + mapId;
-  eng.init({env: files[mapKey], tree: files['tree'] || null, localGlb: files['char-' + slot], localSlot: slot, mapId});
+  eng.init({env: files[mapKey], ext: mapId !== 'exterior' ? files['map-exterior'] || null : null, localGlb: files['char-' + slot], localSlot: slot, mapId});
   const api = eng.api;
   LB(88, 'Biên dịch shader...');
   let warmed = false; try { warmed = localStorage.getItem('vyWarm') === mapId; } catch (e) {}   // lần sau: trình duyệt đã cache shader → chờ ngắn hơn

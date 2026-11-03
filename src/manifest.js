@@ -15,24 +15,24 @@ export const FILES = {
   "v": "b552db26",
   "size": 512472
  },
+ "map-bin": {
+  "file": "map-bin.glb",
+  "v": "a6c3beaa",
+  "size": 934052
+ },
  "map-exterior": {
   "file": "map-exterior.glb",
   "v": "f1238e01",
   "size": 5700440
  },
- "map-house": {
-  "file": "map-house.glb",
-  "v": "ceffea6e",
-  "size": 4647636
+ "map-living": {
+  "file": "map-living.glb",
+  "v": "7f2cfeff",
+  "size": 3367756
  },
- "map-studio": {
-  "file": "map-studio.glb",
-  "v": "c5fc07c0",
-  "size": 3131688
- },
- "tree": {
-  "file": "tree.glb",
-  "v": "1c364e0d",
-  "size": 1062472
+ "map-vy": {
+  "file": "map-vy.glb",
+  "v": "e97eb83e",
+  "size": 1129644
  }
 };

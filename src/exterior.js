@@ -242,7 +242,7 @@ export function setupExterior(c) {
     const ref = set[0]; ref.updateWorldMatrix(true, false);
     const W = ref.matrixWorld; let mats = [];
     const dt = MC.dropTrees;
-    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (dt && cls === 'tree') { V3.setFromMatrixPosition(mm); if (dt.some(q => Math.hypot(V3.x - q[0], V3.z - q[1]) < 1.6)) continue; } 
+    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (dt && cls === 'tree') { V3.setFromMatrixPosition(mm); if (dt.some(q => Math.hypot(V3.x - q[0], V3.z - q[1]) < 1.6)) continue; } if (MC.noPlant) { V3.setFromMatrixPosition(mm); if (MC.noPlant.some(b => V3.x > b[0] && V3.x < b[1] && V3.z > b[2] && V3.z < b[3])) continue; }   // không mọc cây/cỏ trong lòng nhà (lộ ra ở các phòng mặt cắt) 
       mats.push(mm); }
     if (!mats.length) { set.forEach(m => m.removeFromParent()); continue; }
     nIn += mats.length;

@@ -22,6 +22,13 @@ import {initPins} from './ui/pins.js';
 // API công khai cho lớp mạng (sync.js) — game không biết gì về Supabase.
 export const api={local:null,remote:null,emit:null,sendInput:null,onTick:null,envOut:null,peerChanged:null};
 const r3=v=>Math.round(v*1000)/1000;
+// tường/mái nhà hàng xóm chắn giữa camera và nhân vật (map trong nhà có ngoại cảnh): khoét một "ống" quanh tia nhìn, mép hoà dither
+const OCCW_GLSL=`
+{ vec3 cp=uOcc.xyz; vec3 ab=uOccPl-cp; float tt=clamp(dot(vWP-cp,ab)/max(dot(ab,ab),1e-3),0.0,1.0);
+  float dl=distance(vWP,cp+ab*tt); float al=mix(1.0,smoothstep(3.0,4.8,dl),(1.0-smoothstep(0.86,0.97,tt))*uOcc.w);
+  float th=fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(0.06711056,0.00583715))));
+  if(al<th) discard; }
+`;
 export function init(ctx){
   const envG=ctx.env,treeG=ctx.tree,MAPID=window.MAPID;
   const renderer=new THREE.WebGLRenderer({antialias:true});
@@ -32,7 +39,7 @@ export function init(ctx){
   document.body.appendChild(renderer.domElement);
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x1a2030);
   const camera=new THREE.PerspectiveCamera(18,innerWidth/innerHeight,1,900);
-  camera.position.set(17,16,23);
+  camera.position.set((MAP_CONFIGS[window.MAPID]||{}).camMirror?-7:17,16,23);   // camMirror: nhìn từ bên trái (phòng Bin: cánh nhà bên phải sẽ che nếu nhìn từ phải)
   const controls=new OrbitControls(camera,renderer.domElement);
   controls.target.set(5,2,-4);controls.enableDamping=true;controls.minDistance=14;controls.maxDistance=38;controls.enablePan=true;controls.screenSpacePanning=false;controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.PAN};controls.update();
   {const az=controls.getAzimuthalAngle(),po=controls.getPolarAngle();controls.minAzimuthAngle=az-CFG.camPan;controls.maxAzimuthAngle=az+CFG.camPan;controls.minPolarAngle=po-CFG.camTilt;controls.maxPolarAngle=po+CFG.camTilt;}
@@ -74,9 +81,9 @@ export function init(ctx){
            _p=instanceMatrix*_p;
           #endif
           vWP=(modelMatrix*_p).xyz;}`);
-        if(F2||GB){sh.uniforms.uCenter={value:m.userData.center||new THREE.Vector3(0,0.65,0)};sh.uniforms.uHInv={value:m.userData.hInv||0.66};sh.uniforms.uWindDir=FU.uWindDir;sh.uniforms.uHybrid=FU.uHybrid;sh.uniforms.uBaseShade=FU.uBaseShade;sh.uniforms.uFolEmi=FU.uFolEmi;sh.uniforms.uGMap=FU.uGMap;sh.uniforms.uGK=FU.uGK;sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uPl=FU.uPl;sh.uniforms.uFolTint=FU.uFolTint;sh.uniforms.uFolVar=FU.uFolVar;sh.uniforms.uGrTint=FU.uGrTint;sh.uniforms.uGrVar=FU.uGrVar;sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}
+        if(F2||GB){sh.uniforms.uCenter={value:m.userData.center||new THREE.Vector3(0,0.65,0)};sh.uniforms.uHInv={value:m.userData.hInv||0.66};sh.uniforms.uWindDir=FU.uWindDir;sh.uniforms.uHybrid=FU.uHybrid;sh.uniforms.uBaseShade=FU.uBaseShade;sh.uniforms.uFolEmi=FU.uFolEmi;sh.uniforms.uGMap=FU.uGMap;sh.uniforms.uGK=FU.uGK;sh.uniforms.uGTint=FU.uGTint;if(m.userData.occW&&!(F2||GB)){sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}sh.uniforms.uPl=FU.uPl;sh.uniforms.uFolTint=FU.uFolTint;sh.uniforms.uFolVar=FU.uFolVar;sh.uniforms.uGrTint=FU.uGrTint;sh.uniforms.uGrVar=FU.uGrVar;sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}
         sh.vertexShader=(SW?'#define SWAYX\n':'')+'varying vec3 vWP;uniform float uWindT,uWindA;\n'+VS0;
-        sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uDesat={value:m.userData.desat==null?1:m.userData.desat};sh.fragmentShader='uniform float uDesat;uniform vec3 uGTint;\n'+(FOL?'#define FOLIAGE\n':'')+(F2?'#define FOL2\n':'')+(m.userData.bush?'#define BUSHF\n':'')+(GB?'#define GRASSB\n':'')+(GRD?'#define GROUNDX\n':'')+((F2||GB)?FRAG_PARS:'')+'uniform float uInHK;uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <normal_fragment_begin>',(F2||GB)?'#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\nnormal*=(gl_FrontFacing?1.0:-1.0);\n#endif\n'+(m.userData.occ?OCC_GLSL:''):'#include <normal_fragment_begin>').replace('#include <opaque_fragment>',`
+        sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uDesat={value:m.userData.desat==null?1:m.userData.desat};sh.fragmentShader='uniform float uDesat;uniform vec3 uGTint;\n'+(FOL?'#define FOLIAGE\n':'')+(F2?'#define FOL2\n':'')+(m.userData.bush?'#define BUSHF\n':'')+(GB?'#define GRASSB\n':'')+(GRD?'#define GROUNDX\n':'')+((F2||GB)?FRAG_PARS:(m.userData.occW?'uniform vec4 uOcc;uniform vec3 uOccPl;\n':''))+'uniform float uInHK;uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <normal_fragment_begin>',(F2||GB)?'#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\nnormal*=(gl_FrontFacing?1.0:-1.0);\n#endif\n'+(m.userData.occ?OCC_GLSL:''):'#include <normal_fragment_begin>'+(m.userData.occW?OCCW_GLSL:'')).replace('#include <opaque_fragment>',`
         {float I=1.0,Ih=1.0,vis=1.0,Ig=0.0;
          #ifdef FOLIAGE
          {float lm=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));vec3 lf=mix(uLeafA,uLeafB,smoothstep(0.03,0.4,lm));
@@ -149,7 +156,7 @@ ${FRAG_COLOR}
           col+=diffuseColor.rgb*vec3(1.0,0.8,0.52)*lp*uLK*0.85;}
          outgoingLight=col+totalEmissiveRadiance;}
         #include <opaque_fragment>`)};
-      m.customProgramCacheKey=()=>'vytoon9'+(m.userData.fol2?'F':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
+      m.customProgramCacheKey=()=>'vytoon9'+(m.userData.occW?'W':'')+(m.userData.fol2?'F':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
 
   // env
   const env=envG.scene;toonify(env);scene.add(env);env.updateMatrixWorld(true);
@@ -161,7 +168,7 @@ ${FRAG_COLOR}
 
   // anchors
   const MAPS=MAP_CONFIGS;
-  const MC=MAPS[MAPID]||MAPS.studio;const OUTD=!!MC.outdoor;TU.uInHK.value=OUTD?0:1;bindTU(TU);
+  const MC=MAPS[MAPID]||MAPS.living;const OUTD=!!MC.outdoor;TU.uInHK.value=OUTD?0:1;bindTU(TU);
   if(OUTD){const sp=MC.spawn.vy;controls.target.set(sp[0],A0y(MC)+1,sp[1]);camera.fov=30;camera.updateProjectionMatrix();camera.position.set(sp[0]+7.2,A0y(MC)+9,sp[1]+11.4);controls.minDistance=5;controls.maxDistance=28;controls.update();
     controls.minAzimuthAngle=-Infinity;controls.maxAzimuthAngle=Infinity;controls.minPolarAngle=0.12;controls.maxPolarAngle=1.5;CFG.camPan=Math.PI*2;CFG.camTilt=0.9}
   function A0y(c){return c.floorY||0}
@@ -172,8 +179,24 @@ ${FRAG_COLOR}
   let EXT=null;
   if(OUTD){const _t0=performance.now();EXT=setupExterior({scene,env,MC,toonMat});console.log('[ext] setup '+Math.round(performance.now()-_t0)+'ms');if(/[?&]tune\b/.test(location.search))import('./tune.js').then(m=>m.mountTune(EXT,FU));for(let i=envMeshes.length-1;i>=0;i--)if(!envMeshes[i].parent)envMeshes.splice(i,1);
     env.traverse(o=>{if(o.isMesh&&/^Stylized Grass$/.test((o.material&&o.material.name)||''))o.visible=false;if(o.isMesh&&/^\.SF_/.test(o.name))o.visible=false});env.updateMatrixWorld(true)}
+  // ===== map TRONG NHÀ có ngoại cảnh: dùng lại nguyên map ngoài vườn (map-exterior, đúng như bản đang chạy) quanh căn nhà =====
+  // MC.ext = {dx,dz: dời ngoại cảnh cho khớp toạ độ phòng; hide: regex node vỏ nhà phải ẩn (cánh nhà đang ở bị cắt); roofX: x tâm mái (instancing) cần ẩn}
+  let EXTV=null,extG=null;
+  if(!OUTD&&MC.ext&&ctx.ext){const X=MC.ext,_t0=performance.now();extG=ctx.ext.scene;extG.name='__EXTERIOR__';
+    extG.traverse(o=>{if((X.hide&&X.hide.test(o.name))||/^Interior_(Bin|Living|Vy)/.test(o.name))o.visible=false});   // hộp tối giả nội thất sau cửa sổ: kính đã đặc nên không cần, và để chỗ 'khoét' tường hàng xóm không lộ mảng đen
+    extG.position.set(X.dx||0,0,X.dz||0);extG.updateMatrixWorld(true);
+    if(X.roofX!=null){const c=new THREE.Vector3(),M=new THREE.Matrix4();extG.traverse(o=>{if(!o.isInstancedMesh)return;let p=o.parent,inHouse=false;for(;p;p=p.parent)if(/^HOUSE_L1/.test(p.name))inHouse=true;if(!inHouse)return;
+      o.geometry.computeBoundingBox();const gc=o.geometry.boundingBox.getCenter(new THREE.Vector3());
+      for(let i=0;i<o.count;i++){o.getMatrixAt(i,M);c.copy(gc).applyMatrix4(M).applyMatrix4(o.matrixWorld);if(Math.abs(c.x-(X.roofX+(X.dx||0)))<3){M.makeScale(0,0,0);o.setMatrixAt(i,M);o.instanceMatrix.needsUpdate=true}}})}
+    extG.traverse(o=>{if(!o.isMesh||!o.visible)return;let p=o.parent,inHouse=false;for(;p;p=p.parent)if(/^HOUSE_L1/.test(p.name))inHouse=true;if(inHouse)[].concat(o.material).forEach(mm=>{if(mm)mm.userData.occW=true})});
+    toonify(extG);scene.add(extG);extG.updateMatrixWorld(true);
+    const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
+    const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null};
+    EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat});EXTV.setLevel(TP.quality==='low'?'low':'medium');
+    extG.traverse(o=>{if(o.isMesh&&/^Stylized Grass$/.test((o.material&&o.material.name)||''))o.visible=false;if(o.isMesh&&/^\.SF_/.test(o.name))o.visible=false});extG.updateMatrixWorld(true);
+    console.log('[ext] ngoại cảnh cho map trong nhà '+Math.round(performance.now()-_t0)+'ms')}
   // kính cửa sổ/cửa chính nhìn từ ngoài: đặc (không thấy nội thất), màu xanh trời theo giờ & thời tiết, hơi bóng
-  const WGLASS=[];if(OUTD)env.traverse(o=>{if(!o.isMesh)return;[].concat(o.material).forEach(m=>{if(m&&/^M_Glass/.test(m.name)&&!WGLASS.includes(m)){m.transparent=false;m.opacity=1;m.depthWrite=true;m.alphaMap=null;m.needsUpdate=true;WGLASS.push(m)}})});
+  const WGLASS=[];if(OUTD||extG)(extG||env).traverse(o=>{if(!o.isMesh)return;[].concat(o.material).forEach(m=>{if(m&&/^M_Glass/.test(m.name)&&!WGLASS.includes(m)){m.transparent=false;m.opacity=1;m.depthWrite=true;m.alphaMap=null;m.needsUpdate=true;WGLASS.push(m)}})});
   const _gc1=new THREE.Color(),_gc2=new THREE.Color();
   const updGlass=(day,dim,des)=>{if(!WGLASS.length)return;_gc1.setRGB(0.55,0.78,0.97).multiplyScalar(0.28+0.72*day*(0.55+0.45*dim));_gc2.setRGB(0.5,0.56,0.62).multiplyScalar(0.3+0.5*day*dim);_gc1.lerp(_gc2,Math.min(1,des*0.9));
     WGLASS.forEach(m=>{m.color.copy(_gc1);if(m.emissive){m.emissive.copy(_gc1).multiplyScalar(0.22);m.emissiveIntensity=1}if('roughness' in m)m.roughness=0.12;if('metalness' in m)m.metalness=0.35})};
@@ -214,9 +237,9 @@ ${FRAG_COLOR}
   A.chairL=A.seatC&&A.seatC.y>(A.L0+A.L1)/2?1:0;A.CY=[A.L0,A.L1][A.chairL];
   const CHAIR=OUTD?Object.assign(new THREE.Object3D(),{name:'__NO_CHAIR__'}):(Object.values(byName).find(o=>MC.chair.test(o.name)&&!o.isMesh)||byName['Desk_Chair']);
   const q=new THREE.Quaternion();if(!OUTD)CHAIR.getWorldQuaternion(q);
-  const fw=new THREE.Vector3(0,0,1).applyQuaternion(q);fw.y=0;fw.normalize();if(MC.chairFlip)fw.negate();   // ghế nhà 2 tầng dựng quay lưng về phía +z: mặt ghế hướng -z (về phía bàn)
+  const fw=new THREE.Vector3(0,0,1).applyQuaternion(q);fw.y=0;fw.normalize();if(MC.chairFlip)fw.negate();if(MC.chairToward&&byName[MC.chairToward]){const dc=box(MC.chairToward).getCenter(new THREE.Vector3()),cc=new THREE.Box3().setFromObject(CHAIR).getCenter(new THREE.Vector3());fw.set(dc.x-cc.x,0,dc.z-cc.z).normalize()}   // ghế nhà 2 tầng dựng quay lưng về phía +z: mặt ghế hướng -z (về phía bàn)
   A.chairYaw=Math.atan2(fw.x,fw.z);A.fwd=fw;
-  A.mattress=OUTD?new THREE.Box3():box('Bed_Mattress');A.bedBox=OUTD?new THREE.Box3():box('Bed');
+  A.bedBox=OUTD||!byName['Bed']?new THREE.Box3():box('Bed');A.mattress=OUTD?new THREE.Box3():byName['Bed_Mattress']?box('Bed_Mattress'):(()=>{const b=A.bedBox.clone();b.max.y=b.min.y+0.55;return b})();   // giường gộp 1 mesh: đệm ≈ 0.55m trên sàn
 
   // colliders + A*
   const G=OUTD?{...MC.grid,R:0.13}:{x0:-1,z0:-9,c:0.1,W:125,H:100,R:0.13};
@@ -341,7 +364,9 @@ ${FRAG_COLOR}
     CLIMBBED_L:'ACT_BIN_SLEEP_CLIMB ON BED_L',CLIMBBED_R:'ACT_BIN_SLEEP_CLIMB ON BED_R',SLEEP_L:'ACT_BIN_SLEEP-LOOP BREATHE_L',SLEEP_R:'ACT_BIN_SLEEP-LOOP BREATHE_R',
     OFFBED_L:'ACT_BIN_SLEEP_OFF BED_L',OFFBED_R:'ACT_BIN_SLEEP_OFF BED_R'};
   const DEF_BIN={id:'bin',K:KB,eye:{close:'ACT_BIN_EYE_CLOSE',open:'ACT_BIN_EYE_OPEN',blink:'ACT_BIN_BLINK'},eyeMeshes:['Sphere002','Sphere003'],trim:null,idleBurst:true,foot:{walk:[0.29,0.77],run:[0.20,0.68]},colors:{BLACK:'#16161b',SKIN:'#f2c9b3',BLUE:'#2b37b5',ORANGE:'#f26b1d'},pos:new THREE.Vector3(4.5,0,-1.5),yaw:0.4,ctrl:'wasd'};
-  if(OUTD&&MC.spawn){DEF_VY.pos.set(MC.spawn.vy[0],A.L0,MC.spawn.vy[1]);DEF_VY.yaw=MC.spawn.vy[2];DEF_BIN.pos.set(MC.spawn.bin[0],A.L0,MC.spawn.bin[1]);DEF_BIN.yaw=MC.spawn.bin[2]}
+  {let from='';try{from=sessionStorage.getItem('vyFrom')||''}catch(e){}const sp=MC.spawnFrom&&(MC.spawnFrom[from]||MC.spawnFrom.default);
+   if(sp){[DEF_VY,DEF_BIN].forEach((D,k)=>{D.pos.set(sp[0]+(k?0.45:0)*Math.cos(sp[2]),sp[3]?A.L1:A.L0,sp[1]-(k?0.45:0)*Math.sin(sp[2]));D.yaw=sp[2];D.level=sp[3]||0})}}
+  if(OUTD&&MC.spawn&&!(MC.spawnFrom)){DEF_VY.pos.set(MC.spawn.vy[0],A.L0,MC.spawn.vy[1]);DEF_VY.yaw=MC.spawn.vy[2];DEF_BIN.pos.set(MC.spawn.bin[0],A.L0,MC.spawn.bin[1]);DEF_BIN.yaw=MC.spawn.bin[2]}
   function makeChar(chrG,DEF){
   const K=DEF.K;
   let emitOff=0;const em=(t,a)=>{if(!DEF.remote&&!emitOff&&api.emit)api.emit(t,a)};
@@ -430,7 +455,7 @@ ${FRAG_COLOR}
   }
 
   // ===== player =====
-  const P={sp:0,pos:DEF.pos.clone(),yaw:DEF.yaw,level:0,mode:'free',side:'L',stand:null};
+  const P={sp:0,pos:DEF.pos.clone(),yaw:DEF.yaw,level:DEF.level||0,mode:'free',side:'L',stand:null};
   let plan=[],busy=null,cur=null,clock=0,anchor=null;
   const off=new THREE.Vector3(),offFrom=new THREE.Vector3(),offTo=new THREE.Vector3(),ZERO=new THREE.Vector3();let offT=1,offD=0.3;
   function setOff(to,dur){offFrom.copy(off);offTo.copy(to);offT=0;offD=Math.max(dur,0.001)}
@@ -826,7 +851,9 @@ ${FRAG_COLOR}
     {key:'tv',icon:'tv',label:'Xem TV',at:()=>tvPt,act:()=>{const s=tvStand();if(s)cmdMove(s.x,s.z,s.lv,false)}},
     {key:'chair',icon:'chair',label:'Ngồi',at:()=>chairPt,state:()=>P0.mode==='sit'||P0.mode==='type'?{on:true,label:'Đứng dậy'}:null,act:()=>{if(P0.mode==='sit'||P0.mode==='type')cmdOffChair();else cmdSit()}},
     {key:'bed',icon:'sleep',label:'Ngủ',at:()=>bedPt,state:()=>P0.mode==='bed'?{on:true,label:'Thức dậy'}:null,act:()=>{if(P0.mode==='bed')cmdWake();else cmdSleep()}},
-    {key:'door',icon:'door',label:MC.doorLabel||'Bản đồ',at:()=>doorPt,act:()=>{if(MC.doorTo&&window.__switchMap){window.__switchMap(MC.doorTo);return}const b=$('iMap');if(b)b.click()}}];
+    ...(MC.doors?[]:[{key:'door',icon:'door',label:MC.doorLabel||'Bản đồ',at:()=>doorPt,act:()=>{if(MC.doorTo&&window.__switchMap){window.__switchMap(MC.doorTo);return}const b=$('iMap');if(b)b.click()}}]),
+    ...(MC.doors||[]).map((d,i)=>{const b=ctr(d.node),p=b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+(b.max.y-b.min.y>0.5?-0.8:0.15),(b.min.z+b.max.z)/2):null;
+      return {key:'door'+i,icon:'door',label:d.label,at:()=>p,act:()=>{if(window.__switchMap)window.__switchMap(d.to)}}})];
    const pn=initPins({camera,items:items.filter(i=>i.at())});pinsUpd=pn.update;api.pins=pn;}
   // phím tắt (src/ui/shortcuts.js) → cùng các lệnh với nút ẩn ở trên
   {const ACT={walk:'bWalk',run:'bRun',sit:'bSit',type:'bType',off:'bOff',sleep:'bSleep',wake:'bWake'};window.__runMode=runMode;addEventListener('vy:act',e=>{let id=e.detail;if(id==='run'&&runMode.v)id='walk';   // R bật/tắt chế độ chạy — dùng chung cho cả WASD lẫn bấm chọn điểm
@@ -925,11 +952,11 @@ ${FRAG_COLOR}
   sky.renderOrder=-1000;sky.frustumCulled=false;sky.scale.setScalar(700);scene.add(sky);scene.background=null;
   scene.fog=new THREE.Fog(SKY.hor,70,300);
   
-  let grassCol=null;const grassTex=(()=>{let t=null;const gn=MC.gtex||'Plane001';env.traverse(o=>{if(o.isMesh&&o.name===gn&&o.material.map){t=o.material.map;grassCol=o.material.color.clone()}});return t})();
+  let grassCol=null;const grassTex=(()=>{let t=null;const gn=MC.gtex||'Plane001';(extG||env).traverse(o=>{if(o.isMesh&&o.name===gn&&o.material.map){t=o.material.map;grassCol=o.material.color.clone()}});return t})();
   const gTex=grassTex?grassTex.clone():null;if(gTex){gTex.channel=0;gTex.wrapS=gTex.wrapT=THREE.RepeatWrapping;gTex.repeat.set(110,110);gTex.needsUpdate=true}
-  const ground=new THREE.Mesh(new THREE.CircleGeometry(650,48),new THREE.MeshStandardMaterial({map:gTex,color:(MC.gtex&&grassCol)||0xffffff,roughness:1,metalness:0}));ground.material.userData.ground=true;if(OUTD){FU.uGTint.value.setRGB(0.68,0.8,0.52);ground.material.userData.desat=0.95}toonify(ground);
-  ground.rotation.x=-Math.PI/2;ground.position.set(0,OUTD?A.L0-0.03:-0.3,0);ground.renderOrder=-999;ground.receiveShadow=OUTD;scene.add(ground);
-  if(OUTD){envMeshes.push(ground);FU.uGMap.value=gTex}
+  const ground=new THREE.Mesh(new THREE.CircleGeometry(650,48),new THREE.MeshStandardMaterial({map:gTex,color:(MC.gtex&&grassCol)||0xffffff,roughness:1,metalness:0}));ground.material.userData.ground=true;if(OUTD||extG){FU.uGTint.value.setRGB(0.68,0.8,0.52);ground.material.userData.desat=0.95}toonify(ground);
+  ground.rotation.x=-Math.PI/2;ground.position.set(0,OUTD?A.L0-0.03:extG?MAPS.exterior.floorY-0.03:-0.3,0);ground.renderOrder=-999;ground.receiveShadow=OUTD||!!extG;scene.add(ground);
+  if(OUTD){envMeshes.push(ground)}if(OUTD||extG)FU.uGMap.value=gTex;
 
   // ===== TỐI ƯU: gộp mesh tĩnh theo material (batching), tắt matrix auto, ngoại cảnh: bỏ bóng + cull theo khoảng cách =====
   const OPT={far:[],inst:[]};
@@ -1226,7 +1253,7 @@ ${FRAG_COLOR}
   function applyLevel(){const q=TP.quality,lvl=q==='auto'?(curPR<0.8?'low':curPR<1.1?'medium':'high'):q;if(lvl===curLvl||!LEVELS[lvl])return;curLvl=lvl;EXT.setLevel(lvl);setRainCount(LEVELS[lvl].rain);
     const ms={low:1536,medium:2048,high:2560}[lvl],hs={low:13,medium:15,high:17}[lvl],sh=sun.shadow;
     if(sh.mapSize.x!==ms){sh.mapSize.set(ms,ms);if(sh.map){sh.map.dispose();sh.map=null}}Object.assign(sh.camera,{left:-hs,right:hs,top:hs*0.9,bottom:-hs*0.9});sh.camera.updateProjectionMatrix()}
-  function updCull(){if(EXT){applyLevel();EXT.update(controls.target,camera.position,scene.fog.color)}else updInst();const cx=controls.target;OPT.far.forEach(o=>{if(!o.userData.c){const b=new THREE.Box3().setFromObject(o);o.userData.c=b.getCenter(new THREE.Vector3());o.userData.r=b.getSize(new THREE.Vector3()).length()/2}
+  function updCull(){if(EXT){applyLevel();EXT.update(controls.target,camera.position,scene.fog.color)}else updInst();if(EXTV)EXTV.update(controls.target,camera.position,scene.fog.color);const cx=controls.target;OPT.far.forEach(o=>{if(!o.userData.c){const b=new THREE.Box3().setFromObject(o);o.userData.c=b.getCenter(new THREE.Vector3());o.userData.r=b.getSize(new THREE.Vector3()).length()/2}
       const d=o.userData.c.distanceTo(camera.position)-o.userData.r;o.visible=d<300})}
 
   // ===== MÔI TRƯỜNG: ngày/đêm · thời tiết · light shafts · post-fx =====
@@ -1478,7 +1505,7 @@ ${FRAG_COLOR}
     {const f=local;tmp.set(f.char.position.x,f.char.position.y+0.7,f.char.position.z);
       tmp2.copy(tmp).sub(controls.target).multiplyScalar(Math.min(1,dt*3));controls.target.add(tmp2);camera.position.add(tmp2);}
     controls.update();
-    if(OUTD){const lp=local.char.position;FU.uPl.value[0].set(lp.x,lp.y,lp.z);if(remote&&remote.char.visible){const rp=remote.char.position;FU.uPl.value[1].set(rp.x,rp.y,rp.z)}else FU.uPl.value[1].set(1e5,0,1e5);
+    if(OUTD||extG){const lp=local.char.position;FU.uPl.value[0].set(lp.x,lp.y,lp.z);if(remote&&remote.char.visible){const rp=remote.char.position;FU.uPl.value[1].set(rp.x,rp.y,rp.z)}else FU.uPl.value[1].set(1e5,0,1e5);
       FU.uOcc.value.set(camera.position.x,camera.position.y,camera.position.z,1);FU.uOccPl.value.set(lp.x,lp.y+0.9,lp.z)}
     {const t=controls.target,cb=OUTD?MC.camBox:[0.5,9.5,-7.6,0.3],cx=clamp(t.x,cb[0],cb[1]),cy=clamp(t.y,OUTD?A.L0:0.3,OUTD?A.L0+4:5.5),cz=clamp(t.z,cb[2],cb[3]);
       if(!window.__free&&(cx!==t.x||cy!==t.y||cz!==t.z)){tmp.set(cx-t.x,cy-t.y,cz-t.z);t.add(tmp);camera.position.add(tmp);}}

@@ -1,11 +1,12 @@
 import {SFX} from './sfx.js';
 // Danh sách map (metadata + asset phụ thuộc). Thêm map mới: xem README → "Thêm map mới".
 export const MAP_LIST = {
-  studio: {name: 'Studio (cũ)', icon: '🏢', desc: 'Gác lửng 1 cầu thang, vườn cây', assets: ['map-studio']},
-  house:  {name: 'Nhà 2 tầng (mới)', icon: '🏠', desc: '2 cầu thang, giường & bàn làm việc', assets: ['map-house']},
+  living:   {name: 'Phòng khách', icon: '🛋️', desc: 'Phòng khách 2 tầng, cửa sang phòng Vy & Bin', assets: ['map-living', 'map-exterior']},
+  vy:       {name: 'Phòng Vy', icon: '🌸', desc: 'Studio của Vy (gác lửng)', assets: ['map-vy', 'map-exterior']},
+  bin:      {name: 'Phòng Bin', icon: '🛠️', desc: 'Studio của Bin (gác lửng)', assets: ['map-bin', 'map-exterior']},
   exterior: {name: 'Vườn ngoài nhà', icon: '🌳', desc: 'Sân vườn quanh nhà, cổng & hàng rào', assets: ['map-exterior']},
 };
-export const DEFAULT_MAP = 'house';
+export const DEFAULT_MAP = 'living';
 export const isMap = id => Object.prototype.hasOwnProperty.call(MAP_LIST, id);
 
 // Quản lý chuyển map: nạp trước (HTTP cache) + fade + tải lại có giữ phiên.
@@ -22,7 +23,7 @@ export function prefetchMap(id) {
 }
 export function goToMap(id, {fade = true} = {}) {
   try { SFX.play('whoosh'); } catch (e) {}
-  try { localStorage.setItem('vyMap', id); } catch (e) {}
+  try { localStorage.setItem('vyMap', id); sessionStorage.setItem('vyFrom', window.MAPID || ''); } catch (e) {}
   if (fade) { try { sessionStorage.setItem('vyFade', '1'); } catch (e) {} }   // trang mới bắt đầu từ đen rồi hiện dần ra ảnh loading
   const fd = document.getElementById('fade');
   if (fade && fd) fd.classList.add('on');
