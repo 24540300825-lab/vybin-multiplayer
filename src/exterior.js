@@ -8,20 +8,31 @@ import {makeDepthMat} from './foliage.js';
 
 // ---- mức chất lượng: mật độ, tầm nhìn, bóng, số lớp sương, hạt mưa -----------------------------------------
 export const LEVELS = {
-  low:    {dens: 0.40, dist: 0.62, shadowR: 9,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.45},
-  medium: {dens: 0.66, dist: 0.85, shadowR: 10, grassShadowR: 5,  haze: 2, rain: 4200, far: 0.75},
-  high:   {dens: 0.85, dist: 1.00, shadowR: 12, grassShadowR: 8,  haze: 2, rain: 6000, far: 1.00},
+  low:    {dens: 0.35, dist: 0.62, shadowR: 8,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.40},
+  medium: {dens: 0.55, dist: 0.85, shadowR: 9,  grassShadowR: 4,  haze: 2, rain: 4200, far: 0.60},
+  high:   {dens: 0.72, dist: 1.00, shadowR: 11, grassShadowR: 6,  haze: 2, rain: 6000, far: 0.80},
   // map trong nhà (phòng khách / phòng Vy / phòng Bin): vườn chỉ thấy qua khung cửa → thưa hơn, gần hơn, cây cỏ không đổ bóng
-  indoor: {dens: 0.48, dist: 0.58, shadowR: 0,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.55},
+  indoor: {dens: 0.42, dist: 1.00, shadowR: 0,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.45},
 };
 // theo loại: tầm nhìn tối đa (m), đường cong mật độ theo khoảng cách (d0 = bắt đầu thưa, d1 = còn tối thiểu), có đổ bóng không
-const CLASS = {
-  grass:  {maxD: 50,  d0: 22, d1: 46,  min: 0.04, shadow: true,  cell: 9,  lod: 0},
-  flower: {maxD: 46,  d0: 22, d1: 42,  min: 0.03, shadow: false, cell: 10, lod: 30},
-  bush:   {maxD: 110, d0: 45, d1: 105, min: 0.12, shadow: true,  cell: 11, lod: 48},
-  tree:   {maxD: 230, d0: 70, d1: 220, min: 0.35, shadow: true,  cell: 12, lod: 70},
-  rock:   {maxD: 130, d0: 55, d1: 120, min: 0.25, shadow: true,  cell: 10, lod: 55},
+// "Đẹp chỗ cần đẹp": khoảng cách tính từ NHÂN VẬT (chỗ mắt người chơi nhìn). Quanh nhân vật đủ dày + đủ chi tiết;
+// ra xa nhanh chóng thưa dần và đổi sang hình giảm tam giác (lod: từ khoảng này trở ra dùng bản ~12–16% tam giác).
+const CLASS_OUT = {
+  grass:  {maxD: 32,  d0: 10, d1: 27,  min: 0.04, shadow: true,  cell: 9,  lod: 12},
+  flower: {maxD: 34,  d0: 10, d1: 30,  min: 0.03, shadow: false, cell: 10, lod: 12},
+  bush:   {maxD: 90,  d0: 18, d1: 80,  min: 0.10, shadow: true,  cell: 12, lod: 18},
+  tree:   {maxD: 200, d0: 30, d1: 180, min: 0.30, shadow: true,  cell: 14, lod: 18},
+  rock:   {maxD: 110, d0: 25, d1: 100, min: 0.20, shadow: true,  cell: 12, lod: 25},
 };
+// 3 phòng trong nhà: vườn chỉ là phông nền nhìn qua mặt cắt → rất thưa ở xa, đổi hình nhẹ sớm, ô to (ít lượt vẽ), không cây nào "đặc" vì không đi ra được
+const CLASS_IN = {
+  grass:  {maxD: 24,  d0: 6,  d1: 20,  min: 0.03, shadow: false, cell: 16, lod: 7},
+  flower: {maxD: 24,  d0: 6,  d1: 20,  min: 0.02, shadow: false, cell: 16, lod: 8},
+  bush:   {maxD: 60,  d0: 10, d1: 50,  min: 0.08, shadow: false, cell: 20, lod: 12},
+  tree:   {maxD: 110, d0: 16, d1: 100, min: 0.20, shadow: false, cell: 24, lod: 14},
+  rock:   {maxD: 70,  d0: 12, d1: 60,  min: 0.15, shadow: false, cell: 20, lod: 12},
+};
+let CLASS = CLASS_OUT;
 
 const M4 = new THREE.Matrix4(), V3 = new THREE.Vector3(), Q = new THREE.Quaternion(), S3 = new THREE.Vector3(), E = new THREE.Euler();
 let _seed = 987654321;
@@ -87,6 +98,7 @@ export function setupExterior(c) {
   let grassDepth = null;
   const group = new THREE.Group(); group.name = 'EXT_CELLS'; scene.add(group);
   const cells = [];          // {im, cls, n, cx, cz, r}
+  const INDOOR = !!(c.MC && c.MC.indoor); CLASS = INDOOR ? CLASS_IN : CLASS_OUT;
   const colliders = {boxes: [], circles: []};
   env.updateMatrixWorld(true);
 
@@ -271,7 +283,7 @@ export function setupExterior(c) {
       else if (mat.userData.fol2) im.customDepthMaterial = depthMat;
       group.add(im);
       // mức LOD xa: cùng ma trận (dùng chung buffer), hình học đã giảm ~85% tam giác
-      let im1 = null; const lg = CLASS[cls].lod ? simplified(src.geometry, 0.16) : null;
+      let im1 = null; const lg = CLASS[cls].lod ? simplified(src.geometry, cls === 'tree' || cls === 'bush' ? 0.12 : 0.16) : null;
       if (lg) { im1 = new THREE.InstancedMesh(lg, mat, arr.length); im1.instanceMatrix = im.instanceMatrix; im1.matrixAutoUpdate = false; im1.castShadow = false; im1.receiveShadow = cls === 'tree' || cls === 'rock'; im1.boundingSphere = im.boundingSphere; im1.visible = false;
         if (im.customDepthMaterial) im1.customDepthMaterial = im.customDepthMaterial; group.add(im1); }
       cells.push({im, im1, cls, n: arr.length, cx, cz, far: !!far});
@@ -325,7 +337,7 @@ export function setupExterior(c) {
       const t = T[(rnd() * T.length) | 0], src = t.mats[(rnd() * t.mats.length) | 0];
       src.decompose(V3, Q, S3);
       const m = new THREE.Matrix4().compose(new THREE.Vector3(x, V3.y, z), Q, S3);
-      const CL = CLASS[cls], k = (T.indexOf(t)) + '|' + Math.floor(x / CL.cell) + ',' + Math.floor(z / CL.cell);
+      const CL = CLASS[cls], FC = CL.cell * 3, k = (T.indexOf(t)) + '|' + Math.floor(x / FC) + ',' + Math.floor(z / FC);   // rải ngoài hàng rào: ô to gấp 3 (thưa, ở xa → ít lượt vẽ)
       let b = per.get(k); if (!b) { b = {t, arr: []}; per.set(k, b); } b.arr.push(m);
     });
     for (const b of per.values()) makeCells(b.t.set, cls, b.arr, true);
@@ -368,7 +380,7 @@ export function setupExterior(c) {
       if (ce.im1 && ce.im1.visible !== v1) ce.im1.visible = v1;
       if (!vis) continue;
       // cây/đá trong hàng rào có VẬT CẢN → luôn đủ bản (không thưa) để không "va vào cây tàng hình"; còn lại thưa dần theo khoảng cách
-      const solid = !ce.far && (ce.cls === 'tree' || ce.cls === 'rock');
+      const solid = !INDOOR && !ce.far && (ce.cls === 'tree' || ce.cls === 'rock');
       const f = solid ? 1 : Math.min(1, Math.max(CL.min, 1 - (d - CL.d0) / (CL.d1 - CL.d0) * (1 - CL.min))) * lv.dens;
       const dens = ce.cls === 'tree' && ce.far ? Math.max(f, lv.far * 0.4) : f;
       const n = Math.max(1, Math.ceil(ce.n * Math.min(1, dens)));

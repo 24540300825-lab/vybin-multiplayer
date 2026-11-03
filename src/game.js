@@ -197,7 +197,7 @@ ${FRAG_COLOR}
       if(inHouse&&!roof)[].concat(o.material).forEach(mm=>{if(mm&&!/Roof|Tile/i.test(mm.name||''))mm.userData.occW=true})});
     toonify(extG);scene.add(extG);extG.updateMatrixWorld(true);
     const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
-    const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null};
+    const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null,indoor:true};
     EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat});EXTV.setLevel(TP.quality==='low'?'low':'indoor');
     extG.traverse(o=>{if(o.isMesh&&/^Stylized Grass$/.test((o.material&&o.material.name)||''))o.visible=false;if(o.isMesh&&/^\.SF_/.test(o.name))o.visible=false});extG.updateMatrixWorld(true);
     console.log('[ext] ngoại cảnh cho map trong nhà '+Math.round(performance.now()-_t0)+'ms')}
@@ -1461,8 +1461,10 @@ ${FRAG_COLOR}
       gl_FragColor=vec4(max(c,0.0),1.0);}`};
   const SANITIZE={uniforms:{tDiffuse:{value:null}},vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
     fragmentShader:'uniform sampler2D tDiffuse;varying vec2 vUv;void main(){vec3 r=texture2D(tDiffuse,vUv).rgb;gl_FragColor=vec4(r.r>=0.0?min(r.r,16.0):0.0,r.g>=0.0?min(r.g,16.0):0.0,r.b>=0.0?min(r.b,16.0):0.0,1.0);}'};
-  let curPR=Math.min(devicePixelRatio,1.5),maxPR=curPR,composer=null,bloomP=null,fxaaP=null,GU=GradeShader.uniforms,postLevel=0;
+  let curPR=Math.min(devicePixelRatio,1.5),maxPR=curPR,composer=null,PRKEY='vyPR:'+TP.quality,bloomP=null,fxaaP=null,GU=GradeShader.uniforms,postLevel=0;
   try{postLevel=+(localStorage.getItem('vyPostLvl')||0)}catch(e){}
+  // nhớ độ phân giải đã ổn định của máy này ở lần chơi trước → vào là dùng luôn, không phải chờ bộ tự co dò lại từ đầu (10–30 s giật)
+  try{const sv=parseFloat(localStorage.getItem(PRKEY));if(sv>=0.5&&sv<curPR){curPR=sv;renderer.setPixelRatio(sv);renderer.setSize(innerWidth,innerHeight)}}catch(e){}
   function buildComposer(){
     if(composer){try{composer.renderTarget1.dispose();composer.renderTarget2.dispose()}catch(e){}}
     const type=postLevel===0?THREE.HalfFloatType:THREE.UnsignedByteType,pr=Math.min(curPR,1.25);
@@ -1635,7 +1637,7 @@ ${FRAG_COLOR}
     for(let i=1;i<=8;i++)for(let j=1;j<=6;j++){gl.readPixels(Math.floor(w*i/9),Math.floor(h*j/7),1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);n++;if(px[0]+px[1]+px[2]<3)bad++}return bad/n}
   // dynamic resolution scaling kiểu game: giữ ~60fps bằng cách tăng/giảm pixel ratio
   let pendPR=null;
-  function setPR(p){curPR=p;renderer.setPixelRatio(p);renderer.setSize(innerWidth,innerHeight);const pr=Math.min(p,1.25);composer.setPixelRatio(pr);composer.setSize(innerWidth,innerHeight);fxaaP.material.uniforms['resolution'].value.set(1/(innerWidth*pr),1/(innerHeight*pr))}
+  function setPR(p){curPR=p;try{localStorage.setItem(PRKEY,String(p))}catch(e){}renderer.setPixelRatio(p);renderer.setSize(innerWidth,innerHeight);const pr=Math.min(p,1.25);composer.setPixelRatio(pr);composer.setSize(innerWidth,innerHeight);fxaaP.material.uniforms['resolution'].value.set(1/(innerWidth*pr),1/(innerHeight*pr))}
   // Tự co độ phân giải render để giữ ≥30 fps. 'Tự động': mục tiêu ~45fps; các preset cố định (Điện ảnh/Đẹp…): giữ trần độ phân giải của preset nhưng vẫn tự hạ khi máy tụt dưới ~30fps (rồi nâng lại khi thoải mái).
   function adaptRes(dtr){if(TEST||throttled)return;ftEma+=(Math.min(dtr,0.1)-ftEma)*0.08;if(--adaptCool>0)return;
     const q=TP.quality,auto=q==='auto',cap=auto?Math.min(maxPR,1.25):Math.min(maxPR,{low:0.75,medium:1,high:maxPR}[q]||maxPR),bad=auto?0.0235:0.033,good=auto?0.0185:0.026,floor=auto?0.6:0.7;
@@ -1757,7 +1759,14 @@ ${FRAG_COLOR}
   window.__envChanged=()=>{if(api.envOut)api.envOut({time:TP.time,weather:TP.weather,auto:TP.auto?1:0})};
   api.applyEnv=m=>{if(m.time!=null&&!window.__realTime)TP.time=m.time;if(m.weather)TP.weather=m.weather;window.__tpSync&&window.__tpSync();applyToon(false)};
   api.syncEnvOut=()=>window.__envChanged();
-  api.warm=()=>renderer.compileAsync?renderer.compileAsync(scene,camera):Promise.resolve();
+  // làm nóng TRƯỚC khi hiện game: biên dịch shader cho MỌI ô cây cỏ (kể cả ô đang ẩn / bản giảm tam giác) và đẩy hết texture lên GPU
+  // → lúc di chuyển không còn khựng vì biên dịch / tải texture lần đầu (nguyên nhân chính của ~10 giây giật đầu tiên)
+  api.warm=()=>{const back=[];const show=o=>{if(o&&!o.visible){o.visible=true;o.count=Math.min(o.count,1);back.push(o)}};      // count=1: chỉ cần biên dịch, đừng bắt máy vẽ cả vườn trong lúc đang tải
+    [EXT,EXTV].forEach(E=>E&&E.cells.forEach(ce=>{show(ce.im);show(ce.im1)}));
+    const seen=new Set();scene.traverse(o=>{[].concat(o.material||[]).forEach(m=>{if(!m)return;for(const k in m){const t=m[k];if(t&&t.isTexture&&!seen.has(t)){seen.add(t);try{renderer.initTexture(t)}catch(e){}}}})});
+    const done=()=>{back.forEach(o=>o.visible=false);if(EXT)EXT.update(controls.target,camera.position,scene.fog.color);if(EXTV)EXTV.update(controls.target,camera.position,scene.fog.color)};
+    let p;try{p=renderer.compileAsync?renderer.compileAsync(scene,camera):Promise.resolve(renderer.compile(scene,camera))}catch(e){p=Promise.resolve()}
+    return p.then(done,done)};
   api.dispose=()=>{try{remote&&remote.dispose();local.dispose()}catch(e){}renderer.dispose()};
   window.__FU=FU;window.VY={EXT,Perf,local,get remote(){return remote},api,A,scene,camera,renderer,controls,tick,THREE,doorList,toggleDoor,occ,TP,envApply,rain,ripples,garden,WC};
 }
