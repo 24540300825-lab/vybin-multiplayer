@@ -106,3 +106,19 @@ Toàn bộ hiệu ứng âm thanh nằm trong `src/sfx.js`, tổng hợp bằng 
 - **Thêm nguồn thưởng mới:** (1) thêm mã vào `allowed` trong `game_report` (migration mới), (2) thêm luật vào `game_config.rewards`, (3) gọi `VYPROG.report('ma_su_kien', {...}, 'idem')` ở client. Thành tựu: thêm 1 mục vào `achievements` với `event` = mã đó — không cần code.
 - **Hộp quà** (`game_inbox`): quà lên cấp, thành tựu, chào mừng, và sau này đồ dư khi túi đầy. Món `c:"soon:*"` chỉ hiển thị (Sắp có).
 - Thử cục bộ không cần Google: `?mock=/dev/mock-supabase.js` (giả lập cũ, không có tiến trình). Luồng tài khoản thật chỉ chạy trên Supabase.
+
+## 7. Trang vỏ (shell) — gọi, nhạc, chat liên tục khi đổi map
+- `index.html` mở ở cửa sổ ngoài cùng chạy `src/shell.js`: đăng nhập / chọn nhân vật (`src/boot-session.js`), giữ **Session, Voice, Chat, nhạc YouTube + Lofi** suốt phiên.
+- Game 3D chạy trong `<iframe id="gameFrame">` (`index.html?g=1#map=…`). `src/main.js` phát hiện `window.parent.VYSHELL` và dùng các đối tượng của vỏ thay vì tự tạo.
+- Đổi map = `VYSHELL.go(id)` chỉ nạp lại iframe → cuộc gọi, nhạc, kênh realtime không đứt. Khi iframe cũ bị gỡ, `VYSHELL.purge(win)` dọn mọi callback trang cũ đã gắn (`obj.h[ev]`) — **đối tượng dùng chung mới phải có `.h` dạng `{ev:[fn]}`** để được dọn.
+- Trình phát nhạc YouTube nằm ở trang vỏ (`#ytDock`), HUD trong iframe gọi `ytm.mount(ô video)` → vỏ đặt khung đè đúng lên ô đó.
+- Cú bấm trong iframe được chuyển lên vỏ (`VYSHELL.gesture`) để nhạc / tiếng cuộc gọi được phép phát.
+- Test 1 trang như cũ: thêm `?noshell`.
+
+## 8. Rạp chung (xem TV cùng nhau) — `src/cinema/`
+- `cinema.js`: luồng ghim TV → ngồi sofa (`local.cmdWatch`) → cutscene (`api.cineCam('in')`) → màn rạp; host/khách, tạm rời (khung nhỏ), tắt TV; đồng bộ qua tin `{k:'cin'}`.
+- `players.js`: một giao diện cho YouTube / Vimeo / Twitch / file / HLS / luồng WebRTC / trang chỉ nhúng. Thêm nền tảng mới: thêm nhánh trong `createPlayer` + nhận diện link trong `sources.js`.
+- Chia sẻ tab / file trên máy: WebRTC riêng host → khách (TURN lấy từ cuộc gọi).
+- Game: chế độ nhân vật `watch` (clip `WATCH`, `WATCH_IDLE`, `OFFWATCH` trong bảng `K`), đệm `Sofa_Seat*` + `TV_Screen` trong map; khi màn rạp mở `api.theater=true` → gần như ngừng vẽ 3D.
+- Bắp rang: object `POPCORN_IN` / `POPCORN_IDLE` / `POPCORN_OUT` trong file nhân vật (đã bake theo tay); clip nào target object nào thì chạy theo đó.
+- Miệng LazyRig (`src/lazyrig.js`): biểu cảm tự động theo tư thế + nhép theo tiếng nói cuộc gọi (`api.meTalk / api.peerTalk`).

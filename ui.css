@@ -742,3 +742,88 @@ html[data-fx=lite] #pick{-webkit-backdrop-filter:none;backdrop-filter:none;backg
 #tutBox b{font:400 1.375rem/1.2 var(--f-d)}#tutBox p{margin:0;color:var(--ink3);font-weight:600;line-height:1.45}
 #tutBox .tt-dots{display:flex;gap:.375rem;margin-top:.375rem}#tutBox .tt-dots i{width:1.5rem;height:.25rem;border-radius:999px;background:rgba(255,255,255,.18)}#tutBox .tt-dots i.ok{background:var(--green)}#tutBox .tt-dots i.on{background:var(--ac)}
 @media(max-width:640px){#tutBox{top:auto;bottom:9rem}}
+/* ===== trang vỏ (shell): game chạy trong iframe phủ kín; khung nhạc YouTube của vỏ đè lên đúng ô video trong panel ===== */
+html.shell,html.shell body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0d12}
+#gameFrame{position:fixed;inset:0;width:100vw;height:100vh;border:0;display:block;z-index:0;background:#0b0d12}
+#ytDock{position:fixed;left:-10000px;top:0;width:320px;height:180px;opacity:0;pointer-events:none;z-index:7;border-radius:1.5rem;overflow:hidden;background:#000}
+#ytDock iframe{width:100%;height:100%;border:0;display:block}
+
+/* ===================== RẠP CHUNG (#cine) =====================
+   Màn rạp phủ kín (nền tối như phòng chiếu, viền sáng ấm quanh màn) → game ngừng vẽ 3D để dồn sức cho video.
+   .mini = tạm rời: chỉ còn khung phim nhỏ góc dưới trái + thanh "Vào lại / Tắt TV". */
+#cine{position:fixed;inset:0;z-index:9;display:none;font:700 var(--t1)/1.3 var(--f-b);color:var(--ink)}
+#cine.show{display:block}
+#cine .cBack{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 42%,#2a2219 0%,#120f0c 55%,#070606 100%)}
+#cine .cBack::after{content:"";position:absolute;left:0;right:0;bottom:0;height:22%;background:linear-gradient(to top,rgba(0,0,0,.65),transparent)}
+#cine .cTop{position:absolute;left:1.5rem;right:1.5rem;top:1rem;display:flex;align-items:center;gap:1rem;z-index:2}
+#cine .cTi{display:flex;align-items:center;gap:.75rem;min-width:0;flex:1}
+#cine .cTi>div{display:flex;flex-direction:column;min-width:0}
+#cine .cTi b{font:400 1.5rem/1.1 var(--f-d)}
+#cine .cNow{color:var(--ink2);font-size:var(--t0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:36rem}
+#cine .cLogo{display:grid;place-items:center;width:2.75rem;height:2.75rem;border-radius:1rem;background:var(--ac);color:var(--ac-ink);font-size:1.5rem;flex:none}
+#cine .cLogo.big{width:5rem;height:5rem;border-radius:1.75rem;font-size:2.75rem;margin:0 auto .75rem}
+#cine .cWho{display:flex;gap:.5rem}
+#cine .cP{display:flex;align-items:center;gap:.5rem;padding:.25rem .875rem .25rem .25rem;border-radius:999px;background:var(--chipbg);border:1px solid var(--line)}
+#cine .cP img{width:2.25rem;height:2.25rem;border-radius:50%;object-fit:cover}
+#cine .cP span{display:flex;flex-direction:column;line-height:1.15}#cine .cP b{font-size:var(--t0)}#cine .cP small{font-size:max(.6875rem,9px);color:var(--ink2);display:flex;align-items:center;gap:.25rem}
+#cine .cP small svg{color:var(--ac)}
+#cine .cP.watch{border-color:rgba(139,226,139,.55)}#cine .cP.away{border-color:rgba(255,213,129,.5)}#cine .cP.off{opacity:.55}
+#cine .cAct{display:flex;gap:.5rem}
+#cine .cb{display:inline-flex;align-items:center;gap:.5rem;height:2.5rem;padding:0 .875rem;border:0;border-radius:999px;background:var(--fill);color:#fff;cursor:pointer;font:700 var(--t0)/1 var(--f-b);transition:background .15s}
+#cine .cb svg{font-size:1.125rem}#cine .cb:hover{background:var(--fill2)}#cine .cb:disabled{opacity:.45;cursor:default}
+#cine .cb.off{background:rgba(229,72,77,.85)}#cine .cb.off:hover{background:#e5484d}
+#cine .cb.big{width:3rem;height:3rem;padding:0;justify-content:center;background:var(--ac);color:var(--ac-ink)}#cine .cb.big svg{font-size:1.25rem}
+#cine .cStage{position:absolute;left:0;right:0;top:4.75rem;bottom:5.5rem;display:grid;place-items:center;padding:0 2rem}
+#cine .cScreen{position:relative;width:min(100%,calc((100vh - 11.5rem)*16/9));aspect-ratio:16/9;border-radius:1.25rem;overflow:hidden;background:#000;
+  box-shadow:0 0 0 1px rgba(255,255,255,.08),0 0 4rem rgba(255,190,120,.16),0 1.5rem 4rem rgba(0,0,0,.6)}
+#cine .cPl,#cine .cpBox{position:absolute;inset:0}
+#cine .cpBox iframe,#cine .cpBox video,#cine .cpBox>div{width:100%!important;height:100%!important;border:0;display:block;background:#000}
+#cine .cEmpty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;background:linear-gradient(160deg,#1d1914,#0d0b09)}
+#cine .ce h2{font:400 1.75rem/1.2 var(--f-d);margin:0 0 .25rem}#cine .ce p{color:var(--ink2);margin:0 0 1.25rem}
+#cine .ceB{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;padding:0 1rem}
+#cine .cTap{position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.45)}
+#cine .cMiniBar{display:none}
+#cine .cBar{position:absolute;left:50%;bottom:1.25rem;transform:translateX(-50%);width:min(calc(100% - 3rem),64rem);display:flex;align-items:center;gap:.75rem;padding:.5rem .75rem .5rem .5rem;border-radius:999px;background:rgba(20,18,16,.85);border:1px solid var(--line);z-index:2}
+#cine .cT{font-variant-numeric:tabular-nums;font-size:var(--t0);color:var(--ink2);min-width:3rem;text-align:center}
+#cine #cnSeek{flex:1;min-width:4rem;accent-color:var(--ac)}
+#cine .cVol{display:flex;align-items:center;gap:.25rem;color:var(--ink2)}#cine .cVol input{width:5.5rem;accent-color:var(--ac)}
+#cine .cSync i{display:inline-flex;align-items:center;gap:.25rem;font-style:normal;font-size:var(--t0);white-space:nowrap}#cine .cSync .ok{color:var(--green)}#cine .cSync .w{color:var(--orange)}
+#cine.guest #cnPlay,#cine.guest #cnSeek{opacity:.45}
+/* thư viện chọn phim (ngăn kéo bên phải) */
+#cine .cLib{position:absolute;top:4.75rem;right:1.5rem;bottom:5.5rem;width:min(30rem,calc(100% - 3rem));display:flex;flex-direction:column;gap:.75rem;padding:1rem;border-radius:1.5rem;
+  background:var(--panel);border:1px solid var(--line);box-shadow:0 1rem 3rem rgba(0,0,0,.5);z-index:3;transform:translateX(calc(100% + 2rem));opacity:0;pointer-events:none;transition:transform .28s ease,opacity .2s}
+#cine .cLib.on{transform:none;opacity:1;pointer-events:auto}
+#cine .cLib .ph{display:flex;align-items:center;gap:.5rem}#cine .cLib h3{margin:0;font:400 1.25rem/1.2 var(--f-d)}#cine .sp{flex:1}
+#cine .cLib .rb{width:2.25rem;height:2.25rem;border-radius:50%;border:0;background:var(--fill);color:#fff;cursor:pointer;display:grid;place-items:center}
+#cine .cTabs{display:flex;flex-wrap:wrap;gap:.375rem}
+#cine .cTabs button{display:inline-flex;align-items:center;gap:.375rem;border:0;border-radius:999px;padding:.375rem .75rem;background:var(--fill);color:var(--ink2);cursor:pointer;font:700 var(--t0)/1.2 var(--f-b)}
+#cine .cTabs button.on{background:var(--ac);color:var(--ac-ink)}#cine .cTabs em{font-style:normal;background:var(--bad);color:#fff;border-radius:999px;padding:0 .375rem}#cine .cTabs em:empty{display:none}
+#cine .cPane{display:none;flex-direction:column;gap:.625rem;min-height:0;overflow:auto;flex:1}#cine .cPane.on{display:flex}
+#cine .cRow{display:flex;gap:.5rem}#cine .cRow input{flex:1;min-width:0;height:2.5rem;border-radius:999px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:#fff;padding:0 1rem;font:700 var(--t0)/1 var(--f-b)}
+#cine .help{margin:0;color:var(--ink2);font-size:var(--t0);font-weight:600;line-height:1.45}#cine .help.dim{opacity:.7}
+#cine .cSub{font:400 1rem/1.2 var(--f-d);margin-top:.5rem}
+#cine .pb.wide{width:100%;height:3rem}
+#cine .cGrid,#cine .cList{display:flex;flex-direction:column;gap:.375rem}
+#cine .cCard{display:flex;gap:.75rem;align-items:center;text-align:left;border:0;border-radius:1rem;padding:.375rem;background:transparent;color:#fff;cursor:pointer;font:inherit}
+#cine .cCard:hover{background:var(--fill)}
+#cine .cCard .th{position:relative;flex:none;width:8.5rem;aspect-ratio:16/9;border-radius:.75rem;overflow:hidden;background:#222;display:grid;place-items:center;font-size:1.5rem;color:var(--ink2)}
+#cine .cCard .th img{width:100%;height:100%;object-fit:cover}#cine .cCard .th em{position:absolute;right:.25rem;bottom:.25rem;font-style:normal;font-size:max(.625rem,9px);background:rgba(0,0,0,.75);padding:0 .25rem;border-radius:.25rem}
+#cine .cCard .tt{display:flex;flex-direction:column;min-width:0}#cine .cCard b{font-size:var(--t0);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}#cine .cCard small{color:var(--ink2);font-size:max(.6875rem,9px)}
+/* xin quyền điều khiển */
+#cine .cAsk{position:absolute;left:50%;top:5.25rem;transform:translateX(-50%);display:flex;align-items:center;gap:.75rem;padding:.625rem .75rem;border-radius:1.25rem;background:var(--panel);border:1px solid var(--line);z-index:4;box-shadow:0 .75rem 2rem rgba(0,0,0,.5)}
+#cine .cAsk img{width:2.5rem;height:2.5rem;border-radius:50%}#cine .cAsk div{display:flex;flex-direction:column}#cine .cAsk small{color:var(--ink2);font-size:var(--t0)}
+/* tạm rời: khung nhỏ góc dưới trái, trên HUD (không che 3D) */
+#cine.mini{inset:auto auto 1rem 1rem;width:min(22rem,calc(100vw - 2rem));pointer-events:none}
+#cine.mini .cBack,#cine.mini .cTop,#cine.mini .cBar,#cine.mini .cLib,#cine.mini .cAsk{display:none}
+#cine.mini .cStage{position:static;padding:0;display:block}
+#cine.mini .cScreen{width:100%;border-radius:1rem;pointer-events:auto;box-shadow:0 .75rem 2rem rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.12)}
+#cine.mini .cEmpty .ce p,#cine.mini .cEmpty .ceB{display:none}#cine.mini .ce h2{font-size:1rem}#cine.mini .cLogo.big{width:2.5rem;height:2.5rem;font-size:1.25rem;border-radius:.75rem}
+#cine.mini .cMiniBar{display:flex;position:absolute;left:0;right:0;bottom:0;align-items:center;gap:.375rem;padding:1.5rem .5rem .5rem .75rem;background:linear-gradient(to top,rgba(0,0,0,.78),transparent);opacity:0;transition:opacity .2s}
+#cine.mini .cScreen:hover .cMiniBar,#cine.mini .cScreen:focus-within .cMiniBar{opacity:1}
+#cine.mini .cMiniBar b{font-size:var(--t0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#cine.mini .cMiniBar .cb{height:2rem;padding:0 .625rem}
+/* đang trong rạp / cutscene: ẩn HUD game + ghim 3D cho gọn màn */
+html.cineOn .col,html.cineOn #pins,html.cineOn #kSide,html.cineOn #hCall:not(.full),html.cineCut .col,html.cineCut #pins,html.cineCut #kSide{visibility:hidden}
+#cine:fullscreen{background:#000}
+@media (max-width:760px){#cine .cWho{display:none}#cine .cAct .cb span{display:none}#cine .cVol,#cine .cSync{display:none}#cine .cStage{padding:0 .75rem}}
+html[data-fx="lite"] #cine .cLib{transition:none}

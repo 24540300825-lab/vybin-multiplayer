@@ -18,6 +18,7 @@ import {setupExterior,LEVELS} from './exterior.js';
 import './hud.js';
 import {SFX} from './sfx.js';
 import {initPins} from './ui/pins.js';
+import {LazyMouth} from './lazyrig.js';
 
 // API công khai cho lớp mạng (sync.js) — game không biết gì về Supabase.
 export const api={local:null,remote:null,emit:null,sendInput:null,onTick:null,envOut:null,peerChanged:null};
@@ -318,7 +319,7 @@ ${FRAG_COLOR}
     const p=halo.t/T;halo.mat.opacity=0.95*(1-p)*(0.6+0.4*Math.sin(p*18));}
 
   // ===== dùng chung cho 2 nhân vật =====
-  const occ={bedL:null,bedR:null,chair:null};
+  const occ={bedL:null,bedR:null,chair:null,sofa0:null,sofa1:null};
   const toast=m=>{const t=$('toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast._t);toast._t=setTimeout(()=>t.style.opacity=0,1800)};
   // ===== env: chair clips (phát đồng thời với clip nhân vật) =====
   const envMixer=new THREE.AnimationMixer(env),chairActs={};
@@ -358,8 +359,19 @@ ${FRAG_COLOR}
     Object.values(chairActs).forEach(x=>{if(x!==a)x.stop()});a.reset();a.setLoop(THREE.LoopOnce,1);a.clampWhenFinished=true;a.timeScale=1;a.play();}
 
 
+  // ===== SOFA (xem TV): 2 đệm ngồi Sofa_Seat / Sofa_Seat001, hướng nhìn = từ sofa về phía màn TV =====
+  const SOFA=(()=>{if(OUTD)return null;const seats=['Sofa_Seat','Sofa_Seat001'].map(n=>byName[n]).filter(Boolean),tv=byName['TV_Screen']||byName['TV_Panel'];
+    if(!seats.length||!tv)return null;env.updateMatrixWorld(true);
+    const tb=new THREE.Box3().setFromObject(tv),tc=tb.getCenter(new THREE.Vector3());
+    const S=seats.map(o=>{const b=new THREE.Box3().setFromObject(o);return{c:b.getCenter(new THREE.Vector3()),top:b.max.y}});
+    const sc=S.reduce((a,x)=>a.add(x.c),new THREE.Vector3()).multiplyScalar(1/S.length);
+    const yaw=Math.atan2(tc.x-sc.x,tc.z-sc.z),fwd=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+    // chừa ô đứng trước mỗi đệm (lưới va chạm bơm phồng quanh sofa chặn mất chỗ đứng để ngồi xuống)
+    S.forEach(x=>{const st=x.c.clone().addScaledVector(fwd,0.55);const R=0.24;
+      for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const X=G.x0+(i+.5)*G.c,Z=G.z0+(j+.5)*G.c;if(Math.hypot(X-st.x,Z-st.z)<R)blocked[0][j*G.W+i]=0}});
+    return{yaw,fwd,tv:tc,tvBox:tb,center:sc,seats:S}})();
   const DEF_VY={id:'vy',K,eye:{close:'ACT_EYE_CLOSE',open:'ACT_EYE_OPEN',blink:'ACT_BLINK'},eyeMeshes:['Sphere','Sphere001'],trim:null,foot:{walk:[0.255,0.76],run:[0.29,0.70]},pos:new THREE.Vector3(2.5,0,-1.5),yaw:0.4,ctrl:'wasd'};
-  const KB={REST:'ACT_BIN_RESTPOSE',IDLE:'ACT_BIN_IDLE',WALK:'ACT_BIN_WALK',RUN:'ACT_BIN_RUN',
+  const KB={WATCH:'ACT_BIN_WATCHING',WATCH_IDLE:'ACT_BIN_WATCHING_IDLE',OFFWATCH:'ACT_BIN_OFFWATCH',REST:'ACT_BIN_RESTPOSE',IDLE:'ACT_BIN_IDLE',WALK:'ACT_BIN_WALK',RUN:'ACT_BIN_RUN',
     CLIMBCHAIR_L:'ACT_BIN_CLIMB ON CHAIR_L',CLIMBCHAIR_R:'ACT_BIN_CLIMB ON CHAIR_R',OFFCHAIR_L:'ACT_BIN_OFF CHAIR_L',OFFCHAIR_R:'ACT_BIN_OFF CHAIR_R',
     CLIMBBED_L:'ACT_BIN_SLEEP_CLIMB ON BED_L',CLIMBBED_R:'ACT_BIN_SLEEP_CLIMB ON BED_R',SLEEP_L:'ACT_BIN_SLEEP-LOOP BREATHE_L',SLEEP_R:'ACT_BIN_SLEEP-LOOP BREATHE_R',
     OFFBED_L:'ACT_BIN_SLEEP_OFF BED_L',OFFBED_R:'ACT_BIN_SLEEP_OFF BED_R'};
@@ -377,7 +389,11 @@ ${FRAG_COLOR}
   toonify(char);scene.add(char);
   char.traverse(o=>{if((o.isMesh||o.isSkinnedMesh)&&(()=>{for(let p=o;p&&p!==char;p=p.parent)if(/^cs_/.test(p.name))return true;return false})()){o.visible=false;o.layers.disable(0);}
     else if(o.isMesh||o.isSkinnedMesh){o.frustumCulled=false;o.castShadow=true;o.receiveShadow=false;}});
-  ['Workstation','Workstation001'].forEach(n=>{const o=char.getObjectByName(n);if(o)o.removeFromParent()});
+  ['Workstation','Workstation001','LIVING_STUDIO','SleepingArea'].forEach(n=>{const o=char.getObjectByName(n);if(o)o.removeFromParent()});
+  // hộp bắp: 3 object đã bake theo tay — POPCORN_IN (clip lấy bắp), POPCORN_IDLE (cầm lúc ngồi xem), POPCORN_OUT (clip cất bắp)
+  const popFind=re=>{let r=null;char.traverse(o=>{if(!r&&re.test(o.name))r=o});return r};
+  const POPM={IN:popFind(/^POPCORN[ _]?IN$/i),IDLE:popFind(/^POPCORN[ _]?IDLE$/i),OUT:popFind(/^POPCORN[ _]?OUT$/i)};
+  Object.values(POPM).forEach(o=>{if(o){o.visible=false;o.traverse(m=>{if(m.isMesh){m.castShadow=true;m.frustumCulled=false}})}});
   chrG.animations=chrG.animations.filter(c=>!/^ACT_CHAIR/.test(c.name.trim()));
   const mixer=new THREE.AnimationMixer(char);
   const acts={},eye={CLOSE:[],OPEN:[],BLINK:[]};
@@ -442,6 +458,54 @@ ${FRAG_COLOR}
     HIP[key]={s:sampleHips(a,t0),e:sampleHips(a,cl.duration)}});
   mixer.stopAllAction();
   console.log('HIP '+JSON.stringify(Object.fromEntries(Object.entries(HIP).map(([k,v])=>[k,[v.s.toArray().map(x=>+x.toFixed(2)),v.e.toArray().map(x=>+x.toFixed(2))]]))));
+
+  // ===== bắp rang: clip của POPCORN_IN chạy cùng WATCHING; xong thì đổi sang POPCORN_IDLE (đặt đúng chỗ IN kết thúc); OFFWATCH chạy clip của POPCORN_OUT =====
+  const popA={};
+  chrG.animations.forEach(c=>{const tn=c.tracks[0]&&THREE.PropertyBinding.parseTrackName(c.tracks[0].name).nodeName;
+    if(POPM.IN&&tn===POPM.IN.name)popA.IN=mixer.clipAction(c);else if(POPM.OUT&&tn===POPM.OUT.name)popA.OUT=mixer.clipAction(c)});
+  let popSt='off';
+  const popShow=k=>{for(const n in POPM)if(POPM[n])POPM[n].visible=n===k};
+  function popIn(){if(!POPM.IN||!popA.IN){if(POPM.IDLE){popShow('IDLE');popSt='held'}return}popA.OUT&&popA.OUT.stop();popShow('IN');once(popA.IN);popA.IN.setEffectiveWeight(1);popSt='in'}
+  function popHeld(){const a=POPM.IN,b=POPM.IDLE;if(b&&a){b.position.copy(a.position);b.quaternion.copy(a.quaternion);b.scale.copy(a.scale)}popShow(b?'IDLE':'IN');popSt='held'}
+  function popOut(){if(popSt==='off')return;popA.IN&&popA.IN.stop();if(!POPM.OUT||!popA.OUT){popHide();return}popShow('OUT');once(popA.OUT);popA.OUT.setEffectiveWeight(1);popSt='out'}
+  function popHide(){popA.IN&&popA.IN.stop();popA.OUT&&popA.OUT.stop();popShow(null);popSt='off'}
+  mixer.addEventListener('finished',e=>{if(e.action===popA.IN&&popSt==='in'){popHeld();if(POPM.IDLE)popA.IN.stop()}else if(e.action===popA.OUT&&popSt==='out')popHide()});
+
+  // ===== MIỆNG (LazyRig): biểu cảm tự động theo ngữ cảnh — người chơi không điều khiển =====
+  // Ô atlas (giống nhau ở 2 file, 15 ô đầu): 0 cười hở răng · 1 cười mím · 2 nhếch mép · 3 nhe răng · 4 buồn · 5 há "ồ" · 6 khóc · 7 cười lớn
+  // 8 chu môi · 9 lè lưỡi · 10 gầm · 11 méo · 12 ngáp · 13 nhăn · 14 mèo "w". Bin có thêm khung nhép nói (vòng lặp đầu tiên trong file).
+  let mouth=null;try{mouth=new LazyMouth(char)}catch(e){console.warn('[mouth]',e.message)}
+  const MZ={rest:mouth?(mouth.meta.rest??0):0,talk:mouth&&mouth.loops&&mouth.loops[0]?mouth.loops[0].name:null,n:mouth?mouth.cells.length:0,burst:null,next:4+Math.random()*6,talking:false,prevMode:'free',prevBusy:null};
+  const mzOk=i=>i>=0&&i<MZ.n;
+  function mouthSay(seq){if(!mouth)return;MZ.burst={seq:seq.filter(s=>mzOk(s[0])),i:0,t:0}}
+  function mouthBase(){const k=busy&&busy.kind;
+    if(k==='climbBed'||k==='offBed')return 12;
+    if(P.mode==='bed')return DEF.id==='vy'?14:1;
+    if(P.mode==='type'||P.mode==='sit'||k==='climbChair')return 1;
+    if(P.mode==='watch'||k==='climbWatch'||k==='offWatch')return 1;
+    if(cur===acts[K.RUN])return 0;
+    return MZ.rest}
+  function mouthTick(dt){
+    if(!mouth)return;
+    const talk=!!(DEF.remote?(api.peerTalk&&api.peerTalk()):(api.meTalk&&api.meTalk()));
+    if(talk&&MZ.talk){if(!MZ.talking){MZ.talking=true;mouth.playLoop(MZ.talk,{repeat:true,speed:1})}mouth.update(dt);return}
+    if(MZ.talking){MZ.talking=false;mouth.stop(false)}
+    // phản ứng theo sự kiện (đổi tư thế)
+    const bk=busy&&busy.kind;
+    if(bk!==MZ.prevBusy){if(bk==='climbChair'||bk==='climbWatch')mouthSay([[2,0.9]]);else if(bk==='offBed')mouthSay([[12,1.1],[0,0.6]]);MZ.prevBusy=bk}
+    if(P.mode!==MZ.prevMode){if(P.mode==='watch')mouthSay([[0,1.2]]);MZ.prevMode=P.mode}
+    // thỉnh thoảng đổi nét mặt theo tình huống
+    MZ.next-=dt;
+    if(MZ.next<=0&&!MZ.burst&&!busy){const r=Math.random();
+      if(P.mode==='watch'){MZ.next=7+Math.random()*12;
+        if(r<0.3)mouthSay([[5,0.14],[1,0.14],[5,0.14],[1,0.14],[5,0.14],[1,0.3]]);          // nhai bắp
+        else if(r<0.55)mouthSay([[7,1.4]]);else if(r<0.75)mouthSay([[0,1.6]]);else if(r<0.88)mouthSay([[5,0.9]]);else mouthSay([[14,1.4]])}
+      else if(P.mode==='bed'){MZ.next=20}
+      else if(P.mode==='type'||P.mode==='sit'){MZ.next=8+Math.random()*10;mouthSay(r<0.5?[[2,1.2]]:r<0.8?[[8,0.9]]:[[3,0.8]])}
+      else{MZ.next=6+Math.random()*10;mouthSay(r<0.45?[[1,1.5]]:r<0.75?[[2,1.1]]:r<0.9?[[0,1.2]]:[[9,0.8]])}}
+    let e=mouthBase();
+    const b=MZ.burst;if(b){if(b.i<b.seq.length){e=b.seq[b.i][0];b.t+=dt;if(b.t>=b.seq[b.i][1]){b.i++;b.t=0}}else MZ.burst=null}
+    if(mzOk(e))mouth.setExpression(e)}
 
   // ===== eyes: blink =====
   let eyeSt='open',nextBlink=2,blinkEnd=0;
@@ -532,10 +596,14 @@ ${FRAG_COLOR}
       for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const k=j*g.W+i,x=g.x0+(i+.5)*g.c,z=g.z0+(j+.5)*g.c;
         if(!(x>cb.min.x&&x<cb.max.x&&z>cb.min.z&&z<cb.max.z)&&mk.stands.some(v=>Math.hypot(v.x-x,v.z-z)<0.22)){if(mk.mine.has(k)){blocked[lv][k]=0;mk.mine.delete(k)}continue}
         if(!blocked[lv][k]){blocked[lv][k]=1;mk.mine.add(k)}}}}
+  // ghế sofa xem TV: gốc đứng sao cho hông cuối clip WATCHING rơi đúng tâm đệm (clip lùi ~0.5 m rồi ngồi xuống)
+  function watchPose(i){const se=SOFA.seats[i],an=HIP.WATCH?HIP.WATCH.e:new THREE.Vector3(0,0.5,-0.52),y=SOFA.yaw,c=Math.cos(y),s=Math.sin(y);
+    return new THREE.Vector3(se.c.x-(an.x*c+an.z*s),A.L0,se.c.z-(-an.x*s+an.z*c))}
+  const watchDY=i=>{const an=HIP.WATCH?HIP.WATCH.e:null;if(!an)return 0;return clamp(SOFA.seats[i].top+0.06-(A.L0+an.y),-0.15,0.15)};
   const bedPose=side=>new THREE.Vector3(side==='L'?A.bedBox.min.x-CFG.bedSide:A.bedBox.max.x+CFG.bedSide,A.L1,A.bedBox.min.z+CFG.bedHeadZ);
   const bedRootY=()=>A.mattress.max.y-CFG.bedHipH;
 
-  function startPos(){return (P.mode==='bed'||P.mode==='sit'||P.mode==='type')&&P.stand?P.stand.clone():P.pos.clone()}
+  function startPos(){return (P.mode==='bed'||P.mode==='sit'||P.mode==='type'||P.mode==='watch')&&P.stand?P.stand.clone():P.pos.clone()}
   function pickSide(fn){const p=startPos();return ['L','R'].map(s=>{const v=fn(s);return{s,d:Math.hypot(v.x-p.x,v.z-p.z)}}).sort((a,b)=>a.d-b.d)[0].s}
   // điểm "chờ" thẳng trục trước miệng cầu thang (xa nhất còn trống, tối đa 0.5 m); nếu chật hơn 0.3 m thì dùng luôn điểm miệng
   const approachZ=(cx,z0,dir,lv)=>{let best=z0;for(let d=0.1;d<=0.5;d+=0.1){const zz=z0+dir*d,c=cell(cx,zz);if(free(lv,c[0],c[1])&&zz<(lv?MC.l1[3]:MC.walk0[3])-0.05&&zz>MC.walk0[2])best=zz;else break}return Math.abs(best-z0)>=0.3?best:z0};
@@ -544,7 +612,7 @@ ${FRAG_COLOR}
     if(L===0&&lv===1){const S=pickStair(x0,z0,x,z,true),cx=S.cx,ap=approachZ(cx,S.botZ,1,0);add(findPath(x0,z0,cx,ap,0,true));it.slice(-2).forEach(w=>w.strict=1);it.push(wp(cx,S.botZ,null,run,1),wp(cx,S.midZ,1,run),wp(cx,S.topZ,null,run));x0=cx;z0=S.topZ}      // tới thẳng trục chân cầu thang rồi mới leo (không cắt góc từ bên hông)
     else if(L===1&&lv===0){const S=pickStair(x0,z0,x,z,false),cx=S.cx,ok=approachZ(cx,S.topZ,-1,1);add(findPath(x0,z0,cx,ok,1,true));it.slice(-2).forEach(w=>w.strict=1);it.push(wp(cx,S.topZ,null,run,1),wp(cx,S.midZ,0,run),wp(cx,S.botZ,null,run),wp(cx,approachZ(cx,S.botZ,1,0),null,run,1));x0=cx;z0=approachZ(cx,S.botZ,1,0)}
     add(findPath(x0,z0,x,z,lv,exact));return it;}
-  const leave=()=>{const k=busy&&busy.kind;return (P.mode==='bed'||k==='climbBed')?[{t:'offBed'}]:(P.mode==='sit'||P.mode==='type'||k==='climbChair')?[{t:'offChair'}]:[]};
+  const leave=()=>{const k=busy&&busy.kind;return (P.mode==='bed'||k==='climbBed')?[{t:'offBed'}]:(P.mode==='sit'||P.mode==='type'||k==='climbChair')?[{t:'offChair'}]:(P.mode==='watch'||k==='climbWatch')?[{t:'offWatch'}]:[]};
   function cmdMove(x,z,lv,run){
     em('move',[r3(x),r3(z),lv,run?1:0]);
     if(lv===0){x=clamp(x,MC.walk0[0],MC.walk0[1]);z=clamp(z,MC.walk0[2],MC.walk0[3]);} else {x=clamp(x,MC.cl1[0],MC.cl1[1]);z=clamp(z,MC.cl1[2],MC.cl1[3]);}
@@ -558,6 +626,17 @@ ${FRAG_COLOR}
     const side=pickSide(chairStandOf),s=chairStandOf(side);
     plan=[...leave(),...route(s.x,s.z,A.chairL,false,true),{t:'face',yaw:A.chairYaw},{t:'climbChair',side}];if(type==='type')plan.push({t:'type'});}
   const cmdWake=()=>{em('wake');if(P.mode==='bed'||(busy&&busy.kind==='climbBed'))plan=[{t:'offBed'}];else if(plan.some(s=>s.t==='climbBed')){plan=[];['bedL','bedR'].forEach(k=>{if(occ[k]===DEF.id)occ[k]=null})}};
+  // xem TV: đi tới trước đệm sofa còn trống gần nhất → quay mặt về TV → ngồi lùi lên sofa (WATCHING) → WATCHING_IDLE
+  function cmdWatch(seat){if(!SOFA)return false;
+    if(P.mode==='watch'||(busy&&busy.kind==='climbWatch')||plan.some(x=>x.t==='climbWatch'))return true;
+    const p0=startPos(),free=[0,1].filter(i=>i<SOFA.seats.length&&(!occ['sofa'+i]||occ['sofa'+i]===DEF.id));
+    if(seat!=null&&free.includes(seat|0))seat=seat|0;else{if(!free.length){toast('Sofa đã kín chỗ');return false}
+      seat=free.sort((a,b)=>{const va=watchPose(a),vb=watchPose(b);return Math.hypot(va.x-p0.x,va.z-p0.z)-Math.hypot(vb.x-p0.x,vb.z-p0.z)})[0]}
+    em('watch',seat);occ['sofa'+seat]=DEF.id;const s=watchPose(seat);
+    plan=[...leave(),...route(s.x,s.z,0,false,true),{t:'face',yaw:SOFA.yaw},{t:'climbWatch',seat}];return true}
+  function cmdUnwatch(){em('unwatch');
+    if(P.mode==='watch'||(busy&&busy.kind==='climbWatch'))plan=[{t:'offWatch'}];
+    else if(plan.some(x=>x.t==='climbWatch')){plan=[];for(const k of ['sofa0','sofa1'])if(occ[k]===DEF.id)occ[k]=null}}
   const cmdOffChair=()=>{em('off');if(P.mode==='sit'||P.mode==='type'||(busy&&busy.kind==='climbChair'))plan=[{t:'offChair'}];else if(plan.some(s=>s.t==='climbChair')){plan=[];if(occ.chair===DEF.id)occ.chair=null}};
 
   // clip nhân vật + clip ghế (nếu có) bắt đầu CÙNG MỘT LÚC
@@ -565,7 +644,7 @@ ${FRAG_COLOR}
     const a=play(key,{once:true,fade:0.15,restart:true});
     if(chairTag)playChair(chairTag,P.side);
     busy={kind,a,dur:a.getClip().duration,y0,y1};P.pos.y=y0;
-    sfxAt({climbBed:'bedClimb',offBed:'bedOff',climbChair:'sit',offChair:'standUp'}[kind],{range:14});
+    sfxAt({climbBed:'bedClimb',offBed:'bedOff',climbChair:'sit',offChair:'standUp',climbWatch:'sit',offWatch:'standUp'}[kind],{range:14});
   }
   // clip off kết thúc lệch root (hông ở xa gốc) -> dời root theo đúng chỗ hông đã tới, tránh bị kéo/snap khi về REST
   function endDrift(key){const e=HIP[key]&&HIP[key].e,r=HIP.REST&&HIP.REST.s;if(!e||!r)return false;
@@ -580,6 +659,8 @@ ${FRAG_COLOR}
       if(b.kind==='climbBed'){P.mode='bed';if(plan[0]&&plan[0].t==='offBed'){}else{play('SLEEP_'+P.side,{fade:0.05});eyeClose();sfxAt('sleep',{range:12});}}
       else if(b.kind==='climbChair'){if(plan[0]&&plan[0].t==='offChair'){P.mode='sit'}else if(!K.SIT){P.mode='sit';}else if(plan[0]&&plan[0].t==='type'){plan.shift();P.mode='type';play('TYPE',{fade:0.05});}else{P.mode='sit';play('SIT',{fade:0.1});}}
       else if(b.kind==='offBed'){sfxAt('wake',{range:12});occ['bed'+P.side]=null;const dr=endDrift('OFFBED_'+P.side);P.mode='free';P.level=1;P.stand=null;anchor=null;toRest(dr);}
+      else if(b.kind==='climbWatch'){P.mode='watch';if(!(plan[0]&&plan[0].t==='offWatch'))play('WATCH_IDLE',{fade:0.15});if(!DEF.remote&&api.onWatchSeated)api.onWatchSeated()}
+      else if(b.kind==='offWatch'){for(const k of ['sofa0','sofa1'])if(occ[k]===DEF.id)occ[k]=null;const dr=endDrift('OFFWATCH');P.mode='free';P.level=0;P.stand=null;P.seat=undefined;anchor=null;toRest(dr);if(!DEF.remote&&api.onWatchLeft)api.onWatchLeft()}
       else if(b.kind==='offChair'){occ.chair=null;const dr=endDrift('OFFCHAIR_'+P.side);P.mode='free';P.level=A.chairL;P.stand=null;anchor=null;toRest(dr);}
     }
   }
@@ -612,6 +693,10 @@ ${FRAG_COLOR}
         anchor=HIP['CLIMBCHAIR_'+it.side].e.clone();startBusy('climbChair','CLIMBCHAIR_'+it.side,'CLIMBUP',A.CY,A.CY+CFG.sitYAdj);break;}
       case 'offBed':{plan.shift();eyeOpen();startBusy('offBed','OFFBED_'+P.side,null,bedRootY(),A.L1);break;}
       case 'offChair':{plan.shift();startBusy('offChair','OFFCHAIR_'+P.side,'OFF',A.CY+CFG.sitYAdj,A.CY);break;}
+      case 'climbWatch':{plan.shift();const i=it.seat|0;if(occ['sofa'+i]&&occ['sofa'+i]!==DEF.id){plan=[];toast('Chỗ đó có người rồi');break}occ['sofa'+i]=DEF.id;
+        P.yaw=SOFA.yaw;P.seat=i;const s=watchPose(i);P.stand=s.clone();P.pos.x=s.x;P.pos.z=s.z;P.level=0;
+        startBusy('climbWatch','WATCH',null,A.L0,A.L0+watchDY(i));popIn();break;}
+      case 'offWatch':{plan.shift();startBusy('offWatch','OFFWATCH',null,P.pos.y,A.L0);popOut();break;}
       case 'type':{plan.shift();if(P.mode==='sit'&&K.TYPE){P.mode='type';play('TYPE',{fade:0.06});}break;}
       case 'sitidle':{plan.shift();if(P.mode==='type'){P.mode='sit';play('SIT',{fade:0.2});}break;}
     }
@@ -696,17 +781,20 @@ ${FRAG_COLOR}
   // ----- WASD control -----
   function manualUpdate(dt,inp){if(inp.interact){em('int');emitOff++;try{manualUpdate0(dt,inp)}finally{emitOff--}}else manualUpdate0(dt,inp)}
   function manualUpdate0(dt,inp){
-    if(busy&&(inp.mag>0.1||inp.interact)&&!plan[0]){if(busy.kind==='climbBed')plan=[{t:'offBed'}];else if(busy.kind==='climbChair')plan=[{t:'offChair'}]}
+    const lockW=(P.mode==='watch'||(busy&&busy.kind==='climbWatch'))&&api.cineLock;      // đang mở màn rạp: phím không làm nhân vật đứng dậy
+    if(lockW){inp.mag=0;inp.interact=false}
+    if(busy&&(inp.mag>0.1||inp.interact)&&!plan[0]){if(busy.kind==='climbBed')plan=[{t:'offBed'}];else if(busy.kind==='climbChair')plan=[{t:'offChair'}];else if(busy.kind==='climbWatch')plan=[{t:'offWatch'}]}
     if(busy||plan[0]){
       if(!busy&&plan[0]&&plan[0].t==='wp'&&inp.mag>0.1)plan=[];
       else{updatePlan(dt);return}}
     if(inp.interact){
       if(P.mode==='bed'){plan=[{t:'offBed'}];return}
       if(P.mode==='sit'||P.mode==='type'){plan=[{t:'offChair'}];return}
+      if(P.mode==='watch'){cmdUnwatch();return}
       const dB=nearestDist(bedPose),dC=nearestDist(chairStandOf),bOK=P.level===1&&dB<2.2,cOK=P.level===A.chairL&&dC<2.2;
       if(cOK&&(!bOK||dC<=dB)){cmdSit();return}if(bOK){cmdSleep();return}}
-    if(P.mode==='bed'||P.mode==='sit'||P.mode==='type'){
-      if(inp.mag>0.1)plan=[{t:P.mode==='bed'?'offBed':'offChair'}];
+    if(P.mode==='bed'||P.mode==='sit'||P.mode==='type'||P.mode==='watch'){
+      if(inp.mag>0.1){if(P.mode==='watch')cmdUnwatch();else plan=[{t:P.mode==='bed'?'offBed':'offChair'}]}
       return;}
     if(inp.mag>0.1){
       const diff=angDiff(Math.atan2(inp.x,inp.z),P.yaw);
@@ -761,11 +849,12 @@ ${FRAG_COLOR}
       if(P.sp<0.05&&!plan[0])P.yaw+=angDiff(s.w,P.yaw)*(1-Math.exp(-dt*6));}
     // đồng bộ chế độ (nằm/ngồi) nếu lệch kéo dài
     if(s.m!==P.mode&&!s.b&&!plan[0]){netMis+=dt;if(netMis>0.8){netMis=0;
-      if(s.m==='bed')cmdSleep();else if(s.m==='sit'||s.m==='type')cmdSit(s.m==='type'?'type':0);else if(P.mode==='bed')cmdWake();else cmdOffChair();}}
+      if(s.m==='watch')cmdWatch(s.s);else if(P.mode==='watch')cmdUnwatch();
+      else if(s.m==='bed')cmdSleep();else if(s.m==='sit'||s.m==='type')cmdSit(s.m==='type'?'type':0);else if(P.mode==='bed')cmdWake();else cmdOffChair();}}
     else netMis=0;}
   function setNet(s){net=s}
   function dispose(){
-    for(const x of ['L','R'])if(occ['bed'+x]===DEF.id)occ['bed'+x]=null;if(occ.chair===DEF.id)occ.chair=null;
+    for(const x of ['L','R'])if(occ['bed'+x]===DEF.id)occ['bed'+x]=null;if(occ.chair===DEF.id)occ.chair=null;for(const k of ['sofa0','sofa1'])if(occ[k]===DEF.id)occ[k]=null;
     SFX.typing(DEF.id,false);mixer.stopAllAction();mixer.uncacheRoot(char);scene.remove(char);
     const seen=new Set();char.traverse(o=>{if(o.geometry&&!seen.has(o.geometry)){seen.add(o.geometry);o.geometry.dispose()}
       const ms=Array.isArray(o.material)?o.material:o.material?[o.material]:[];ms.forEach(m=>{if(seen.has(m))return;seen.add(m);for(const k in m){const t=m[k];if(t&&t.isTexture&&!seen.has(t)){seen.add(t);t.dispose()}}m.dispose()})});
@@ -776,10 +865,10 @@ ${FRAG_COLOR}
     const c=Math.cos(P.yaw),s=Math.sin(P.yaw);
     char.position.set(P.pos.x+off.x*c+off.z*s,P.pos.y+off.y,P.pos.z-off.x*s+off.z*c);
     if(cur===acts[K.WALK])cur.timeScale=CFG.walkAnim;else if(cur===acts[K.RUN])cur.timeScale=CFG.runAnim;
-    updateLayers(dt);mixer.update(dt);updateEyes(dt);blinkTick();sfxTick();
+    updateLayers(dt);mixer.update(dt);updateEyes(dt);blinkTick();sfxTick();mouthTick(dt);
   }
   play('REST',{fade:0});
-  return{id:DEF.id,DEF,char,P,K,acts,runMode,logic,finish,setNet,netCmd,dispose,cmdMove,cmdSleep,cmdSit,cmdWake,cmdOffChair,blink:()=>{em('blink');blink(clock)},
+  return{id:DEF.id,DEF,char,P,K,acts,runMode,logic,finish,setNet,netCmd,dispose,cmdMove,cmdSleep,cmdSit,cmdWake,cmdOffChair,cmdWatch,cmdUnwatch,mouthSay,mouth:()=>mouth,blink:()=>{em('blink');blink(clock)},
     get plan(){return plan},get cur(){return cur},get busy(){return busy}};
   }
   const DEFS={vy:DEF_VY,bin:DEF_BIN};
@@ -848,7 +937,7 @@ ${FRAG_COLOR}
    const tvStand=()=>{if(!tvB)return null;const c=tvB.getCenter(new THREE.Vector3()),to=sofaB?sofaB.getCenter(new THREE.Vector3()):new THREE.Vector3(5,0,-3.5);
      const dx=to.x-c.x,dz=to.z-c.z,d=Math.hypot(dx,dz)||1;return{x:c.x+dx/d*Math.min(1.6,d*0.6),z:c.z+dz/d*Math.min(1.6,d*0.6),lv:c.y>2?1:0}};
    const P0=local.P,items=[
-    {key:'tv',icon:'tv',label:'Xem TV',at:()=>tvPt,act:()=>{const s=tvStand();if(s)cmdMove(s.x,s.z,s.lv,false)}},
+    {key:'tv',icon:'tv',label:'Xem TV',at:()=>tvPt,state:()=>api.cinema&&api.cinema.pinState?api.cinema.pinState():null,act:()=>{if(api.cinema&&SOFA)api.cinema.fromPin();else{const s=tvStand();if(s)cmdMove(s.x,s.z,s.lv,false)}}},
     {key:'chair',icon:'chair',label:'Ngồi',at:()=>chairPt,state:()=>P0.mode==='sit'||P0.mode==='type'?{on:true,label:'Đứng dậy'}:null,act:()=>{if(P0.mode==='sit'||P0.mode==='type')cmdOffChair();else cmdSit()}},
     {key:'bed',icon:'sleep',label:'Ngủ',at:()=>bedPt,state:()=>P0.mode==='bed'?{on:true,label:'Thức dậy'}:null,act:()=>{if(P0.mode==='bed')cmdWake();else cmdSleep()}},
     ...(MC.doors?[]:[{key:'door',icon:'door',label:MC.doorLabel||'Bản đồ',at:()=>doorPt,act:()=>{if(MC.doorTo&&window.__switchMap){window.__switchMap(MC.doorTo);return}const b=$('iMap');if(b)b.click()}}]),
@@ -1502,14 +1591,15 @@ ${FRAG_COLOR}
     separate();
     local.finish(dt);if(remote)remote.finish(dt);envMixer.update(dt);updDoors();updHalo(dt);
     if(api.sendInput)api.sendInput(inp);if(api.onTick)api.onTick(dt);
+    if(CINE.active)CINE.step(dt);else{
     {const f=local;tmp.set(f.char.position.x,f.char.position.y+0.7,f.char.position.z);
       tmp2.copy(tmp).sub(controls.target).multiplyScalar(Math.min(1,dt*3));controls.target.add(tmp2);camera.position.add(tmp2);}
-    controls.update();
+    controls.update();}
     if(OUTD||extG){const lp=local.char.position;FU.uPl.value[0].set(lp.x,lp.y,lp.z);if(remote&&remote.char.visible){const rp=remote.char.position;FU.uPl.value[1].set(rp.x,rp.y,rp.z)}else FU.uPl.value[1].set(1e5,0,1e5);
       FU.uOcc.value.set(camera.position.x,camera.position.y,camera.position.z,1);FU.uOccPl.value.set(lp.x,lp.y+0.9,lp.z)}
     {const t=controls.target,cb=OUTD?MC.camBox:[0.5,9.5,-7.6,0.3],cx=clamp(t.x,cb[0],cb[1]),cy=clamp(t.y,OUTD?A.L0:0.3,OUTD?A.L0+4:5.5),cz=clamp(t.z,cb[2],cb[3]);
-      if(!window.__free&&(cx!==t.x||cy!==t.y||cz!==t.z)){tmp.set(cx-t.x,cy-t.y,cz-t.z);t.add(tmp);camera.position.add(tmp);}}
-    sky.position.copy(camera.position);envStep(dt);glassStep();
+      if(!window.__free&&!CINE.active&&(cx!==t.x||cy!==t.y||cz!==t.z)){tmp.set(cx-t.x,cy-t.y,cz-t.z);t.add(tmp);camera.position.add(tmp);}}
+    sky.position.copy(camera.position);envStep(dt);glassStep();if(TVS)TVS.step(dt);
     if((tickN++&15)===0)updCull();
     if(markT>0){markT-=dt;marker.scale.setScalar(1+Math.sin(clockG*8)*0.1);if(markT<=0)marker.visible=false;}
     const sx=c=>c.P.mode+(c.busy?' ('+c.busy.kind+')':'')+' L'+c.P.level+' | '+(c.cur?c.cur.getClip().name.trim().replace(/^ACT_(BIN_)?/,''):'-')+' | plan '+c.plan.length;
@@ -1524,23 +1614,51 @@ ${FRAG_COLOR}
       if(window.__shot){const f=window.__shot;window.__shot=null;f()}
       adaptRes(rawDt);if(pinsUpd)pinsUpd();}
   }
-  function loop(){requestAnimationFrame(loop);rawDt=R.getDelta();Perf.frame(rawDt*1000);
+  // Quay lại tab sau một lúc ở tab khác: vài khung đầu luôn khựng (trình duyệt nạp lại tài nguyên GPU đã bị thu hồi, GC, kênh mạng nối lại…).
+  // Trước đây: (1) bước bắt kịp thời gian chạy dồn 0.25s mô phỏng ngay khung đầu, (2) bộ tự co độ phân giải coi các khung khựng đó là "máy yếu"
+  // → hạ pixel ratio rồi mất vài chục giây mới nâng lại = cảm giác lag/mờ/giật kéo dài. Giờ: bỏ qua thời gian lúc ẩn, và cho bộ tự co nghỉ ~4s.
+  // ===== CUTSCENE camera xem TV: lướt ra sau lưng sofa nhìn về màn TV; thoát thì lướt về góc mặc định đang theo nhân vật =====
+  const CINE={active:false,t:0,dur:1.8,fp:new THREE.Vector3(),ft:new THREE.Vector3(),tp:new THREE.Vector3(),tt:new THREE.Vector3(),done:null,hold:false,
+    go(p,t,dur,hold,done){this.active=true;this.t=0;this.dur=Math.max(0.01,dur);this.fp.copy(camera.position);this.ft.copy(controls.target);this.tp.copy(p);this.tt.copy(t);this.hold=hold;this.done=done||null;controls.enabled=false},
+    step(dt){this.t+=dt;const k=Math.min(1,this.t/this.dur),e=k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
+      camera.position.lerpVectors(this.fp,this.tp,e);controls.target.lerpVectors(this.ft,this.tt,e);camera.lookAt(controls.target);
+      if(k>=1){const d=this.done;this.done=null;if(!this.hold){this.active=false;controls.enabled=true;controls.update()}if(d)d()}}};
+  let cineBack=null;
+  api.cineCam=(mode,done)=>{if(!SOFA){done&&done();return}
+    if(mode==='in'){if(!CINE.active)cineBack={p:camera.position.clone().sub(controls.target),};
+      const p=SOFA.center.clone().addScaledVector(SOFA.fwd,-1.55);p.y=A.L0+1.32;const t=SOFA.tv.clone();t.y=A.L0+0.92;CINE.go(p,t,1.9,true,done)}
+    else{const L=local.char.position,t=new THREE.Vector3(L.x,L.y+0.7,L.z),off=cineBack?cineBack.p:new THREE.Vector3(12,14,27);
+      if(!CINE.active){done&&done();return}CINE.go(t.clone().add(off),t,1.3,false,done)}};
+  api.cineActive=()=>CINE.active;
+  // ===== màn TV: tối khi tắt; bật thì sáng dịu, màu chuyển chậm (không vẽ nội dung video lên TV để khỏi tốn GPU) =====
+  const TVS=(()=>{const o=byName['TV_Screen']||byName['TV_Panel'];if(!o)return null;const ms=[];o.traverse(m=>{if(m.isMesh)ms.push(m)});if(!ms.length)return null;
+    const orig=ms.map(m=>m.material);
+    const mat=new THREE.ShaderMaterial({uniforms:{uT:{value:0},uI:{value:0}},toneMapped:false,
+      vertexShader:'varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+      fragmentShader:'uniform float uT,uI;varying vec3 vP;void main(){vec3 p=vP*1.7;float a=sin(p.z*2.1+uT*.35)*.5+.5,b=sin(p.y*2.7-uT*.27+p.z)*.5+.5;vec3 c=mix(vec3(.08,.17,.34),vec3(.36,.24,.52),a);c=mix(c,vec3(.95,.62,.40),b*.28);gl_FragColor=vec4(c*uI,1.0);}'});
+    let on=false;return{set(v){if(v===on)return;on=v;ms.forEach((m,i)=>m.material=v?mat:orig[i]);if(v)mat.uniforms.uI.value=0},step(dt){if(on){mat.uniforms.uT.value+=dt;mat.uniforms.uI.value=Math.min(1.25,mat.uniforms.uI.value+dt*1.6)}},get on(){return on}}})();
+  api.tv=v=>{if(TVS)TVS.set(!!v)};api.hasTV=()=>!!(TVS&&SOFA);
+  let resumeN=0;
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)return;R.getDelta();resumeN=6;adaptCool=Math.max(adaptCool,240);badWin=0;goodWin=0;ftEma=0.0167;renderer.shadowMap.needsUpdate=true});
+  function loop(){requestAnimationFrame(loop);rawDt=R.getDelta();if(resumeN>0){resumeN--;rawDt=Math.min(rawDt,1/60)}Perf.frame(rawDt*1000);
     // BẮT KỊP THỜI GIAN THẬT: máy yếu/khung hình tụt <20fps trước đây bị ép dt<=0.05s => thế giới chạy CHẬM so với đồng hồ thật, trong khi máy kia vẫn chạy đúng tốc độ
     // (nhân vật remote bị dự đoán đi quá xa rồi giật về). Giờ chia nhỏ thành nhiều bước <=0.05s (tối đa 0.25s thực/khung; tab vừa bật lại sau khi ẩn thì không nhảy vọt).
     let acc=Math.min(rawDt,0.25);while(acc>0.0501){tick(0.05,false);acc-=0.05}
-    tick(acc);Perf.draw(performance.now());}
+    // màn rạp phủ kín màn hình: chỉ chạy logic (nhân vật, mạng), gần như không vẽ 3D (1 khung/giây) → máy dồn sức cho video
+    if(api.theater){theaterAcc+=rawDt;const draw=theaterAcc>1;if(draw)theaterAcc=0;tick(acc,draw)}else tick(acc);Perf.draw(performance.now());}
+  let theaterAcc=0;
   if(!TEST)loop();
   // ===== API cho lớp mạng =====
   api.snapshot=()=>{const p=local.P,mv=p.sp>0.05||!!local.busy||local.plan.length>0,mov=p.sp>0.05&&p.mode==='free'&&!local.busy;
-    return{x:r3(p.pos.x),y:r3(p.pos.y),z:r3(p.pos.z),w:r3(p.yaw),l:p.level,m:p.mode,b:local.busy?local.busy.kind:0,vx:mov?r3(Math.sin(p.yaw)*p.sp):0,vz:mov?r3(Math.cos(p.yaw)*p.sp):0,mv:mv?1:0,mp:MAPID}};
+    return{x:r3(p.pos.x),y:r3(p.pos.y),z:r3(p.pos.z),w:r3(p.yaw),l:p.level,m:p.mode,b:local.busy?local.busy.kind:0,vx:mov?r3(Math.sin(p.yaw)*p.sp):0,vz:mov?r3(Math.cos(p.yaw)*p.sp):0,mv:mv?1:0,mp:MAPID,s:p.mode==='watch'?p.seat:undefined}};
   api.addRemote=(slot,glb)=>{if(remote)return;remote=makeChar(glb,{...DEFS[slot],remote:true});api.remote=remote;rinp.mag=0};
   api.setRemoteVisible=v=>{if(remote&&remote.char.visible!==v)remote.char.visible=v};
   api.removeRemote=()=>{if(!remote)return;remote.dispose();remote=null;api.remote=null;if(window.__halo)endHalo()};
   api.setRemoteInput=m=>{rinp.x=m.x;rinp.z=m.z;rinp.run=!!m.r;rinp.mag=m.m?1:0;rinpT=clockG};
-  api.applyState=(m,lat)=>{if(remote)remote.setNet({x:m.x,y:m.y,z:m.z,w:m.w,l:m.l,m:m.m,b:m.b,mv:m.mv,vx:m.vx||0,vz:m.vz||0,rt:performance.now(),t:performance.now()-(lat||0)*1000})};
+  api.applyState=(m,lat)=>{if(remote)remote.setNet({x:m.x,y:m.y,z:m.z,w:m.w,l:m.l,m:m.m,b:m.b,s:m.s,mv:m.mv,vx:m.vx||0,vz:m.vz||0,rt:performance.now(),t:performance.now()-(lat||0)*1000})};
   api.applyCmd=(t,a)=>{if(!remote)return;remote.netCmd();switch(t){
     case 'move':remote.cmdMove(a[0],a[1],a[2],!!a[3]);break;case 'sleep':remote.cmdSleep();break;case 'sit':remote.cmdSit(a||undefined);break;
-    case 'wake':remote.cmdWake();break;case 'off':remote.cmdOffChair();break;case 'blink':remote.blink();break;
+    case 'wake':remote.cmdWake();break;case 'watch':remote.cmdWatch(a);break;case 'unwatch':remote.cmdUnwatch();break;case 'off':remote.cmdOffChair();break;case 'blink':remote.blink();break;
     case 'int':rinp.interact=true;break;case 'door':{if(Array.isArray(a)){const d=doorList.find(x=>x.node.name===a[0]);if(d)doorApply(d,!!a[1],a[2]|0,!localIsBin())}else{const d=doorList.find(x=>x.node.name===a);if(d)toggleDoor(d)}break}}};
   const localIsBin=()=>local&&local.id==='bin';
   // bảng cửa gửi kèm snapshot: "<0|1><phiên bản base36>" cho từng cửa, theo thứ tự tên

@@ -27,5 +27,7 @@ export function goToMap(id, {fade = true} = {}) {
   if (fade) { try { sessionStorage.setItem('vyFade', '1'); } catch (e) {} }   // trang mới bắt đầu từ đen rồi hiện dần ra ảnh loading
   const fd = document.getElementById('fade');
   if (fade && fd) fd.classList.add('on');
-  setTimeout(() => { location.hash = 'map=' + id; location.reload(); }, fade ? 620 : 0);
+  // có trang vỏ: chỉ nạp lại khung game (cuộc gọi, nhạc, chat, phiên ở vỏ chạy tiếp không gián đoạn); không có vỏ: tải lại cả trang như cũ
+  const sh = window.__vyShell;
+  setTimeout(() => { if (sh && sh.go) sh.go(id); else { location.hash = 'map=' + id; location.reload(); } }, fade ? 620 : 0);
 }

@@ -125,7 +125,7 @@ export class Voice {
   // đối phương (mới) xuất hiện / kênh tín hiệu nối lại: báo trạng thái; KHÔNG dựng lại nếu media đang tốt
   async _hello() {
     this._loadIce().catch(() => {});      // lấy sẵn TURN ngay khi thấy đối phương => lúc bấm gọi không phải chờ
-    if (this.active || this.pc) this._announce({req: !this.init && !this._mediaHealthy() && this.active ? 1 : 0});
+    if (this.active || this.pc) this._announce({req: !this.init && !this._mediaHealthy() && this.active ? 1 : 0, q: 1});
     if (this.init && this._wantPc && this.s.peer && !this.pc) await this._rebuild();
     else if (this.pc && this.conn === 'lost') { this._wdStep = 1; this._schedule(300); }     // đối phương vừa quay lại: thử dựng lại ngay
   }
@@ -144,7 +144,7 @@ export class Voice {
       await iceP;
     } finally { this.asking = false; }
     this.active = true; this._declined = false; this._answered = this.peerVoice; if (this.audioEl) this.audioEl.muted = false; this._startWatch();
-    this._announce({req: !this.init && !this._mediaHealthy() ? 1 : 0});
+    this._announce({req: !this.init && !this._mediaHealthy() ? 1 : 0, q: 1});      // q: xin đối phương báo lại trạng thái (sau F5 mình không biết họ có đang trong cuộc gọi không)
     this._enq(async () => { if (this.init && this.s.peer && !this.pc) await this._rebuild(); else if (this.pc) { this._attachAll(); } });
     this._upd();
     if (this.micErr) this._note(this.micErr); if (this.camErr) this._note(this.camErr);
@@ -427,6 +427,9 @@ export class Voice {
       }
     }
     if (this.peerViewing !== prevView || this.peerCam !== prevCam) this._applyVideo();
+    // Đối phương vừa vào (lại) cuộc gọi — vd. sau F5 — và hỏi trạng thái: trả lời ngay, nếu không bên họ cứ tưởng "đang đổ chuông, camera mình tắt"
+    // trong khi bên này vẫn thấy đang gọi bình thường. Chỉ trả lời khi được hỏi (q) → không lặp vô hạn.
+    if (m.q && (this.active || this.pc)) this._announce();
     this._upd();
   }
   _peerGone() {

@@ -1,4 +1,4 @@
-// Service worker của VY · BIN studio — chỉ lo THÔNG BÁO HỆ THỐNG (không cache game, không chặn mạng).
+// Service worker của VIBE LAB — chỉ lo THÔNG BÁO HỆ THỐNG (không cache game, không chặn mạng).
 // - Trang gọi registration.showNotification(...) khi đang ở tab khác / thu nhỏ → thông báo nổi ở góc màn hình như Zalo/Messenger.
 // - Bấm vào thông báo: đưa tab game lên trước (mở mới nếu đã đóng) và báo trang biết cần mở gì (chat, cuộc gọi…).
 // - Sự kiện 'push' để sẵn cho bước sau (thông báo khi đã đóng hẳn trình duyệt — cần máy chủ gửi).
@@ -19,8 +19,8 @@ self.addEventListener('notificationclick', e => {
 });
 
 self.addEventListener('push', e => {
-  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (err) { d = {title: 'VY · BIN', body: e.data && e.data.text()}; }
-  e.waitUntil(self.registration.showNotification(d.title || 'VY · BIN studio', {
+  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (err) { d = {title: 'VIBE LAB', body: e.data && e.data.text()}; }
+  e.waitUntil(self.registration.showNotification(d.title || 'VIBE LAB', {
     body: d.body || '', icon: d.icon || 'assets/ui/icon-192.png', badge: 'assets/ui/badge-96.png', tag: d.tag || 'vy', data: d.data || {},
   }));
 });

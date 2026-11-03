@@ -81,7 +81,7 @@ export function mountSysNotify({chat, voice, sess, prog, other, openChat, toast}
   };
   if (sec) {
     sec.querySelector('#nfBtn').onclick = async () => { const st = sysNotifyState(); if (st === 'on') { setWant(false); paint(); } else await enable(); };
-    sec.querySelector('#nfTest').onclick = () => show('Thử thông báo', {body: 'Thông báo của VY · BIN sẽ trông như thế này.', tag: 'test', force: true});
+    sec.querySelector('#nfTest').onclick = () => show('Thử thông báo', {body: 'Thông báo của VIBE LAB sẽ trông như thế này.', tag: 'test', force: true});
     paint();
   }
 

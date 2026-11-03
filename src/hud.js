@@ -1,6 +1,6 @@
 import {$} from './shared.js';
 import {SFX} from './sfx.js';
-import {Lofi} from './lofi.js';
+import {Lofi as Lofi0} from './lofi.js';
 import {createYTMusic} from './music-yt.js';
 import {mountYtUi} from './ui/music-ui.js';
 import {ic, paintIcons} from './ui/icons.js';
@@ -28,8 +28,8 @@ import {Fx} from './ui/fx.js';
   {const acc=()=>{const s=window.VYNET&&window.VYNET.sess;return s&&s.account?s:null};
    if(!window.CONFIG_SOLO&&!/[?&]solo/.test(location.search)&&!/[?&]mock=/.test(location.search))$('sChg').textContent='Đăng xuất';
    $('sChg').onclick=async()=>{const s=acc();
-    if(s){if(!confirm('Đăng xuất khỏi tài khoản này? Tiến trình vẫn được lưu — đăng nhập lại là vào đúng nhân vật.'))return;await s.signOut();location.reload();return}
-    if(!confirm('Đổi nhân vật? Trang sẽ tải lại và hiện màn chọn Bin / Vy.'))return;try{localStorage.removeItem('vyChar')}catch(e){}const u=new URL(location.href);u.searchParams.delete('as');location.href=u.toString()}}
+    if(s){if(!confirm('Đăng xuất khỏi tài khoản này? Tiến trình vẫn được lưu — đăng nhập lại là vào đúng nhân vật.'))return;await s.signOut();(window.top||window).location.reload();return}
+    if(!confirm('Đổi nhân vật? Trang sẽ tải lại và hiện màn chọn Bin / Vy.'))return;try{localStorage.removeItem('vyChar')}catch(e){}const W=window.top||window,u=new URL(W.location.href);u.searchParams.delete('as');u.searchParams.delete('g');W.location.href=u.toString()}}
   {const MAPID=window.MAPID,MI={living:['home','Phòng khách','Phòng khách 2 tầng, cửa sang phòng Vy & Bin'],vy:['home','Phòng Vy','Studio của Vy (gác lửng)'],bin:['home','Phòng Bin','Studio của Bin (gác lửng)'],exterior:['building','Vườn ngoài nhà','Sân vườn quanh nhà, cổng & hàng rào']};
    $('mpList').innerHTML=Object.keys(MI).map(k=>`<div class="mapc${k===MAPID?' cur':''}" data-m="${k}"><span class="ic">${ic(MI[k][0])}</span><div><b>${MI[k][1]}${k===MAPID?' · đang ở':''}</b><small>${MI[k][2]}</small></div></div>`).join('');
    $('iMap').onclick=()=>$('hMap').classList.add('on');$('mX').onclick=()=>$('hMap').classList.remove('on');$('hMap').onclick=e=>{if(e.target.id==='hMap')$('hMap').classList.remove('on')};
@@ -118,9 +118,12 @@ import {Fx} from './ui/fx.js';
   // --- chụp ảnh
   $('iCam').onclick=()=>{window.__shot=()=>{const a=document.createElement('a');a.download='vy-bin-'+Date.now()+'.png';a.href=V().renderer.domElement.toDataURL('image/png');a.click();SFX.play('shutter');toast('Đã lưu ảnh')}};
   // --- nhạc: 2 nguồn — Lofi (tạo trong game) và YouTube (phát nhúng + thư viện playlist)
-  const T=Lofi.tracks;let playing=false,src=load('vyMusicSrc','lofi')==='yt'?'yt':'lofi';
+  // có trang vỏ: nhạc sống ở vỏ (đổi map không ngắt) — HUD này chỉ điều khiển + vẽ lại theo trạng thái của vỏ
+  const SHM=window.__vyShell&&window.__vyShell.ytm?window.__vyShell:null,Lofi=SHM?SHM.Lofi:Lofi0;
+  const T=Lofi.tracks;let playing=!!Lofi.on,src=load('vyMusicSrc','lofi')==='yt'?'yt':'lofi';
   let ytUi=null;
-  const YTM=createYTMusic({toast,onChange:()=>{ytUi&&ytUi.render();showT()},auth:async()=>{const s=window.VYNET&&window.VYNET.sess;return s?{token:await s.token(),room:s.room}:null}});
+  const YTM=SHM?SHM.ytm:createYTMusic({toast,onChange:()=>{ytUi&&ytUi.render();showT()},auth:async()=>{const s=window.VYNET&&window.VYNET.sess;return s?{token:await s.token(),room:s.room}:null}});
+  if(SHM)YTM.on('change',()=>{playing=!!Lofi.on;ytUi&&ytUi.render();showT()});
   const showT=()=>{
     if(src==='yt'){const it=YTM.curItem;$('mTt').textContent=YTM.title||'YouTube';$('mSt').textContent='YouTube · '+YTM.lib.pls[YTM.lib.pl].name;$('mPlay').innerHTML=ic(YTM.playing?'pause':'play');$('mCv').classList.add('yt');$('mCv').classList.toggle('spin',!!YTM.playing);[...$('mList').children].forEach(d=>d.classList.remove('cur'));return}
     const t=T[Lofi.idx];$('mTt').textContent=t.name;$('mSt').textContent=t.sub+' · '+t.bpm+' BPM';$('mPlay').innerHTML=ic(playing?'pause':'play');$('mCv').classList.remove('yt');$('mCv').classList.toggle('spin',!!playing);[...$('mList').children].forEach((d,i)=>d.classList.toggle('cur',i===Lofi.idx))};
@@ -137,9 +140,10 @@ import {Fx} from './ui/fx.js';
   ytUi=mountYtUi(YTM,{onPick:async i=>{await useSrc('yt');await YTM.playAt(i)},onToggleOpen:o=>$('hMusic').classList.toggle('ytopen',o)});
   const yb=$('mYtB');yb.onclick=()=>{ytUi.open();if(ytUi.isOpen&&src!=='yt'&&YTM.lib.pls[YTM.lib.pl].items.length)useSrc('yt')};
   $('mCv').onclick=()=>yb.click();
-  const mv=$('mVol'),sv=$('sVolS');mv.value=sv.value=0.5;const setVol=v=>{Lofi.vol(v);YTM.vol(v)};YTM.vol(0.5);mv.oninput=()=>{sv.value=mv.value;setVol(+mv.value)};sv.oninput=()=>{mv.value=sv.value;setVol(+sv.value)};
+  const mv=$('mVol'),sv=$('sVolS'),v0=SHM?SHM.vol:0.5;mv.value=sv.value=v0;const setVol=v=>{if(SHM)SHM.setVol(v);else{Lofi.vol(v);YTM.vol(v)}};if(!SHM)YTM.vol(0.5);mv.oninput=()=>{sv.value=mv.value;setVol(+mv.value)};sv.oninput=()=>{mv.value=sv.value;setVol(+sv.value)};
   // ---- đổi map / F5 = tải lại trang → nghe tiếp đúng bài, đúng chỗ (không phát lại từ đầu) ----
-  if(src==='yt'){YTM.restore().then(ok=>{if(!ok&&YTM.lib.pls[YTM.lib.pl].items.length)showT()}).catch(()=>{})}
+  if(SHM){}     // vỏ đã tự nghe tiếp sau F5; đổi map thì nhạc vốn không dừng
+  else if(src==='yt'){YTM.restore().then(ok=>{if(!ok&&YTM.lib.pls[YTM.lib.pl].items.length)showT()}).catch(()=>{})}
   else{const L=load('vyLofi',null);if(L&&L.idx>=0&&L.idx<T.length){Lofi.setTrack(L.idx);
     if(L.on){const go=async()=>{['pointerdown','keydown','touchstart'].forEach(ev=>removeEventListener(ev,go,true));if(!playing&&src==='lofi'){playing=await Lofi.toggle();showT()}};
       ['pointerdown','keydown','touchstart'].forEach(ev=>addEventListener(ev,go,true));toast('Bấm vào đâu đó để nhạc chạy tiếp')}}}

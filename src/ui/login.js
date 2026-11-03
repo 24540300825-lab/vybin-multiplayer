@@ -11,7 +11,7 @@ export function loginScreen({onGoogle, note = ''} = {}) {
   root.innerHTML =
     '<div class="lg-box">' +
       '<div class="lg-av"><img src="assets/ui/avatars/vy.v1.png" alt="" width="96" height="96" draggable="false"><img src="assets/ui/avatars/bin.v1.png" alt="" width="96" height="96" draggable="false"></div>' +
-      '<h2>VY · BIN studio</h2>' +
+      '<h2>VIBE LAB</h2>' +
       '<p>Đăng nhập để game nhớ nhân vật, tiến trình và đồ của bạn trên mọi thiết bị.</p>' +
       '<button type="button" class="lg-g" id="lgG">' + G + '<span>Đăng nhập bằng Google</span></button>' +
       '<p class="lg-err" id="lgE" role="alert"' + (note ? '' : ' hidden') + '>' + esc(note) + '</p>' +

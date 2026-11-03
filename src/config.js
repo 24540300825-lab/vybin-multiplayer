@@ -15,6 +15,7 @@ export const CONFIG = {
   mock: q.get('mock') || c.mock || '',     // dev: đường dẫn module Supabase giả lập
   mockAccount: q.has('mockacct'),           // dev: giả lập kèm 'tài khoản' (test luồng đăng nhập/nhân vật/tiến trình)
   solo: q.has('solo'),
+  noshell: q.has('noshell'),
   as: q.get('as') || '',
   perf: q.has('perf'),
   test: /[?&]test/.test(location.search),

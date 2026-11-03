@@ -5,15 +5,26 @@ import {MAP_LIST, DEFAULT_MAP, isMap, goToMap, prefetchMap} from './maps.js';
 import {FILES} from './manifest.js';
 import {SFX} from './sfx.js';
 import {MAP_CONFIGS} from './map-configs.js';
+import {APP_NAME} from './version.js';
 window.SFX = SFX; SFX.init();
 
 const $ = id => document.getElementById(id);
-const LB = (p, t) => { const b = $('lb'); if (b) b.style.width = Math.round(p) + '%'; const n = $('lpct'); if (n) n.textContent = Math.round(p) + '%'; if (t) $('lmsg').textContent = t; };
+let LB = (p, t) => { const b = $('lb'); if (b) b.style.width = Math.round(p) + '%'; const n = $('lpct'); if (n) n.textContent = Math.round(p) + '%'; if (t) $('lmsg').textContent = t; };
 const fail = e => { console.error(e); $('lmsg').textContent = 'LỖI: ' + (e && e.message || e); $('lmsg').style.color = '#ff8080'; };
 addEventListener('unhandledrejection', e => console.error('[unhandled]', e.reason));
 
+// Trang vỏ (shell.js) giữ phiên/cuộc gọi/chat/nhạc; trang này (game) chạy trong iframe của vỏ. ?noshell = chạy gộp 1 trang như cũ (test).
+const SH = (() => { try { return window.parent !== window && window.parent.VYSHELL || null; } catch (e) { return null; } })();
+if (SH) {
+  window.__vyShell = SH;
+  window.__vyToast = m => { const t = $('toast'); if (!t) return; t.textContent = m; t.style.opacity = 1; clearTimeout(window.__vyToast._t); window.__vyToast._t = setTimeout(() => t.style.opacity = 0, 2200); };
+  ['pointerdown', 'keydown', 'touchstart'].forEach(ev => addEventListener(ev, () => { try { SH.gesture(ev); } catch (e) {} }, true));
+  addEventListener('pagehide', () => { try { SH.purge(window); } catch (e) {} });
+}
+
 async function boot() {
   let sess = null, slot, mapId, gate = null;
+  if (SH && SH.first) { const l0 = LB; LB = (p, t) => { l0(p, t); try { SH.LB(p, t); } catch (e) {} }; }
   // KHỞI ĐỘNG SỚM, SONG SONG với bước chọn nhân vật / kết nối phòng: đoán map + nhân vật (hash/localStorage) rồi tải & parse ngay GLB (engine JS đã được modulepreload trong index.html).
   // Đoán đúng (gần như luôn đúng ở lần vào sau) → tới bước 2 mọi thứ đã sẵn; đoán sai chỉ tốn một ít băng thông (asset có cache bền).
   {
@@ -31,75 +42,16 @@ async function boot() {
   // ---------- 1) nhân vật + phiên ----------
   // Lần đầu: màn CHỌN NHÂN VẬT (BIN / VY). Máy nhớ lựa chọn (localStorage 'vyChar') → các lần sau tự vào đúng nhân vật, không hỏi lại.
   // ?as=bin|vy ép nhân vật (dùng khi test), không lưu.
-  const {pickChar, savedChar, saveChar} = await import('./ui/pick.js');
-  const forced = (CONFIG.as === 'bin' || CONFIG.as === 'vy') ? CONFIG.as : null;
-  let pref = forced || savedChar(), note = '';
-  if (CONFIG.multiplayer) {
-    const {Session} = await import('./net/session.js');
-    sess = new Session();
-    sess.on('status', ({state, text}) => {
-      if (state === 'full') { hide(); gate.show('🚪', 'Chỗ của bạn đã có người khác vào', 'Bạn rời đi khá lâu nên chỗ đã được nhường. Bấm Thử lại để vào lại nếu còn chỗ.', [['Thử lại', () => location.reload()]]); }
-      if (state === 'dup') { hide(); gate.show('🪟', 'Đang chơi ở thiết bị khác', 'Tài khoản này vừa được mở ở một tab hoặc thiết bị khác (laptop, điện thoại…). Bấm nút bên dưới để chơi tiếp ở đây.', [['Chơi ở đây', () => location.reload()]]); }
-    });
-    LB(5, 'Đang kết nối phòng "' + CONFIG.room + '"...');
-    const fatal = e => {
-      hide();
-      if (e.code === 'full') gate.show('🚪', 'Phòng đã đủ 2 người', 'BIN và VY đều đã có người. Thử lại sau, hoặc vào phòng khác bằng ?room=ten-phong.', [['Thử lại', () => location.reload()]]);
-      else gate.show('⚠️', 'Không kết nối được', String(e.message || e), [['Thử lại', () => location.reload()], ['Chơi một mình', () => { const u = new URL(location.href); u.searchParams.set('solo', '1'); location.href = u; }]]);
-    };
-    try { await sess.init(); } catch (e) { fatal(e); return; }
-    // ---- tài khoản Google: chưa đăng nhập => màn đăng nhập (trang sẽ chuyển sang Google rồi quay lại) ----
-    if (sess.needLogin) {
-      const {loginScreen} = await import('./ui/login.js');
-      const q = new URLSearchParams(location.hash.slice(1) + '&' + location.search.slice(1));
-      const oerr = q.get('error_description') || q.get('error') || '';
-      if (oerr) history.replaceState(null, '', location.pathname + location.search.replace(/([?&])(error|error_code|error_description)=[^&]*/g, '$1').replace(/[?&]+$/, ''));
-      loginScreen({onGoogle: () => sess.signInGoogle(), note: oerr ? 'Đăng nhập chưa thành công: ' + oerr.replace(/\+/g, ' ') : ''});
-      return;
-    }
-    // ---- mỗi tài khoản gắn cố định 1 nhân vật: đã có => vào thẳng; chưa có => chọn 1 lần ----
-    if (sess.account) {
-      const email = (sess.user && sess.user.email) || 'tài khoản này';
-      for (;;) {
-        const {data: roster, error} = await sess.sb.rpc('game_roster');
-        if (error) { fatal(new Error('Không đọc được nhân vật: ' + (error.message || error))); return; }
-        if (roster && roster.me) { pref = roster.me; break; }
-        const owned = (roster && roster.owned) || [];
-        if (owned.length >= 2) {
-          hide(); gate.show('🚪', 'Bin và Vy đều đã có chủ', email + ' chưa gắn với nhân vật nào. Đăng xuất rồi đăng nhập bằng Gmail bạn đã dùng để chơi.', [['Đăng xuất', async () => { await sess.signOut(); location.reload(); }]]);
-          return;
-        }
-        const pick = await pickChar({taken: owned, note, takenText: 'Đã có chủ', hint: 'Đã đăng nhập ' + email + '. Chọn nhân vật của bạn — chỉ chọn một lần, sau này mọi thiết bị đăng nhập bằng tài khoản này đều vào đúng nhân vật.'});
-        note = '';
-        const r = await sess.sb.rpc('game_create_player', {p_slot: pick});
-        if (r.error) { note = /slot_owned/.test(r.error.message || '') ? 'Nhân vật đó vừa được chọn bởi tài khoản khác — hãy chọn nhân vật còn lại.' : 'Chưa tạo được nhân vật: ' + r.error.message; continue; }
-        pref = pick; break;
-      }
-      saveChar(pref);
-    }
-    for (;;) {
-      if (!pref) {
-        const taken = await sess.peek();
-        if (taken.length >= 2) { fatal(Object.assign(new Error('full'), {code: 'full'})); return; }
-        pref = await pickChar({taken, note}); note = '';
-        if (!forced) saveChar(pref);
-      }
-      try { const r = await sess.connect(pref); slot = r.slot; mapId = (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap'); if (!isMap(mapId)) mapId = r.map; break; }   // map là của RIÊNG từng người
-      catch (e) {
-        if (e.code === 'taken' && sess.account) { fatal(new Error((pref === 'bin' ? 'Bin' : 'Vy') + ' đang được một phiên khác giữ chỗ. Thử lại sau ít phút.')); return; }
-        if (e.code === 'taken') { note = (pref === 'bin' ? 'Bin' : 'Vy') + ' đang có người khác dùng — hãy chọn nhân vật còn lại.'; pref = null; continue; }
-        fatal(e); return;
-      }
-    }
+  if (SH) {
+    sess = SH.sess; slot = SH.slot;
+    mapId = (location.hash.match(/map=(\w+)/) || [])[1] || SH.mapId; if (!isMap(mapId)) mapId = DEFAULT_MAP;
   } else {
-    if (!pref) { pref = await pickChar({}); }
-    slot = pref;
-    if (!forced) saveChar(slot);
-    mapId = (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap');
+    const {connectStep} = await import('./boot-session.js');
+    const r = await connectStep({gate, hide, LB}); if (!r) return;
+    ({sess, slot, mapId} = r);
   }
-  if (!isMap(mapId)) mapId = DEFAULT_MAP;
   window.MAPID = mapId; window.LOCAL_SLOT = slot;
-  document.title = 'VY · BIN — ' + MAP_LIST[mapId].name;
+  document.title = APP_NAME + ' — ' + MAP_LIST[mapId].name; if (SH) SH.setTitle(document.title);
 
   // ---------- 2) nạp song song: engine (JS) + asset map + nhân vật của mình ----------
   LB(10, 'Đang tải bản đồ & nhân vật ' + slot.toUpperCase() + '...');
@@ -146,18 +98,23 @@ async function boot() {
       api.setRemoteVisible(m.mp === mapId);
     });
     sess.on('version', v => toast(v.mismatch ? '⚠️ Hai máy đang chạy bản game khác nhau — bấm Ctrl+F5 (tải lại) để chơi đồng bộ' : 'Đối phương đang chạy bản game khác — nếu thấy lạ, bấm Ctrl+F5'));
-    const chat = new Chat(sess), voice = new Voice(sess);
+    const chat = SH ? SH.chat : new Chat(sess), voice = SH ? SH.voice : new Voice(sess);
     const ui = mountMpUi({sess, chat, voice});
     try { const {mountCallRing} = await import('./ui/call-ring.js'); mountCallRing({voice, sess, toast, other}); } catch (e) { console.warn('call-ring', e); }
     try { const {mountChatNotify} = await import('./ui/chat-notify.js'); mountChatNotify({chat, openChat: ui.setOpen}); } catch (e) { console.warn('chat-notify', e); }
-    chat.start().catch(e => console.warn('chat', e));
+    if (!SH) chat.start().catch(e => console.warn('chat', e));
     window.VYNET = {sess, chat, voice, api};
+    // miệng nhân vật nhép theo tiếng nói trong cuộc gọi (máy mình: mic của mình; nhân vật kia: tiếng của họ)
+    api.meTalk = () => !!(voice.active && voice.micOn && !voice.muted && voice.speaking);
+    api.peerTalk = () => !!(voice.active && voice.peerVoice && voice.peerSpeaking);
     // tải nền byte của nhân vật kia (HTTP cache) để lúc họ vào không bị khựng
     setTimeout(() => { const f = FILES['char-' + other]; if (f) fetch(`assets/${f.file}?v=${f.v}`, {priority: 'low'}).then(r => r.arrayBuffer()).catch(() => {}); }, 4000);
-    addEventListener('pagehide', () => { try { voice.leave('reload'); } catch (e) {} });
-    voice.resume().catch(e => console.warn('call resume', e));
-    addEventListener('pageshow', e => { if (e.persisted) voice.resume().catch(() => {}); });     // sau đổi map/F5: tự vào lại cuộc gọi nếu trước đó đang gọi
-    $('mpLeave') && ($('mpLeave').onclick = async () => { await sess.leave(); location.reload(); });
+    if (!SH) {     // có vỏ thì cuộc gọi sống ở vỏ — đổi map không đụng tới
+      addEventListener('pagehide', () => { try { voice.leave('reload'); } catch (e) {} });
+      voice.resume().catch(e => console.warn('call resume', e));
+      addEventListener('pageshow', e => { if (e.persisted) voice.resume().catch(() => {}); });     // sau F5: tự vào lại cuộc gọi nếu trước đó đang gọi
+    }
+    $('mpLeave') && ($('mpLeave').onclick = async () => { await sess.leave(); (window.top || window).location.reload(); });
 
     // ---------- 4b) tiến trình người chơi (ví, XP, cấp, Hộp quà, thành tựu, phiên tập trung) — chỉ bản tài khoản ----------
     if (sess.account) {
@@ -185,8 +142,8 @@ async function boot() {
         try { const {mountQuestsUi} = await import('./ui/quests-ui.js'); window.__vyQuests = mountQuestsUi({prog, toast, api, mapId}); }
         catch (e) { console.warn('[quests]', e); }
         // chat
-        const send0 = chat.send.bind(chat);
-        chat.send = async (...args) => { const r = await send0(...args); if (r && r.ok !== false) prog.report('chat_sent', {}, 'chat:' + Date.now()); return r; };
+        if (SH) chat.on('sent', () => prog.report('chat_sent', {}, 'chat:' + Date.now()));
+        else { const send0 = chat.send.bind(chat); chat.send = async (...args) => { const r = await send0(...args); if (r && r.ok !== false) prog.report('chat_sent', {}, 'chat:' + Date.now()); return r; }; }
         // gọi cho nhau (mỗi cuộc gọi tính 1 lần; máy chủ giới hạn theo ngày)
         let inCall = false;
         voice.on && voice.on('state', st => { const on = !!(st && st.active && st.peerVoice && (st.phase === 'connected' || st.phase === 'weak')); if (on && !inCall) prog.report('call_together', {}, 'call:' + Math.floor(Date.now() / 1800000)); inCall = on; });
@@ -206,6 +163,15 @@ async function boot() {
     try { const {mountSysNotify} = await import('./ui/sysnotify.js'); mountSysNotify({chat, voice, sess, prog: window.VYPROG || null, other, openChat: ui.setOpen, toast}); }
     catch (e) { console.warn('[sysnotify]', e); }
   }
+  // ---------- 4d) rạp chung (TV phòng khách): xem phim cùng nhau ----------
+  try {
+    if (api.hasTV && api.hasTV()) {
+      const {mountCinema} = await import('./cinema/cinema.js');
+      const {toast} = await import('./ui/mp-ui.js');
+      const N = window.VYNET || {};
+      api.cinema = mountCinema({api, sess, voice: N.voice || null, slot, other: slot === 'bin' ? 'vy' : 'bin', toast, music: SH ? {ytm: SH.ytm, Lofi: SH.Lofi} : null});
+    }
+  } catch (e) { console.warn('[cinema]', e); }
   // ---------- 5) tính năng cắm thêm (minigame…): lỗi 1 tính năng không ảnh hưởng game ----------
   try {
     const {createFeatureHost} = await import('./features/host.js'), {FEATURES} = await import('./features/registry.js');
@@ -214,8 +180,10 @@ async function boot() {
     window.VYFEATURES = host;
     FEATURES.forEach(load => load().then(m => host.register(m.default)).catch(e => console.warn('[features] không nạp được', e)));
   } catch (e) { console.warn('[features]', e); }
-  LB(100, 'Xong!'); setTimeout(reveal, 60);
+  LB(100, 'Xong!');
+  if (SH && SH.first) { $('load').style.display = 'none'; setTimeout(() => SH.reveal(), 60); } else setTimeout(reveal, 60);
   // tải nền sẵn map mà cửa/cổng của map này dẫn tới (HTTP cache) → lúc bấm chuyển map chỉ còn dựng cảnh, vào nhanh
   setTimeout(() => { const t = (MAP_CONFIGS[mapId] || {}).doorTo; if (t) prefetchMap(t); }, 1200);
 }
-boot().catch(fail);
+if (!SH && window.parent === window && !CONFIG.noshell) import('./shell.js').then(m => m.bootShell()).catch(fail);
+else boot().catch(e => { fail(e); try { SH && SH.fail(String(e && e.message || e)); } catch (x) {} });

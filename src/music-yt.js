@@ -21,12 +21,33 @@ export function parseYouTube(text) {
   return {v, list: list && /^[\w-]{10,}$/.test(list) && !/^RD/.test(list) ? list : null};   // mix tự động (RD…) không nhúng được
 }
 
-export function createYTMusic({toast = () => {}, onChange = () => {}, auth = null} = {}) {
+export function createYTMusic({toast = () => {}, onChange: onChange0 = () => {}, auth = null} = {}) {
+  // nhiều nơi nghe thay đổi (HUD của từng trang game trong iframe) — trang vỏ dọn callback của trang cũ qua .h
+  const h = {};
+  const emit = (ev, a) => (h[ev] || []).forEach(f => { try { f(a); } catch (e) { console.error('[music]', e); } });
+  const onChange = () => { try { onChange0(); } catch (e) {} emit('change'); };
   let lib = {pls: [{id: 'p1', name: 'Của mình', items: []}], pl: 0, i: -1, shuffle: false, rep: true};
   try { const x = JSON.parse(localStorage.getItem(KEY) || 'null'); if (x && Array.isArray(x.pls) && x.pls.length) lib = Object.assign(lib, x); } catch (e) {}
   lib.pl = Math.min(Math.max(0, lib.pl | 0), lib.pls.length - 1);
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(lib)); } catch (e) {} };
   let player = null, apiP = null, ready = false, host = null, playing = false, vol = 0.5, wantPlay = null, skips = 0, title = '';
+  let dockEl = null, dockRaf = 0;
+  function dock(el) {
+    dockEl = el; cancelAnimationFrame(dockRaf); clearTimeout(dockRaf);
+    const st = host && host.style; if (!st) return;
+    const park = () => { st.left = '-10000px'; st.top = '0'; st.width = '320px'; st.height = '180px'; st.opacity = '0'; st.pointerEvents = 'none'; };
+    if (!el) { park(); return; }
+    let last = '';
+    const step = () => {
+      if (dockEl !== el) return;
+      if (!el.isConnected) { dock(null); return; }
+      const r = el.getBoundingClientRect(), vis = r.width > 4 && r.height > 4 && el.offsetParent !== null;
+      const k = vis ? r.left + ',' + r.top + ',' + r.width + ',' + r.height : 'h';
+      if (k !== last) { last = k; if (vis) { st.left = r.left + 'px'; st.top = r.top + 'px'; st.width = r.width + 'px'; st.height = r.height + 'px'; st.opacity = '1'; st.pointerEvents = 'auto'; } else park(); }
+      dockRaf = vis ? requestAnimationFrame(step) : setTimeout(step, 250);     // panel đóng: kiểm tra thưa (đỡ ép trang game tính layout mỗi khung)
+    };
+    step();
+  }
   const cur = () => lib.pls[lib.pl], item = () => cur().items[lib.i], sc = new Map();
 
   const loadApi = () => apiP || (apiP = new Promise((res, rej) => {
@@ -161,7 +182,11 @@ export function createYTMusic({toast = () => {}, onChange = () => {}, auth = nul
   }
 
   return {
-    mount(el) { host = el; },
+    // mount(el): lần đầu = nơi đặt trình phát. Trang vỏ đặt trình phát trong trang của nó; HUD trong iframe gọi mount(ô video của panel)
+    // → không chuyển DOM (chuyển là YouTube tải lại) mà chỉ đặt khung của vỏ đè đúng lên ô đó (iframe game phủ kín màn hình nên toạ độ trùng nhau).
+    mount(el) { if (!host || el.ownerDocument === host.ownerDocument) { host = el; return; } dock(el); },
+    undock(win) { if (dockEl && dockEl.ownerDocument.defaultView === win) dock(null); },
+    h, emit, on(ev, fn) { (h[ev] ||= []).push(fn); return () => { h[ev] = (h[ev] || []).filter(f => f !== fn); }; },
     get lib() { return lib; }, get playing() { return playing; }, get title() { return title || (item() && item().t) || ''; },
     get curItem() { return item(); }, get ready() { return ready; },
     add, playAt, next: () => next(false), prev, restore,
