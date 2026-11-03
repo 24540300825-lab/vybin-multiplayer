@@ -1,6 +1,10 @@
 // Thông báo "cập nhật game" hiện trong trung tâm thông báo (chuông). Thêm bản mới: chèn 1 mục ĐẦU danh sách — id phải duy nhất.
 // Mỗi mục: {id, date, title, items:[các dòng ngắn]}. Trạng thái "đã đọc" lưu trên máy từng người (localStorage).
 export const NEWS = [
+  {id: 'sys-notify', date: '03/11/2026', title: 'Thông báo trên máy', items: [
+    'Có tin nhắn, cuộc gọi, người kia vào nhà… khi bạn đang ở tab khác hoặc app khác → hiện thông báo ở góc màn hình như Zalo/Messenger',
+    'Cuộc gọi đến có nút Nghe / Từ chối ngay trên thông báo',
+    'Bật/tắt: Cài đặt → Thông báo trên máy. iPhone: thêm game vào Màn hình chính rồi mở từ đó']},
   {id: 'dot1-account', date: '03/11/2026', title: 'Tài khoản & tiến trình (Đợt 1)', items: [
     'Đăng nhập bằng Google — mỗi tài khoản gắn cố định 1 nhân vật, vào máy nào cũng đúng tiến trình',
     'Cấp độ + XP thật, ví Xu riêng, Điểm Kiến Tạo là quỹ chung của nhà',

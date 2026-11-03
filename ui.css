@@ -699,3 +699,7 @@ html[data-fx=lite] #pick{-webkit-backdrop-filter:none;backdrop-filter:none;backg
 #fcPill .ic{font-size:1.25rem;color:var(--ac)}#fcPill b{font:400 1.5rem/1 var(--f-d);font-variant-numeric:tabular-nums}#fcPill span:not(.ic){color:var(--ink2);font-size:.875rem}
 @media (max-width:1180px),(max-height:640px){#fcPill span:not(.ic){display:none}.pg-row{grid-template-columns:6rem 1fr}.pg-row small{display:none}}
 #sAcc{flex:0 1 auto!important;min-width:0!important;overflow-wrap:anywhere;color:#fff!important}
+/* lời mời bật thông báo trên máy (hiện 1 lần) */
+#nfAsk{position:fixed;z-index:9;left:50%;bottom:9rem;transform:translateX(-50%);width:min(30rem,calc(100vw - 2rem));padding:1rem 1.25rem;display:flex;flex-direction:column;gap:.5rem}
+#nfAsk b{font:400 1.25rem/1.2 var(--f-d)}#nfAsk span{color:var(--ink3);font-weight:600}#nfAsk div{display:flex;gap:.75rem;justify-content:flex-end}
+#sNoti .help{margin:.25rem 0 0}

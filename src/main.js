@@ -166,7 +166,7 @@ async function boot() {
         const prog = new Progress(sess.sb, sess); window.VYPROG = prog;
         await prog.refresh();
         const {mountProgressUi} = await import('./ui/progress-ui.js');
-        mountProgressUi({prog, toast, sess});
+        const pui = mountProgressUi({prog, toast, sess}); window.__openProgress = pui.open;
         sess.on('msg', m => { if (m.k === 'eco') prog.refresh(); });
         sess.on('peer', ({present}) => { if (present) prog.refresh(); });
         $('sAcc') && ($('sAcc').textContent = (sess.user && sess.user.email) || '');
@@ -182,7 +182,7 @@ async function boot() {
         chat.send = async (...args) => { const r = await send0(...args); if (r && r.ok !== false) prog.report('chat_sent', {}, 'chat:' + Date.now()); return r; };
         // gọi cho nhau (mỗi cuộc gọi tính 1 lần; máy chủ giới hạn theo ngày)
         let inCall = false;
-        voice.on && voice.on('state', st => { const on = st === 'connected' || st === 'weak'; if (on && !inCall) prog.report('call_together', {}, 'call:' + Math.floor(Date.now() / 1800000)); inCall = on; });
+        voice.on && voice.on('state', st => { const on = !!(st && st.active && st.peerVoice && (st.phase === 'connected' || st.phase === 'weak')); if (on && !inCall) prog.report('call_together', {}, 'call:' + Math.floor(Date.now() / 1800000)); inCall = on; });
         // ở cạnh nhau: cùng online + cùng map, cộng dồn mỗi 10 phút
         let together = 0;
         setInterval(() => { if (document.hidden || !sess.peer || peerMap !== mapId) return; if (++together % 10 === 0) prog.report('together_10min', {map: mapId}, 'tg:' + Math.floor(Date.now() / 600000)); }, 60000);
@@ -195,6 +195,9 @@ async function boot() {
         }
       } catch (e) { console.warn('[progress]', e); }
     }
+    // ---------- 4c) thông báo hệ thống (góc màn hình) khi đang ở tab khác ----------
+    try { const {mountSysNotify} = await import('./ui/sysnotify.js'); mountSysNotify({chat, voice, sess, prog: window.VYPROG || null, other, openChat: ui.setOpen, toast}); }
+    catch (e) { console.warn('[sysnotify]', e); }
   }
   // ---------- 5) tính năng cắm thêm (minigame…): lỗi 1 tính năng không ảnh hưởng game ----------
   try {
