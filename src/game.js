@@ -44,6 +44,9 @@ export function init(ctx){
   const controls=new OrbitControls(camera,renderer.domElement);
   controls.target.set(5,2,-4);controls.enableDamping=true;controls.minDistance=14;controls.maxDistance=38;controls.enablePan=true;controls.screenSpacePanning=false;controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.PAN};controls.update();
   {const az=controls.getAzimuthalAngle(),po=controls.getPolarAngle();controls.minAzimuthAngle=az-CFG.camPan;controls.maxAzimuthAngle=az+CFG.camPan;controls.minPolarAngle=po-CFG.camTilt;controls.maxPolarAngle=po+CFG.camTilt;}
+  // phòng Vy / phòng Bin nằm sát cánh nhà bên cạnh (Vy: bên trái, Bin: bên phải): không cho xoay camera vòng sang phía đó
+  // — xoay sang là tường nhà bên chắn ngang cầu thang (nhân vật bị khoét/nhấp nháy trong tường, trông như đi xuyên)
+  {const mc=MAP_CONFIGS[window.MAPID]||{},dx=mc.ext&&mc.ext.dx;if(dx){const az=controls.getAzimuthalAngle();if(dx<0)controls.minAzimuthAngle=az-0.06;else controls.maxAzimuthAngle=az+0.06}}
 
   // lights
   const hemi=new THREE.HemisphereLight(0xdfe8ff,0x8a7f73,0.9);scene.add(hemi);
@@ -169,7 +172,7 @@ ${FRAG_COLOR}
 
   // anchors
   const MAPS=MAP_CONFIGS;
-  const MC=MAPS[MAPID]||MAPS.living;const OUTD=!!MC.outdoor;TU.uInHK.value=OUTD?0:1;bindTU(TU);
+  const MC=MAPS[MAPID]||MAPS.living;const OUTD=!!MC.outdoor;if(!OUTD)sun.shadow.mapSize.set(2048,2048);TU.uInHK.value=OUTD?0:1;bindTU(TU);
   if(OUTD){const sp=MC.spawn.vy;controls.target.set(sp[0],A0y(MC)+1,sp[1]);camera.fov=30;camera.updateProjectionMatrix();camera.position.set(sp[0]+7.2,A0y(MC)+9,sp[1]+11.4);controls.minDistance=5;controls.maxDistance=28;controls.update();
     controls.minAzimuthAngle=-Infinity;controls.maxAzimuthAngle=Infinity;controls.minPolarAngle=0.12;controls.maxPolarAngle=1.5;CFG.camPan=Math.PI*2;CFG.camTilt=0.9}
   function A0y(c){return c.floorY||0}
@@ -193,7 +196,7 @@ ${FRAG_COLOR}
     toonify(extG);scene.add(extG);extG.updateMatrixWorld(true);
     const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
     const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null};
-    EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat});EXTV.setLevel(TP.quality==='low'?'low':'medium');
+    EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat});EXTV.setLevel(TP.quality==='low'?'low':'indoor');
     extG.traverse(o=>{if(o.isMesh&&/^Stylized Grass$/.test((o.material&&o.material.name)||''))o.visible=false;if(o.isMesh&&/^\.SF_/.test(o.name))o.visible=false});extG.updateMatrixWorld(true);
     console.log('[ext] ngoại cảnh cho map trong nhà '+Math.round(performance.now()-_t0)+'ms')}
   // kính cửa sổ/cửa chính nhìn từ ngoài: đặc (không thấy nội thất), màu xanh trời theo giờ & thời tiết, hơi bóng
@@ -219,7 +222,8 @@ ${FRAG_COLOR}
   const inStair=(x,z)=>!!stairAt(x,z);
   const stairY=(S,z)=>Math.min(S.top,Math.max(0,S.a+S.b*(S.z1-z)));
   const heightAt=(x,z,lv)=>{const S=stairAt(x,z);if(S)return stairY(S,z);
-    if(!lv)for(const T of stairs)if(x>T.x0&&x<T.x1&&z>=T.z1&&z<T.z1+0.34)return stairY(T,T.z1)*(1-(z-T.z1)/0.34);   // chân chạm bậc đầu êm trước khi vào cầu thang
+    if(!lv)for(const T of stairs){if(x>T.x0&&x<T.x1&&z>=T.z1&&z<T.z1+0.34)return stairY(T,T.z1)*(1-(z-T.z1)/0.34);
+      if(T.side&&z>T.z1-0.7&&z<T.z1){const d=T.side.dir<0?T.x0-x:x-T.x1;if(d>=0&&d<0.3)return stairY(T,z)*(1-d/0.3)}}   // chân chạm bậc đầu êm trước khi vào cầu thang
     if(!lv&&EXT){const y=EXT.walkHeight(x,z);if(y!=null)return y}
     return lv?A.L1:A.L0};
   A.stairs=stairs;
@@ -280,6 +284,14 @@ ${FRAG_COLOR}
   $('cCol').onchange=e=>colGroup.visible=e.target.checked;
   const cell=(x,z)=>[Math.floor((x-G.x0)/G.c),Math.floor((z-G.z0)/G.c)];
   const free=(lv,i,j)=>i>=0&&j>=0&&i<G.W&&j<G.H&&!blocked[lv][j*G.W+i];
+  // Cầu thang sát tường trước (phòng Vy / phòng Bin): không có chỗ đứng trước chân cầu thang → bước lên từ BÊN HÔNG ở bậc thấp nhất.
+  // Tự nhận ra: ô trước chân cầu thang bị chặn → chọn phía hông còn trống (cách chân cầu thang ~0.35 m, ngang bậc 1).
+  stairs.forEach(S=>{const c=cell(S.cx,S.botZ);if(free(0,c[0],c[1]))return;const sz=S.z1-0.35;
+    for(const sx of [S.x0-0.32,S.x1+0.32]){const k=cell(sx,sz);if(free(0,k[0],k[1])){S.side={x:sx,z:sz,dir:sx<S.cx?-1:1};break}}
+    if(!S.side)return;console.log('[stair] bước lên từ hông',JSON.stringify(S.side));
+    // mở vành đệm dọc hông ở đoạn bậc thấp để bước vào/ra ngang được (cả WASD lẫn click-đi)
+    for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;
+      if(z>S.z1-0.7&&z<S.z1+0.02&&(S.side.dir<0?x>S.side.x-0.1&&x<S.x0+0.02:x<S.side.x+0.1&&x>S.x1-0.02)){const c2=cell(x,z);const hit=cols[0].some(b=>x>b.min.x-0.05&&x<b.max.x+0.05&&z>b.min.z-0.05&&z<b.max.z+0.05);if(!hit)blocked[0][j*G.W+i]=0}}});
   function los(lv,x0,z0,x1,z1,skipA,skipB){const d=Math.hypot(x1-x0,z1-z0),n=Math.max(1,Math.ceil(d/0.05));
     for(let k=0;k<=n;k++){const t=k/n,dd=t*d;if((skipA&&dd<0.25)||(skipB&&d-dd<0.25))continue;const [i,j]=cell(x0+(x1-x0)*t,z0+(z1-z0)*t);if(!free(lv,i,j))return false}return true}
   function findPath(x0,z0,x1,z1,lv,exact){
@@ -439,7 +451,11 @@ ${FRAG_COLOR}
     else if(n.startsWith(DEF.eye.open))eye.OPEN.push(mixer.clipAction(c));
     else if(n.startsWith(DEF.eye.blink))eye.BLINK.push(mixer.clipAction(c));
     else if(n.startsWith('ACT_')&&!n.includes('__'))acts[n]=mixer.clipAction(c);});
-  mixer.addEventListener('finished',e=>{const n=e.action.getClip().name;if(/EYE_OPEN|BLINK/.test(n))e.action.stop();});
+  // KHÔNG stop() action ngay trong sự kiện 'finished': sự kiện bắn ra GIỮA lúc mixer.update đang duyệt danh sách action,
+  // stop() đổi chỗ action trong danh sách → action thân (WATCHING_IDLE, REST…) bị bỏ qua đúng 1 khung → nhân vật chớp về tư thế gốc.
+  // Gom lại, chạy sau khi mixer.update xong.
+  const afterMix=[];const later=f=>afterMix.push(f);
+  mixer.addEventListener('finished',e=>{const n=e.action.getClip().name;if(/EYE_OPEN|BLINK/.test(n))later(()=>e.action.stop());});
   // Locomotion and continuous idle clips use Three.js native LoopRepeat.
   // Do not manually pause/seek these actions: native looping preserves mixer timing.
   const loopClipNames = new Set([
@@ -469,7 +485,7 @@ ${FRAG_COLOR}
   function popHeld(){const a=POPM.IN,b=POPM.IDLE;if(b&&a){b.position.copy(a.position);b.quaternion.copy(a.quaternion);b.scale.copy(a.scale)}popShow(b?'IDLE':'IN');popSt='held'}
   function popOut(){if(popSt==='off')return;popA.IN&&popA.IN.stop();if(!POPM.OUT||!popA.OUT){popHide();return}popShow('OUT');once(popA.OUT);popA.OUT.setEffectiveWeight(1);popSt='out'}
   function popHide(){popA.IN&&popA.IN.stop();popA.OUT&&popA.OUT.stop();popShow(null);popSt='off'}
-  mixer.addEventListener('finished',e=>{if(e.action===popA.IN&&popSt==='in'){popHeld();if(POPM.IDLE)popA.IN.stop()}else if(e.action===popA.OUT&&popSt==='out')popHide()});
+  mixer.addEventListener('finished',e=>{if(e.action===popA.IN&&popSt==='in')later(()=>{if(popSt!=='in')return;popHeld();if(POPM.IDLE)popA.IN.stop()});else if(e.action===popA.OUT&&popSt==='out')later(()=>{if(popSt==='out')popHide()})});
 
   // ===== MIỆNG (LazyRig): biểu cảm tự động theo ngữ cảnh — người chơi không điều khiển =====
   // Ô atlas (giống nhau ở 2 file, 15 ô đầu): 0 cười hở răng · 1 cười mím · 2 nhếch mép · 3 nhe răng · 4 buồn · 5 há "ồ" · 6 khóc · 7 cười lớn
@@ -609,8 +625,12 @@ ${FRAG_COLOR}
   const approachZ=(cx,z0,dir,lv)=>{let best=z0;for(let d=0.1;d<=0.5;d+=0.1){const zz=z0+dir*d,c=cell(cx,zz);if(free(lv,c[0],c[1])&&zz<(lv?MC.l1[3]:MC.walk0[3])-0.05&&zz>MC.walk0[2])best=zz;else break}return Math.abs(best-z0)>=0.3?best:z0};
   function route(x,z,lv,run,exact){const it=[],s=startPos();let L=P.level,x0=s.x,z0=s.z;
     const add=pts=>pts.forEach(p=>it.push(wp(p.x,p.z,null,run)));
-    if(L===0&&lv===1){const S=pickStair(x0,z0,x,z,true),cx=S.cx,ap=approachZ(cx,S.botZ,1,0);add(findPath(x0,z0,cx,ap,0,true));it.slice(-2).forEach(w=>w.strict=1);it.push(wp(cx,S.botZ,null,run,1),wp(cx,S.midZ,1,run),wp(cx,S.topZ,null,run));x0=cx;z0=S.topZ}      // tới thẳng trục chân cầu thang rồi mới leo (không cắt góc từ bên hông)
-    else if(L===1&&lv===0){const S=pickStair(x0,z0,x,z,false),cx=S.cx,ok=approachZ(cx,S.topZ,-1,1);add(findPath(x0,z0,cx,ok,1,true));it.slice(-2).forEach(w=>w.strict=1);it.push(wp(cx,S.topZ,null,run,1),wp(cx,S.midZ,0,run),wp(cx,S.botZ,null,run),wp(cx,approachZ(cx,S.botZ,1,0),null,run,1));x0=cx;z0=approachZ(cx,S.botZ,1,0)}
+    if(L===0&&lv===1){const S=pickStair(x0,z0,x,z,true),cx=S.cx;
+      if(S.side){add(findPath(x0,z0,S.side.x,S.side.z,0,true));it.slice(-1).forEach(w=>w.strict=1);it.push(wp(cx,S.side.z,null,run,1),wp(cx,S.midZ,1,run),wp(cx,S.topZ,null,run));x0=cx;z0=S.topZ}
+      else{const ap=approachZ(cx,S.botZ,1,0);add(findPath(x0,z0,cx,ap,0,true));it.slice(-2).forEach(w=>w.strict=1);it.push(wp(cx,S.botZ,null,run,1),wp(cx,S.midZ,1,run),wp(cx,S.topZ,null,run));x0=cx;z0=S.topZ}}      // tới thẳng trục chân cầu thang rồi mới leo (không cắt góc từ bên hông)
+    else if(L===1&&lv===0){const S=pickStair(x0,z0,x,z,false),cx=S.cx,ok=approachZ(cx,S.topZ,-1,1);add(findPath(x0,z0,cx,ok,1,true));it.slice(-2).forEach(w=>w.strict=1);
+      if(S.side){it.push(wp(cx,S.topZ,null,run,1),wp(cx,S.midZ,0,run),wp(cx,S.side.z,null,run,1),wp(S.side.x,S.side.z,null,run,1));x0=S.side.x;z0=S.side.z}
+      else{it.push(wp(cx,S.topZ,null,run,1),wp(cx,S.midZ,0,run),wp(cx,S.botZ,null,run),wp(cx,approachZ(cx,S.botZ,1,0),null,run,1));x0=cx;z0=approachZ(cx,S.botZ,1,0)}}
     add(findPath(x0,z0,x,z,lv,exact));return it;}
   const leave=()=>{const k=busy&&busy.kind;return (P.mode==='bed'||k==='climbBed')?[{t:'offBed'}]:(P.mode==='sit'||P.mode==='type'||k==='climbChair')?[{t:'offChair'}]:(P.mode==='watch'||k==='climbWatch')?[{t:'offWatch'}]:[]};
   function cmdMove(x,z,lv,run){
@@ -654,6 +674,7 @@ ${FRAG_COLOR}
     const b=busy,p=clamp(b.a.time/b.dur,0,1);
     P.pos.y=THREE.MathUtils.lerp(b.y0,b.y1,sstep(0.2,0.8,p));
     if(b.kind==='climbBed'&&p>=CFG.eyeCloseAt)eyeClose();
+    if(b.kind==='climbWatch'&&!b.cued&&p>=0.3){b.cued=true;if(!DEF.remote&&api.onWatchSitting)api.onWatchSitting()}     // lúc lấy bắp ra: camera bắt đầu lướt
     if(p>=0.995||(!b.a.isRunning()&&p>0.9)){
       busy=null;P.pos.y=b.y1;
       if(b.kind==='climbBed'){P.mode='bed';if(plan[0]&&plan[0].t==='offBed'){}else{play('SLEEP_'+P.side,{fade:0.05});eyeClose();sfxAt('sleep',{range:12});}}
@@ -745,11 +766,14 @@ ${FRAG_COLOR}
   function walkable(ox,oz,x,z){
     const S=stairAt(x,z),W=stairAt(ox,oz),ins=!!S,was=!!W,lv=(was&&!ins)?(z<W.midZ?1:0):P.level;
     if(ins){
-      if(x<S.x0+0.1||x>S.x1-0.1)return false;
+      if((x<S.x0+0.1||x>S.x1-0.1)&&!(S.side&&z>S.z1-0.7))return false;
       if(was&&W!==S)return false;
-      if(!was){const fromBottom=P.level===0&&oz>=S.z1-0.03&&z<oz,fromTop=P.level===1&&oz<=S.z0+0.08&&z>oz;if(!fromBottom&&!fromTop)return false;}
+      if(!was){const fromBottom=P.level===0&&oz>=S.z1-0.03&&z<oz,fromTop=P.level===1&&oz<=S.z0+0.08&&z>oz,
+        fromSide=!!S.side&&P.level===0&&z>S.z1-0.7&&(S.side.dir<0?ox<=S.x0+0.1&&x>ox:ox>=S.x1-0.1&&x<ox);if(!fromBottom&&!fromTop&&!fromSide)return false;}
       return true;}
-    if(was&&!ins){const atBot=z>=W.z1&&oz<W.z1,atTop=z<=W.z0&&oz>W.z0;if((!atBot&&!atTop)||x<W.x0+0.02||x>W.x1-0.02)return false}   // đang ở trên cầu thang: chỉ được ra ở chân/đỉnh, đúng bề ngang bậc
+    if(was&&!ins){const atBot=z>=W.z1&&oz<W.z1,atTop=z<=W.z0&&oz>W.z0,atSide=!!W.side&&oz>W.z1-0.7&&(W.side.dir<0?x<W.x0-0.05:x>W.x1+0.05);
+      if(atSide)return free(0,...cell(x,z));
+      if((!atBot&&!atTop)||x<W.x0+0.02||x>W.x1-0.02)return false}   // đang ở trên cầu thang: chỉ được ra ở chân/đỉnh, đúng bề ngang bậc
     if(lv===0){const w=MC.walk0;if(x<w[0]||x>w[1]||z<w[2]||z>w[3])return false}
     else{const w=MC.l1;if(x<w[0]||x>w[1]||z<w[2]||z>(w[3]==null?stairs[0].z0+0.02:w[3]))return false}
     if(lv===A.chairL&&CHB&&x>CHB[0]&&x<CHB[2]&&z>CHB[1]&&z<CHB[3]&&!(ox>CHB[0]&&ox<CHB[2]&&oz>CHB[1]&&oz<CHB[3]))return false;
@@ -865,7 +889,7 @@ ${FRAG_COLOR}
     const c=Math.cos(P.yaw),s=Math.sin(P.yaw);
     char.position.set(P.pos.x+off.x*c+off.z*s,P.pos.y+off.y,P.pos.z-off.x*s+off.z*c);
     if(cur===acts[K.WALK])cur.timeScale=CFG.walkAnim;else if(cur===acts[K.RUN])cur.timeScale=CFG.runAnim;
-    updateLayers(dt);mixer.update(dt);updateEyes(dt);blinkTick();sfxTick();mouthTick(dt);
+    updateLayers(dt);mixer.update(dt);if(afterMix.length){const q=afterMix.splice(0);q.forEach(f=>{try{f()}catch(e){console.error(e)}})}updateEyes(dt);blinkTick();sfxTick();mouthTick(dt);
   }
   play('REST',{fade:0});
   return{id:DEF.id,DEF,char,P,K,acts,runMode,logic,finish,setNet,netCmd,dispose,cmdMove,cmdSleep,cmdSit,cmdWake,cmdOffChair,cmdWatch,cmdUnwatch,mouthSay,mouth:()=>mouth,blink:()=>{em('blink');blink(clock)},
@@ -1574,8 +1598,8 @@ ${FRAG_COLOR}
   let pendPR=null;
   function setPR(p){curPR=p;renderer.setPixelRatio(p);renderer.setSize(innerWidth,innerHeight);const pr=Math.min(p,1.25);composer.setPixelRatio(pr);composer.setSize(innerWidth,innerHeight);fxaaP.material.uniforms['resolution'].value.set(1/(innerWidth*pr),1/(innerHeight*pr))}
   // Tự co độ phân giải render để giữ ≥30 fps. 'Tự động': mục tiêu ~45fps; các preset cố định (Điện ảnh/Đẹp…): giữ trần độ phân giải của preset nhưng vẫn tự hạ khi máy tụt dưới ~30fps (rồi nâng lại khi thoải mái).
-  function adaptRes(dtr){if(TEST)return;ftEma+=(Math.min(dtr,0.1)-ftEma)*0.08;if(--adaptCool>0)return;
-    const q=TP.quality,auto=q==='auto',cap=auto?maxPR:Math.min(maxPR,{low:0.75,medium:1,high:maxPR}[q]||maxPR),bad=auto?0.0235:0.033,good=auto?0.0185:0.026,floor=auto?0.6:0.7;
+  function adaptRes(dtr){if(TEST||throttled)return;ftEma+=(Math.min(dtr,0.1)-ftEma)*0.08;if(--adaptCool>0)return;
+    const q=TP.quality,auto=q==='auto',cap=auto?Math.min(maxPR,1.25):Math.min(maxPR,{low:0.75,medium:1,high:maxPR}[q]||maxPR),bad=auto?0.0235:0.033,good=auto?0.0185:0.026,floor=auto?0.6:0.7;
     if(ftEma>bad){badWin++;goodWin=0}else if(ftEma<good){goodWin++;badWin=0}else{badWin=0;goodWin=0}
     if(curPR>cap+0.01){pendPR=cap;adaptCool=60;return}
     if(badWin>=20&&curPR>floor){pendPR=Math.max(floor,+(curPR-0.15).toFixed(2));badWin=0;adaptCool=90}
@@ -1618,29 +1642,53 @@ ${FRAG_COLOR}
   // Trước đây: (1) bước bắt kịp thời gian chạy dồn 0.25s mô phỏng ngay khung đầu, (2) bộ tự co độ phân giải coi các khung khựng đó là "máy yếu"
   // → hạ pixel ratio rồi mất vài chục giây mới nâng lại = cảm giác lag/mờ/giật kéo dài. Giờ: bỏ qua thời gian lúc ẩn, và cho bộ tự co nghỉ ~4s.
   // ===== CUTSCENE camera xem TV: lướt ra sau lưng sofa nhìn về màn TV; thoát thì lướt về góc mặc định đang theo nhân vật =====
-  const CINE={active:false,t:0,dur:1.8,fp:new THREE.Vector3(),ft:new THREE.Vector3(),tp:new THREE.Vector3(),tt:new THREE.Vector3(),done:null,hold:false,
-    go(p,t,dur,hold,done){this.active=true;this.t=0;this.dur=Math.max(0.01,dur);this.fp.copy(camera.position);this.ft.copy(controls.target);this.tp.copy(p);this.tt.copy(t);this.hold=hold;this.done=done||null;controls.enabled=false},
+  const CAM0={fov:camera.fov,near:camera.near};
+  const CINE={active:false,t:0,dur:1.8,fp:new THREE.Vector3(),ft:new THREE.Vector3(),tp:new THREE.Vector3(),tt:new THREE.Vector3(),done:null,hold:false,f0:18,f1:18,n0:1,n1:1,
+    go(p,t,dur,hold,done,fov,near){this.active=true;this.t=0;this.dur=Math.max(0.01,dur);this.fp.copy(camera.position);this.ft.copy(controls.target);this.tp.copy(p);this.tt.copy(t);this.hold=hold;this.done=done||null;controls.enabled=false;
+      this.f0=camera.fov;this.f1=fov;this.n0=camera.near;this.n1=near},
     step(dt){this.t+=dt;const k=Math.min(1,this.t/this.dur),e=k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
       camera.position.lerpVectors(this.fp,this.tp,e);controls.target.lerpVectors(this.ft,this.tt,e);camera.lookAt(controls.target);
+      const f=this.f0+(this.f1-this.f0)*e,n=Math.min(this.n0,this.n1)+(k>=1?(this.n1-Math.min(this.n0,this.n1)):0);if(Math.abs(camera.fov-f)>1e-3||camera.near!==n){camera.fov=f;camera.near=n;camera.updateProjectionMatrix()}
       if(k>=1){const d=this.done;this.done=null;if(!this.hold){this.active=false;controls.enabled=true;controls.update()}if(d)d()}}};
   let cineBack=null;
   api.cineCam=(mode,done)=>{if(!SOFA){done&&done();return}
-    if(mode==='in'){if(!CINE.active)cineBack={p:camera.position.clone().sub(controls.target),};
-      const p=SOFA.center.clone().addScaledVector(SOFA.fwd,-1.55);p.y=A.L0+1.32;const t=SOFA.tv.clone();t.y=A.L0+0.92;CINE.go(p,t,1.9,true,done)}
+    // góc "sau lưng sofa" như ảnh mẫu: cao hơn đầu, lệch nhẹ sang bên, nhìn chếch xuống về phía TV; ống kính mở rộng (fov 18 → 40) và hạ mặt cắt gần để không xén sofa
+    if(mode==='in'){if(!CINE.active)cineBack={p:camera.position.clone().sub(controls.target)};
+      const side=new THREE.Vector3(SOFA.fwd.z,0,-SOFA.fwd.x);
+      const p=SOFA.center.clone().addScaledVector(SOFA.fwd,-2.05).addScaledVector(side,0.55);p.y=A.L0+1.85;
+      const t=SOFA.center.clone().lerp(SOFA.tv,0.62);t.y=A.L0+0.78;CINE.go(p,t,2.4,true,done,40,0.1)}
     else{const L=local.char.position,t=new THREE.Vector3(L.x,L.y+0.7,L.z),off=cineBack?cineBack.p:new THREE.Vector3(12,14,27);
-      if(!CINE.active){done&&done();return}CINE.go(t.clone().add(off),t,1.3,false,done)}};
+      if(!CINE.active){done&&done();return}CINE.go(t.clone().add(off),t,1.5,false,done,CAM0.fov,CAM0.near)}};
   api.cineActive=()=>CINE.active;
   // ===== màn TV: tối khi tắt; bật thì sáng dịu, màu chuyển chậm (không vẽ nội dung video lên TV để khỏi tốn GPU) =====
-  const TVS=(()=>{const o=byName['TV_Screen']||byName['TV_Panel'];if(!o)return null;const ms=[];o.traverse(m=>{if(m.isMesh)ms.push(m)});if(!ms.length)return null;
-    const orig=ms.map(m=>m.material);
-    const mat=new THREE.ShaderMaterial({uniforms:{uT:{value:0},uI:{value:0}},toneMapped:false,
-      vertexShader:'varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-      fragmentShader:'uniform float uT,uI;varying vec3 vP;void main(){vec3 p=vP*1.7;float a=sin(p.z*2.1+uT*.35)*.5+.5,b=sin(p.y*2.7-uT*.27+p.z)*.5+.5;vec3 c=mix(vec3(.08,.17,.34),vec3(.36,.24,.52),a);c=mix(c,vec3(.95,.62,.40),b*.28);gl_FragColor=vec4(c*uI,1.0);}'});
-    let on=false;return{set(v){if(v===on)return;on=v;ms.forEach((m,i)=>m.material=v?mat:orig[i]);if(v)mat.uniforms.uI.value=0},step(dt){if(on){mat.uniforms.uT.value+=dt;mat.uniforms.uI.value=Math.min(1.25,mat.uniforms.uI.value+dt*1.6)}},get on(){return on}}})();
+  // TV: mesh TV_Screen = viền/khung (luôn đen). Mặt màn bên trong = tấm phẳng riêng, lùi vào 3 cm so với khung: tắt = đen bóng, bật = phát sáng.
+  const TVS=(()=>{const o=byName['TV_Screen']||byName['TV_Panel'];if(!o||!SOFA)return null;
+    const black=new THREE.MeshStandardMaterial({color:0x0b0b0d,roughness:0.55,metalness:0.1});toonMat(black);
+    o.traverse(m=>{if(m.isMesh){m.material=black}});
+    const b=SOFA.tvBox,sz=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3());
+    const alongX=sz.x<sz.z,depth=alongX?sz.x:sz.z,face=alongX?(SOFA.center.x>c.x?1:-1):(SOFA.center.z>c.z?1:-1);
+    const W=(alongX?sz.z:sz.x)-0.06,H=sz.y-0.06;
+    const off=new THREE.MeshBasicMaterial({color:0x060608});
+    const on=new THREE.ShaderMaterial({uniforms:{uT:{value:0},uI:{value:0}},toneMapped:false,
+      vertexShader:'varying vec2 vU;void main(){vU=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+      fragmentShader:'uniform float uT,uI;varying vec2 vU;void main(){vec2 p=vU;float a=sin(p.x*3.4+uT*.35)*.5+.5,b2=sin(p.y*2.6-uT*.27+p.x*1.3)*.5+.5;vec3 c=mix(vec3(.08,.17,.34),vec3(.36,.24,.52),a);c=mix(c,vec3(.95,.62,.40),b2*.28);float v=smoothstep(0.,.18,p.x)*smoothstep(1.,.82,p.x)*smoothstep(0.,.18,p.y)*smoothstep(1.,.82,p.y);gl_FragColor=vec4(c*uI*(.7+.4*v),1.0);}'});
+    const pan=new THREE.Mesh(new THREE.PlaneGeometry(W,H),off);pan.name='TV_Glow';pan.raycast=()=>{};
+    pan.position.copy(c);if(alongX){pan.position.x+=face*(depth/2+0.002);pan.rotation.y=face>0?Math.PI/2:-Math.PI/2}else{pan.position.z+=face*(depth/2+0.002);pan.rotation.y=face>0?0:Math.PI}
+    scene.add(pan);
+    let st=false;return{set(v){if(v===st)return;st=v;pan.material=v?on:off;if(v)on.uniforms.uI.value=0},step(dt){if(st){on.uniforms.uT.value+=dt;on.uniforms.uI.value=Math.min(1.25,on.uniforms.uI.value+dt*1.6)}},get on(){return st}}})();
   api.tv=v=>{if(TVS)TVS.set(!!v)};api.hasTV=()=>!!(TVS&&SOFA);
   let resumeN=0;
   document.addEventListener('visibilitychange',()=>{if(document.hidden)return;R.getDelta();resumeN=6;adaptCool=Math.max(adaptCool,240);badWin=0;goodWin=0;ftEma=0.0167;renderer.shadowMap.needsUpdate=true});
-  function loop(){requestAnimationFrame(loop);rawDt=R.getDelta();if(resumeN>0){resumeN--;rawDt=Math.min(rawDt,1/60)}Perf.frame(rawDt*1000);
+  // GIỚI HẠN KHUNG HÌNH: màn 120/144 Hz → vẽ ½ tần số (60/72 fps, vẫn chia đều nhịp màn hình nên không giật) thay vì 144 fps;
+  // cửa sổ game không được chọn (đang dùng app/cửa sổ khác bên cạnh) → 30 fps. Tab ẩn thì trình duyệt tự dừng.
+  let rIv=16.7,lastRaf=0,lastDraw=0,focusN=0,hasFoc=true,throttled=false;
+  const topFocus=()=>{try{return (window.top||window).document.hasFocus()}catch(e){return document.hasFocus()}};
+  function loop(t){requestAnimationFrame(loop);t=t||performance.now();
+    if(lastRaf){const iv=t-lastRaf;if(iv>3&&iv<40)rIv+=(iv-rIv)*0.04}lastRaf=t;
+    if((focusN++&15)===0)hasFoc=topFocus()||!!document.fullscreenElement;
+    const hz=1000/rIv,minDt=!hasFoc?1000/30:hz>100?2000/hz:0;throttled=!hasFoc;
+    if(minDt&&t-lastDraw<minDt-2)return;lastDraw=t;
+    rawDt=R.getDelta();if(resumeN>0){resumeN--;rawDt=Math.min(rawDt,1/60)}Perf.frame(rawDt*1000);
     // BẮT KỊP THỜI GIAN THẬT: máy yếu/khung hình tụt <20fps trước đây bị ép dt<=0.05s => thế giới chạy CHẬM so với đồng hồ thật, trong khi máy kia vẫn chạy đúng tốc độ
     // (nhân vật remote bị dự đoán đi quá xa rồi giật về). Giờ chia nhỏ thành nhiều bước <=0.05s (tối đa 0.25s thực/khung; tab vừa bật lại sau khi ẩn thì không nhảy vọt).
     let acc=Math.min(rawDt,0.25);while(acc>0.0501){tick(0.05,false);acc-=0.05}

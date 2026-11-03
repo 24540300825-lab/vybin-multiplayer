@@ -99,7 +99,8 @@ export async function bootShell() {
   // gỡ HUD tĩnh của index.html ở trang vỏ (chỉ trang game cần) — giữ màn loading, cổng trạng thái, toast
   const KEEP = new Set(['load', 'mpGate', 'toast', 'ytDock']);
   [...document.body.children].forEach(el => { if (el.tagName !== 'SCRIPT' && !KEEP.has(el.id)) el.remove(); });
-  const url = id => location.pathname + (location.search ? location.search + '&' : '?') + 'g=1#map=' + id;
+  // map nằm cả trong query (m=) chứ không chỉ trong #hash: chỉ đổi #hash thì trình duyệt KHÔNG tải lại trang → kẹt màn đen khi đổi map
+  const url = id => location.pathname + (location.search ? location.search + '&' : '?') + 'g=1&m=' + id + '#map=' + id;
   const f = SH.frame = document.createElement('iframe');
   f.id = 'gameFrame'; f.title = APP_NAME;
   f.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture; camera; microphone; display-capture; clipboard-read; clipboard-write; encrypted-media; screen-wake-lock');

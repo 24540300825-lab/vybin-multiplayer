@@ -11,6 +11,8 @@ export const LEVELS = {
   low:    {dens: 0.40, dist: 0.62, shadowR: 9,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.45},
   medium: {dens: 0.66, dist: 0.85, shadowR: 10, grassShadowR: 5,  haze: 2, rain: 4200, far: 0.75},
   high:   {dens: 0.85, dist: 1.00, shadowR: 12, grassShadowR: 8,  haze: 2, rain: 6000, far: 1.00},
+  // map trong nhà (phòng khách / phòng Vy / phòng Bin): vườn chỉ thấy qua khung cửa → thưa hơn, gần hơn, cây cỏ không đổ bóng
+  indoor: {dens: 0.48, dist: 0.58, shadowR: 0,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.55},
 };
 // theo loại: tầm nhìn tối đa (m), đường cong mật độ theo khoảng cách (d0 = bắt đầu thưa, d1 = còn tối thiểu), có đổ bóng không
 const CLASS = {

@@ -251,7 +251,9 @@ export function mountCinema({api, sess, voice, slot, other, toast, music}) {
     pendingCut = true;
     if (!L.cmdWatch()) { pendingCut = false; me.st = 'off'; send({t: 'me', st: 'off'}); render(); }
   }
-  api.onWatchSeated = () => { if (pendingCut && me.st === 'watch') { pendingCut = false; cut(); } };
+  // camera bắt đầu lướt ngay lúc nhân vật lấy bắp ra (≈30% clip ngồi); ngồi xong mà chưa lướt (vd. clip ngắn) thì lướt luôn
+  api.onWatchSitting = () => { if (pendingCut && me.st === 'watch') { pendingCut = false; cut(); } };
+  api.onWatchSeated = api.onWatchSitting;
   api.onWatchLeft = () => { if (me.st === 'watch') away(); };
   function cut() {
     api.cineLock = true; document.documentElement.classList.add('cineCut');
