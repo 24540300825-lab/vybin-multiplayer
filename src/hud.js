@@ -24,7 +24,12 @@ import {Fx} from './ui/fx.js';
   $('iSet').onclick=()=>$('hSet').classList.add('on');$('sX').onclick=()=>$('hSet').classList.remove('on');$('hSet').onclick=e=>{if(e.target.id==='hSet')$('hSet').classList.remove('on')};
 
   $('sWho').textContent=(window.LOCAL_SLOT==='bin')?'Bin':'Vy';
-  $('sChg').onclick=()=>{if(!confirm('Đổi nhân vật? Trang sẽ tải lại và hiện màn chọn Bin / Vy.'))return;try{localStorage.removeItem('vyChar')}catch(e){}const u=new URL(location.href);u.searchParams.delete('as');location.href=u.toString()};
+  // bản tài khoản: nút này = Đăng xuất (để đăng nhập Gmail khác). Chơi một mình (?solo): đổi nhân vật như cũ.
+  {const acc=()=>{const s=window.VYNET&&window.VYNET.sess;return s&&s.account?s:null};
+   if(!window.CONFIG_SOLO&&!/[?&]solo/.test(location.search)&&!/[?&]mock=/.test(location.search))$('sChg').textContent='Đăng xuất';
+   $('sChg').onclick=async()=>{const s=acc();
+    if(s){if(!confirm('Đăng xuất khỏi tài khoản này? Tiến trình vẫn được lưu — đăng nhập lại là vào đúng nhân vật.'))return;await s.signOut();location.reload();return}
+    if(!confirm('Đổi nhân vật? Trang sẽ tải lại và hiện màn chọn Bin / Vy.'))return;try{localStorage.removeItem('vyChar')}catch(e){}const u=new URL(location.href);u.searchParams.delete('as');location.href=u.toString()}}
   {const MAPID=window.MAPID,MI={living:['home','Phòng khách','Phòng khách 2 tầng, cửa sang phòng Vy & Bin'],vy:['home','Phòng Vy','Studio của Vy (gác lửng)'],bin:['home','Phòng Bin','Studio của Bin (gác lửng)'],exterior:['building','Vườn ngoài nhà','Sân vườn quanh nhà, cổng & hàng rào']};
    $('mpList').innerHTML=Object.keys(MI).map(k=>`<div class="mapc${k===MAPID?' cur':''}" data-m="${k}"><span class="ic">${ic(MI[k][0])}</span><div><b>${MI[k][1]}${k===MAPID?' · đang ở':''}</b><small>${MI[k][2]}</small></div></div>`).join('');
    $('iMap').onclick=()=>$('hMap').classList.add('on');$('mX').onclick=()=>$('hMap').classList.remove('on');$('hMap').onclick=e=>{if(e.target.id==='hMap')$('hMap').classList.remove('on')};
@@ -70,7 +75,7 @@ import {Fx} from './ui/fx.js';
   setInterval(clk,1000);setReal(real);
   // --- hồ sơ: bấm đổi nhân vật
   const LS=()=>window.LOCAL_SLOT||'vy';
-  function prof(){const bin=LS()==='bin';$('pNm').textContent=bin?'Bin':'Vy';$('pAv').src=bin?'assets/ui/avatars/bin.v1.png':'assets/ui/avatars/vy.v1.png';$('pLv').textContent='Lv.12'}
+  function prof(){const bin=LS()==='bin';$('pNm').textContent=bin?'Bin':'Vy';$('pAv').src=bin?'assets/ui/avatars/bin.v1.png':'assets/ui/avatars/vy.v1.png';$('pLv').textContent=''}
   prof();
   // --- thu gọn / mở rộng (nhớ lại; màn nhỏ mặc định thu gọn)
   const compact=()=>matchMedia('(max-width:1180px),(max-height:640px)').matches;
@@ -92,9 +97,15 @@ import {Fx} from './ui/fx.js';
   },500);
   { const sc = mountShortcuts({toast}); try { mountKeyHints(sc.keys); } catch (e) { console.warn('keyhints', e); } }
   // --- task
-  let tasks=load('vyTasks',[{t:'Hoàn thiện storyboard',h:'16:00',d:0},{t:'Render test animation',h:'18:00',d:0},{t:'Chỉnh thiết kế poster',h:'20:00',d:0},{t:'Đọc tài liệu',h:'22:00',d:0},{t:'Uống nước (2L)',h:'15:00',d:1}]);
-  function rt(){const L=$('tkList');L.innerHTML='';if(!tasks.length){L.innerHTML='<div class="tk-empty">Chưa có việc nào — bấm + để thêm.</div>';return}tasks.forEach((k,i)=>{const r=document.createElement('div');r.className='tk'+(k.d?' done':'');const c=document.createElement('input');c.type='checkbox';c.checked=!!k.d;c.onchange=()=>{k.d=c.checked?1:0;save('vyTasks',tasks);rt()};
-    const s=document.createElement('span');s.textContent=k.t;const e=document.createElement('em');e.textContent=k.h;const u=document.createElement('u');u.innerHTML=ic('x');u.title='Xoá';u.onclick=()=>{SFX.play('del');tasks.splice(i,1);save('vyTasks',tasks);rt()};r.append(c,s,e,u);L.appendChild(r)})}
+  // Việc hôm nay: không còn danh sách mẫu (dữ liệu minh hoạ). Bản tài khoản đồng bộ lên máy chủ qua window.__vyTasks (main.js).
+  const DEMO=['Hoàn thiện storyboard','Render test animation','Chỉnh thiết kế poster','Đọc tài liệu','Uống nước (2L)'];
+  let tasks=load('vyTasks',[]);if(!Array.isArray(tasks))tasks=[];
+  if(tasks.length===DEMO.length&&tasks.every((k,i)=>k&&k.t===DEMO[i]))tasks=[];
+  const TK={get:()=>tasks.map(k=>({t:k.t,h:k.h,d:k.d?1:0})),set:l=>{tasks=Array.isArray(l)?l.filter(k=>k&&typeof k.t==='string').map(k=>({t:String(k.t).slice(0,120),h:String(k.h||'--:--').slice(0,5),d:k.d?1:0})):[];save('vyTasks',tasks);rt()},onChange:null};
+  window.__vyTasks=TK;
+  const saveT=v=>{save('vyTasks',v);try{TK.onChange&&TK.onChange(TK.get())}catch(e){}};
+  function rt(){const L=$('tkList');L.innerHTML='';if(!tasks.length){L.innerHTML='<div class="tk-empty">Chưa có việc nào — bấm + để thêm.</div>';return}tasks.forEach((k,i)=>{const r=document.createElement('div');r.className='tk'+(k.d?' done':'');const c=document.createElement('input');c.type='checkbox';c.checked=!!k.d;c.onchange=()=>{k.d=c.checked?1:0;saveT(tasks);rt()};
+    const s=document.createElement('span');s.textContent=k.t;const e=document.createElement('em');e.textContent=k.h;const u=document.createElement('u');u.innerHTML=ic('x');u.title='Xoá';u.onclick=()=>{SFX.play('del');tasks.splice(i,1);saveT(tasks);rt()};r.append(c,s,e,u);L.appendChild(r)})}
   rt();
   // panel bên phải: chỉ mở 1 cái một lúc (Việc / Thông báo); trạng thái "Việc" được nhớ
   const setTasks=v=>{$('hTasks').classList.toggle('on',v);$('iTask').classList.toggle('on',v);ui.tasks=v;saveUi();if(v)Notify.close()};
@@ -102,7 +113,7 @@ import {Fx} from './ui/fx.js';
   $('iTask').onclick=()=>setTasks(!$('hTasks').classList.contains('on'));$('tkX').onclick=()=>setTasks(false);
   if(ui.tasks)setTasks(true);
   $('tkPlus').onclick=()=>{const a=$('tkAdd');a.hidden=!a.hidden;if(!a.hidden)$('tkTx').focus()};
-  const addT=()=>{const t=$('tkTx').value.trim();if(!t)return;tasks.push({t,h:$('tkTm').value||'--:--',d:0});$('tkTx').value='';save('vyTasks',tasks);rt()};
+  const addT=()=>{const t=$('tkTx').value.trim();if(!t)return;tasks.push({t,h:$('tkTm').value||'--:--',d:0});$('tkTx').value='';saveT(tasks);rt()};
   $('tkOk').dataset.nosfx='1';$('tkOk').onclick=addT;$('tkTx').onkeydown=e=>{if(e.key==='Enter')addT()};
   // --- chụp ảnh
   $('iCam').onclick=()=>{window.__shot=()=>{const a=document.createElement('a');a.download='vy-bin-'+Date.now()+'.png';a.href=V().renderer.domElement.toDataURL('image/png');a.click();SFX.play('shutter');toast('Đã lưu ảnh')}};

@@ -13,6 +13,7 @@ export const CONFIG = {
   ice: c.ice || [{urls: 'stun:stun.l.google.com:19302'}, {urls: 'stun:stun1.l.google.com:19302'}, {urls: 'stun:stun.cloudflare.com:3478'}],
   turn: c.turn || null,                    // {urls:[...], username, credential}
   mock: q.get('mock') || c.mock || '',     // dev: đường dẫn module Supabase giả lập
+  mockAccount: q.has('mockacct'),           // dev: giả lập kèm 'tài khoản' (test luồng đăng nhập/nhân vật/tiến trình)
   solo: q.has('solo'),
   as: q.get('as') || '',
   perf: q.has('perf'),
