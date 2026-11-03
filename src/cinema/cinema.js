@@ -41,7 +41,7 @@ export function mountCinema({api, sess, voice, slot, other, toast, music}) {
       <button class="cb" id="cnHostB" title="Quyền điều khiển">${ic('crown')}<span id="cnHostT">Host</span></button>
       <button class="cb" id="cnFs" title="Toàn màn hình">${ic('expand')}</button>
       <button class="cb" id="cnMin" title="Tạm rời (thu nhỏ, phim vẫn chạy)">${ic('shrink')}<span>Tạm rời</span></button>
-      <button class="cb off" id="cnOff" title="Tắt TV">${ic('power')}<span>Tắt TV</span></button>
+      <button class="cb off" id="cnOff" title="Tắt TV">${ic('power')}<span id="cnOffT">Tắt TV</span></button>
     </div>
   </header>
   <main class="cStage">
@@ -50,7 +50,7 @@ export function mountCinema({api, sess, voice, slot, other, toast, music}) {
       <div class="cEmpty" id="cnEmpty"></div>
       <div class="cTap" id="cnTap" hidden><button class="pb">${ic('play')}<span>Bấm để bật tiếng / phát</span></button></div>
       <div class="cMiniRz" id="cnRz" title="Kéo để phóng to / thu nhỏ"></div>
-      <div class="cMiniBar"><b id="cnMiniT">Rạp chung</b><span class="sp"></span><button class="cb" id="cnBack" title="Vào xem lại">${ic('expand')}<span>Vào lại</span></button><button class="cb off" id="cnOff2" title="Tắt TV">${ic('power')}</button></div>
+      <div class="cMiniBar"><b id="cnMiniT">Rạp chung</b><span class="sp"></span><button class="cb" id="cnBack" title="Vào xem lại">${ic('expand')}<span>Vào lại</span></button><button class="cb off" id="cnOff2" title="Tắt TV">${ic('power')}<span id="cnOff2T"></span></button></div>
     </div>
   </main>
   <footer class="cBar">
@@ -115,6 +115,9 @@ export function mountCinema({api, sess, voice, slot, other, toast, music}) {
     el.hostB.disabled = !S || (isHost() && !peerIn());
     el.libT.textContent = isHost() ? 'Chọn phim' : 'Gợi ý phim'; el.libH.textContent = isHost() ? 'Chọn phim' : 'Gợi ý phim cho ' + (S ? NAME[S.host] : 'host');
     root.classList.toggle('guest', !!S && !isHost());
+    // còn người kia đang xem → nút này chỉ cho RIÊNG mình rời rạp (đóng hẳn màn hình phim), người kia xem tiếp
+    const solo = !peerIn(), lb = solo ? 'Tắt TV' : 'Rời rạp', tt = solo ? 'Tắt TV' : 'Rời rạp — đóng màn hình phim của bạn, ' + NAME[other] + ' vẫn xem tiếp';
+    $('cnOffT').textContent = lb; $('cnOff').title = tt; $('cnOff2T').textContent = solo ? '' : 'Rời'; $('cnOff2').title = tt;
   }
   const peerIn = () => !!(sess && sess.peer) && (peerSt === 'watch' || peerSt === 'away');
   function renderNow() {
@@ -284,7 +287,9 @@ export function mountCinema({api, sess, voice, slot, other, toast, music}) {
     if (!peerIn()) S = null;
     setMode('off'); api.cineCam('out');
     const L = api.local; if (L && (L.P.mode === 'watch' || (L.busy && L.busy.kind === 'climbWatch') || L.plan.some(x => x.t === 'climbWatch'))) L.cmdUnwatch();
+    const stay = peerIn();
     render(); musicResume();
+    if (stay) toast('Bạn đã rời rạp — ' + NAME[other] + ' vẫn đang xem. Bấm vào TV nếu muốn xem cùng lại');
   }
   addEventListener('pagehide', () => { if (me.st !== 'off') { if (isHost() && peerIn()) send({t: 'host', to: other, v: (S.v || 0) + 1}); send({t: 'me', st: 'off'}); } });
   $('cnMin').onclick = away; $('cnOff').onclick = off; $('cnOff2').onclick = off; $('cnBack').onclick = back;
