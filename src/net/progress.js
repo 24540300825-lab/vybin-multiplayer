@@ -6,9 +6,13 @@ export const CUR = {
   xp: {name: 'Kinh nghiệm', short: 'XP'},
   kt: {name: 'Điểm Kiến Tạo', short: 'Kiến Tạo'},
 };
+// danh mục vật phẩm (máy chủ gửi kèm game_me / game_bag) — để hiện tên "Gỗ" thay vì "item:wood"
+export const ITEMS = {};
+export const setItems = list => (list || []).forEach(i => { if (i && i.id) ITEMS[i.id] = i; });
 const SKILL = {creative: 'Sáng tạo', garden: 'Làm vườn', fishing: 'Câu cá', explore: 'Khám phá', craft: 'Chế tạo'};
 export function curName(c) {
   if (CUR[c]) return CUR[c].short;
+  if (c && c.startsWith('item:')) { const it = ITEMS[c.slice(5)]; return it ? it.name : c.slice(5); }
   if (c && c.startsWith('skill:')) return 'điểm ' + (SKILL[c.slice(6)] || 'kỹ năng');
   return c;
 }
@@ -31,7 +35,7 @@ export class Progress {
   refresh() {
     if (this._busy) return this._busy;
     this._busy = (async () => {
-      try { const d = await this._rpc('game_me'); if (d) { this.me = d; this.ok = true; this.emit('change', d); } return d; }
+      try { const d = await this._rpc('game_me'); if (d) { setItems(d.items); this.me = d; this.ok = true; this.emit('change', d); } return d; }
       catch (e) { console.warn('[progress] refresh', e); return null; }
       finally { setTimeout(() => { this._busy = null; }, 0); }
     })();
@@ -43,6 +47,7 @@ export class Progress {
     if (!res) return res;
     const got = res.granted || res.items || [];
     if (got.length || (res.achievements && res.achievements.length)) { this.emit('reward', res); this._poke(); }
+    if (res.quests && res.quests.length) { this.emit('quests', res.quests); this._poke(); }
     this.refresh();
     return res;
   }
@@ -60,6 +65,16 @@ export class Progress {
   async focusStart(min) { const r = await this._rpc('game_focus_start', {p_minutes: min}); await this.refresh(); return r; }
   async focusCancel() { await this._rpc('game_focus_cancel'); await this.refresh(); }
   async focusFinish(id) { const r = await this._rpc('game_focus_finish', {p_id: id}); if (r) r.label = 'Xong phiên tập trung!'; return this._after(r); }
+  // ---- nhiệm vụ & hướng dẫn (hạng mục 04) ----
+  async quests() { return this._rpc('game_quests'); }
+  async claimQuest(id, period) { const r = await this._rpc('game_quest_claim', {p_quest: id, p_period: period}); return r && r.dup ? r : this._after(r); }
+  async tutorial(skip) { await this._rpc('game_tutorial', {p_skip: !!skip}); await this.refresh(); }
+  // ---- túi đồ & kho nhà (hạng mục 05) ----
+  async bag() { const b = await this._rpc('game_bag'); if (b) setItems(b.items); return b; }
+  async transfer(item, n, toHouse) {
+    const r = await this._rpc('game_transfer', {p_item: item, p_n: n, p_to_house: !!toHouse, p_idem: Date.now().toString(36) + Math.random().toString(36).slice(2, 8)});
+    this._poke(); return r;
+  }
   async save({settings = null, tasks = null, title = null, flags = null} = {}) {
     await this._rpc('game_save', {p_settings: settings, p_tasks: tasks, p_title: title, p_flags: flags});
   }

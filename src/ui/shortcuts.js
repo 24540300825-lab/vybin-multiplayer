@@ -12,9 +12,9 @@ export const ACTIONS = [
 // phím cố định của game (không đổi được) — hiển thị để biết, và để không gán trùng
 const FIXED = [
   ['W A S D', 'Di chuyển'], ['Shift', 'Giữ để chạy'], ['E', 'Tương tác: ngồi / ngủ / dậy gần đồ vật'],
-  ['T', 'Mở chat'], ['M', 'Tắt / bật mic khi đang gọi'], ['Esc', 'Đóng hộp thoại'], ['F3', 'Thông số hiệu năng'],
+  ['T', 'Mở chat'], ['B', 'Túi đồ'], ['J', 'Nhiệm vụ'], ['M', 'Tắt / bật mic khi đang gọi'], ['Esc', 'Đóng hộp thoại'], ['F3', 'Thông số hiệu năng'],
 ];
-const RESERVED = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'KeyT', 'KeyM']);
+const RESERVED = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'KeyT', 'KeyM', 'KeyB', 'KeyJ']);
 const OK_CODE = /^(Key[A-Z]|Digit\d|Numpad\d|Arrow(Up|Down|Left|Right)|Backquote|Minus|Equal|Bracket(Left|Right)|Semicolon|Quote|Comma|Period|Slash|Backslash)$/;
 const LS = 'vyKeys';
 

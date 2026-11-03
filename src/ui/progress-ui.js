@@ -89,7 +89,7 @@ export function mountProgressUi({prog, toast, sess}) {
       B.innerHTML = d.inbox.length
         ? `<div class="pg-acts"><button class="pb" id="pgAll">Nhận tất cả (${d.inbox.length})</button></div>` + d.inbox.slice().reverse().map(g => `<div class="pg-gift"><span class="ic">${ic('stars')}</span><div><b>${esc(g.title)}</b><small>${esc(g.body || '')}</small><div class="pg-items">${(g.items || []).map(i => `<span class="pg-item${String(i.c).startsWith('soon:') ? ' soon' : ''}">${String(i.c).startsWith('soon:') ? esc(i.label || 'Sắp có') : '+' + nf(i.n) + ' ' + esc(curName(i.c))}</span>`).join('')}</div></div><button class="pl" data-g="${g.id}">Nhận</button></div>`).join('')
         : '<p class="pg-empty">Hộp quà trống. Quà lên cấp, thành tựu và phần thưởng chờ nhận sẽ nằm ở đây.</p>';
-      const take = async (id, btn) => { btn.disabled = true; try { const r = await prog.claim(id); if (!(r && r.items && r.items.length)) toast('Đã nhận'); } catch (e) { toast(errText(e)); btn.disabled = false; } render(); };
+      const take = async (id, btn) => { btn.disabled = true; try { const r = await prog.claim(id); if (r && r.kept) setTimeout(() => toast('Túi đầy — còn ' + r.kept + ' quà chờ. Cất bớt đồ vào kho nhà (phím B) rồi nhận lại.'), 1800); else if (!(r && r.items && r.items.length)) toast('Đã nhận'); } catch (e) { toast(errText(e)); btn.disabled = false; } render(); };
       $('pgAll') && ($('pgAll').onclick = e => take(null, e.currentTarget));
       B.querySelectorAll('[data-g]').forEach(b => b.onclick = () => take(b.dataset.g, b));
     } else if (tab === 'skills') {

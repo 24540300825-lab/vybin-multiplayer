@@ -176,7 +176,14 @@ async function boot() {
         if (mapEv) prog.report(mapEv, {map: mapId}, mapEv + ':' + day());
         // ngủ: game phát lệnh 'sleep' qua api.emit (cùng lệnh đồng bộ cho người kia)
         const emit0 = api.emit;
-        api.emit = (t, a) => { if (t === 'sleep') prog.report('sleep', {}, 'sleep:' + Math.floor(Date.now() / 60000)); return emit0 ? emit0(t, a) : undefined; };
+        api.emit = (t, a) => {
+          if (t === 'sleep') prog.report('sleep', {}, 'sleep:' + Math.floor(Date.now() / 60000));
+          if (t === 'sit') prog.report('sit', {}, 'sit:' + Math.floor(Date.now() / 120000));
+          return emit0 ? emit0(t, a) : undefined;
+        };
+        // nhiệm vụ, túi đồ & kho nhà, hướng dẫn người mới (hạng mục 04 + 05)
+        try { const {mountQuestsUi} = await import('./ui/quests-ui.js'); window.__vyQuests = mountQuestsUi({prog, toast, api, mapId}); }
+        catch (e) { console.warn('[quests]', e); }
         // chat
         const send0 = chat.send.bind(chat);
         chat.send = async (...args) => { const r = await send0(...args); if (r && r.ok !== false) prog.report('chat_sent', {}, 'chat:' + Date.now()); return r; };
