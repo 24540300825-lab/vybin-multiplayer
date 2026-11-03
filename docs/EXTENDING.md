@@ -87,3 +87,12 @@ Toàn bộ hiệu ứng âm thanh nằm trong `src/sfx.js`, tổng hợp bằng 
 ## Cuộc gọi đến / đi
 
 `src/ui/call-ring.js` lắng nghe `Voice`: có người gọi (`state.incoming`) → popup + chuông lặp; bấm Nghe = `voice.join()`, Từ chối = `voice.decline()`; bên gọi (`state.outgoing`) nghe tiếng chờ, tự dập máy sau 45 giây nếu người kia đang trong phòng mà không nghe. Âm thanh của người gọi bị tắt (muted) cho tới khi bên nhận bấm Nghe.
+
+## 6. Tài khoản, ví & phần thưởng (Đợt 1 — `supabase/migrations/003_players_economy.sql`)
+- **Tài khoản:** đăng nhập Google (Supabase Auth). Mỗi tài khoản = 1 nhân vật cố định (`game_players`, slot `bin`/`vy` duy nhất). Chọn 1 lần, mọi máy đăng nhập cùng Gmail vào đúng nhân vật. Cài đặt → Tài khoản → Đăng xuất để đổi Gmail.
+- **Sổ giao dịch:** mọi Xu / XP / Điểm Kiến Tạo / điểm kỹ năng đi qua hàm máy chủ `_grant` → bảng `game_ledger` (có `idem` chống cộng trùng, không âm). Client KHÔNG gửi số dư; chỉ gọi `game_*` (RPC).
+- **Bảng cân bằng = bảng `game_config`** (sửa trong Supabase → Table editor, hoặc Command Center sau này; mỗi lần sửa tự lưu vào `game_config_history`):
+  `welcome` quà chào mừng · `levels` ngưỡng XP · `level_rewards` quà lên cấp · `rewards` luật thưởng theo sự kiện (`once`, `daily`, `xu`, `xp`, `kt`) · `focus` phiên tập trung · `skills` nhánh kỹ năng (`live:false` = Sắp có) · `achievements` danh mục thành tựu · `house_levels` giá lên cấp nhà · `tz` múi giờ reset ngày.
+- **Thêm nguồn thưởng mới:** (1) thêm mã vào `allowed` trong `game_report` (migration mới), (2) thêm luật vào `game_config.rewards`, (3) gọi `VYPROG.report('ma_su_kien', {...}, 'idem')` ở client. Thành tựu: thêm 1 mục vào `achievements` với `event` = mã đó — không cần code.
+- **Hộp quà** (`game_inbox`): quà lên cấp, thành tựu, chào mừng, và sau này đồ dư khi túi đầy. Món `c:"soon:*"` chỉ hiển thị (Sắp có).
+- Thử cục bộ không cần Google: `?mock=/dev/mock-supabase.js` (giả lập cũ, không có tiến trình). Luồng tài khoản thật chỉ chạy trên Supabase.

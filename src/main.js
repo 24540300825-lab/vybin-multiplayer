@@ -39,7 +39,7 @@ async function boot() {
     sess = new Session();
     sess.on('status', ({state, text}) => {
       if (state === 'full') { hide(); gate.show('🚪', 'Chỗ của bạn đã có người khác vào', 'Bạn rời đi khá lâu nên chỗ đã được nhường. Bấm Thử lại để vào lại nếu còn chỗ.', [['Thử lại', () => location.reload()]]); }
-      if (state === 'dup') { hide(); gate.show('🪟', 'Đang mở ở tab khác', 'Tài khoản/slot này đang được dùng ở một tab khác. Dùng tab đó hoặc bấm nút bên dưới để chuyển sang tab này.', [['Dùng tab này', () => location.reload()]]); }
+      if (state === 'dup') { hide(); gate.show('🪟', 'Đang chơi ở thiết bị khác', 'Tài khoản này vừa được mở ở một tab hoặc thiết bị khác (laptop, điện thoại…). Bấm nút bên dưới để chơi tiếp ở đây.', [['Chơi ở đây', () => location.reload()]]); }
     });
     LB(5, 'Đang kết nối phòng "' + CONFIG.room + '"...');
     const fatal = e => {
@@ -48,6 +48,35 @@ async function boot() {
       else gate.show('⚠️', 'Không kết nối được', String(e.message || e), [['Thử lại', () => location.reload()], ['Chơi một mình', () => { const u = new URL(location.href); u.searchParams.set('solo', '1'); location.href = u; }]]);
     };
     try { await sess.init(); } catch (e) { fatal(e); return; }
+    // ---- tài khoản Google: chưa đăng nhập => màn đăng nhập (trang sẽ chuyển sang Google rồi quay lại) ----
+    if (sess.needLogin) {
+      const {loginScreen} = await import('./ui/login.js');
+      const q = new URLSearchParams(location.hash.slice(1) + '&' + location.search.slice(1));
+      const oerr = q.get('error_description') || q.get('error') || '';
+      if (oerr) history.replaceState(null, '', location.pathname + location.search.replace(/([?&])(error|error_code|error_description)=[^&]*/g, '$1').replace(/[?&]+$/, ''));
+      loginScreen({onGoogle: () => sess.signInGoogle(), note: oerr ? 'Đăng nhập chưa thành công: ' + oerr.replace(/\+/g, ' ') : ''});
+      return;
+    }
+    // ---- mỗi tài khoản gắn cố định 1 nhân vật: đã có => vào thẳng; chưa có => chọn 1 lần ----
+    if (sess.account) {
+      const email = (sess.user && sess.user.email) || 'tài khoản này';
+      for (;;) {
+        const {data: roster, error} = await sess.sb.rpc('game_roster');
+        if (error) { fatal(new Error('Không đọc được nhân vật: ' + (error.message || error))); return; }
+        if (roster && roster.me) { pref = roster.me; break; }
+        const owned = (roster && roster.owned) || [];
+        if (owned.length >= 2) {
+          hide(); gate.show('🚪', 'Bin và Vy đều đã có chủ', email + ' chưa gắn với nhân vật nào. Đăng xuất rồi đăng nhập bằng Gmail bạn đã dùng để chơi.', [['Đăng xuất', async () => { await sess.signOut(); location.reload(); }]]);
+          return;
+        }
+        const pick = await pickChar({taken: owned, note, takenText: 'Đã có chủ', hint: 'Đã đăng nhập ' + email + '. Chọn nhân vật của bạn — chỉ chọn một lần, sau này mọi thiết bị đăng nhập bằng tài khoản này đều vào đúng nhân vật.'});
+        note = '';
+        const r = await sess.sb.rpc('game_create_player', {p_slot: pick});
+        if (r.error) { note = /slot_owned/.test(r.error.message || '') ? 'Nhân vật đó vừa được chọn bởi tài khoản khác — hãy chọn nhân vật còn lại.' : 'Chưa tạo được nhân vật: ' + r.error.message; continue; }
+        pref = pick; break;
+      }
+      saveChar(pref);
+    }
     for (;;) {
       if (!pref) {
         const taken = await sess.peek();
@@ -57,6 +86,7 @@ async function boot() {
       }
       try { const r = await sess.connect(pref); slot = r.slot; mapId = (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap'); if (!isMap(mapId)) mapId = r.map; break; }   // map là của RIÊNG từng người
       catch (e) {
+        if (e.code === 'taken' && sess.account) { fatal(new Error((pref === 'bin' ? 'Bin' : 'Vy') + ' đang được một phiên khác giữ chỗ. Thử lại sau ít phút.')); return; }
         if (e.code === 'taken') { note = (pref === 'bin' ? 'Bin' : 'Vy') + ' đang có người khác dùng — hãy chọn nhân vật còn lại.'; pref = null; continue; }
         fatal(e); return;
       }
@@ -105,6 +135,8 @@ async function boot() {
     const other = slot === 'bin' ? 'vy' : 'bin';
     const loadChar = async s => { const g = await Assets.load('char-' + s); Assets.retain('char-' + s); return g; };
     bindSync(sess, api, loadChar);
+    let peerMap = null;
+    sess.on('msg', m => { if (m.k === 's' && m.mp) peerMap = m.mp; });
     api.envOut = o => sess.send({k: 'env', ...o});
     sess.on('peer', ({present}) => { if (!present) return; });
     // Mỗi người có thể ở map KHÁC nhau. Mỗi snapshot kèm map của người gửi: khác map thì ẩn nhân vật kia (toạ độ map khác sẽ làm họ "đứng giữa không trung"),
@@ -126,6 +158,43 @@ async function boot() {
     voice.resume().catch(e => console.warn('call resume', e));
     addEventListener('pageshow', e => { if (e.persisted) voice.resume().catch(() => {}); });     // sau đổi map/F5: tự vào lại cuộc gọi nếu trước đó đang gọi
     $('mpLeave') && ($('mpLeave').onclick = async () => { await sess.leave(); location.reload(); });
+
+    // ---------- 4b) tiến trình người chơi (ví, XP, cấp, Hộp quà, thành tựu, phiên tập trung) — chỉ bản tài khoản ----------
+    if (sess.account) {
+      try {
+        const {Progress} = await import('./net/progress.js');
+        const prog = new Progress(sess.sb, sess); window.VYPROG = prog;
+        await prog.refresh();
+        const {mountProgressUi} = await import('./ui/progress-ui.js');
+        mountProgressUi({prog, toast, sess});
+        sess.on('msg', m => { if (m.k === 'eco') prog.refresh(); });
+        sess.on('peer', ({present}) => { if (present) prog.refresh(); });
+        $('sAcc') && ($('sAcc').textContent = (sess.user && sess.user.email) || '');
+        const day = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+        // vào map => sự kiện (máy chủ tự áp giới hạn: về nhà lần đầu, dạo vườn 1 lần/ngày…)
+        const mapEv = {house: 'enter_house', exterior: 'visit_garden', studio: 'enter_studio'}[mapId];
+        if (mapEv) prog.report(mapEv, {map: mapId}, mapEv + ':' + day());
+        // ngủ: game phát lệnh 'sleep' qua api.emit (cùng lệnh đồng bộ cho người kia)
+        const emit0 = api.emit;
+        api.emit = (t, a) => { if (t === 'sleep') prog.report('sleep', {}, 'sleep:' + Math.floor(Date.now() / 60000)); return emit0 ? emit0(t, a) : undefined; };
+        // chat
+        const send0 = chat.send.bind(chat);
+        chat.send = async (...args) => { const r = await send0(...args); if (r && r.ok !== false) prog.report('chat_sent', {}, 'chat:' + Date.now()); return r; };
+        // gọi cho nhau (mỗi cuộc gọi tính 1 lần; máy chủ giới hạn theo ngày)
+        let inCall = false;
+        voice.on && voice.on('state', st => { const on = st === 'connected' || st === 'weak'; if (on && !inCall) prog.report('call_together', {}, 'call:' + Math.floor(Date.now() / 1800000)); inCall = on; });
+        // ở cạnh nhau: cùng online + cùng map, cộng dồn mỗi 10 phút
+        let together = 0;
+        setInterval(() => { if (document.hidden || !sess.peer || peerMap !== mapId) return; if (++together % 10 === 0) prog.report('together_10min', {map: mapId}, 'tg:' + Math.floor(Date.now() / 600000)); }, 60000);
+        // "Việc hôm nay" đồng bộ giữa các máy
+        const T = window.__vyTasks;
+        if (T && prog.me) {
+          const srv = prog.me.player.tasks || [], loc = T.get();
+          if (srv.length) T.set(srv); else if (loc.length) prog.save({tasks: loc}).catch(e => console.warn('tasks', e));
+          let tm = null; T.onChange = list => { clearTimeout(tm); tm = setTimeout(() => prog.save({tasks: list}).catch(e => console.warn('tasks', e)), 800); };
+        }
+      } catch (e) { console.warn('[progress]', e); }
+    }
   }
   // ---------- 5) tính năng cắm thêm (minigame…): lỗi 1 tính năng không ảnh hưởng game ----------
   try {

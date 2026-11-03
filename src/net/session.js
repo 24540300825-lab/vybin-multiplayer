@@ -36,6 +36,7 @@ export class Session {
   // Bước 1: dựng client + phiên ẩn danh (chưa giữ slot) — để màn chọn nhân vật còn hỏi được "ai đang có người".
   async init() {
     if (this.sb) return;
+    this.needLogin = false;
     this.setState('connecting', 'Đang kết nối...');
     const mod = await import(/* @vite-ignore */ CONFIG.mock || CONFIG.supabaseJs);
     const createClient = mod.createClient || (mod.default && mod.default.createClient);
@@ -43,15 +44,31 @@ export class Session {
       auth: {persistSession: true, autoRefreshToken: true, storageKey: 'vybin-auth'},
       realtime: {params: {eventsPerSecond: 40}},
     });
-    // phiên ẩn danh (tự khôi phục sau F5 vì lưu trong localStorage)
+    // Bản mới: tài khoản Google (một tài khoản = một nhân vật). Chưa đăng nhập => dừng ở đây, main.js hiện màn đăng nhập.
+    // Giả lập (?mock=) vẫn dùng phiên ẩn danh như cũ để test.
     let {data: {session}} = await this.sb.auth.getSession();
-    if (!session) {
+    this.account = !CONFIG.mock || CONFIG.mockAccount;
+    if (this.account) {
+      if (!session || !session.user || session.user.is_anonymous) { this.needLogin = true; this.setState('login', ''); return; }
+      this.needLogin = false; this.user = session.user;
+    } else if (!session) {
       const r = await this.sb.auth.signInAnonymously();
       if (r.error) throw new Error('Đăng nhập ẩn danh thất bại: ' + r.error.message + ' (đã bật Anonymous sign-ins chưa?)');
       session = r.data.session;
     }
     this.uid = session.user.id; this._token = session.access_token;
     try { this.sb.auth.onAuthStateChange((ev, ss) => { if (ss && ss.access_token) { this._token = ss.access_token; try { this.sb.realtime.setAuth(ss.access_token); } catch (e) {} } }); } catch (e) {}
+  }
+  // Đăng nhập Google: chuyển trang sang Google rồi quay lại đúng địa chỉ này (giữ ?room=…, bỏ #map để supabase đọc token).
+  async signInGoogle() {
+    const back = location.origin + location.pathname + location.search;
+    const {error} = await this.sb.auth.signInWithOAuth({provider: 'google', options: {redirectTo: back, queryParams: {prompt: 'select_account'}}});
+    if (error) throw new Error(error.message || String(error));
+  }
+  async signOut() {
+    try { await this.leave(); } catch (e) {}
+    try { await this.sb.auth.signOut(); } catch (e) {}
+    try { ['vyChar'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
   }
   // Nhân vật nào đang có NGƯỜI KHÁC giữ (['bin'] / ['vy'] / []). Server cũ chưa có hàm → trả [] (không khoá gì).
   async peek() {
@@ -76,7 +93,8 @@ export class Session {
   }
 
   async _claim() {
-    const {data, error} = this.pref ? await this.sb.rpc('claim_slot_as', {p_room: this.room, p_pref: this.pref}) : await this.sb.rpc('claim_slot', {p_room: this.room});
+    const {data, error} = this.account ? await this.sb.rpc('game_claim_slot', {p_room: this.room})
+      : this.pref ? await this.sb.rpc('claim_slot_as', {p_room: this.room, p_pref: this.pref}) : await this.sb.rpc('claim_slot', {p_room: this.room});
     if (error) {
       const m = String(error.message || error);
       if (m.includes('slot_taken')) { const e = new Error('slot_taken'); e.code = 'taken'; throw e; }

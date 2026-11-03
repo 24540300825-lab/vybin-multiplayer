@@ -1,6 +1,12 @@
 // Thông báo "cập nhật game" hiện trong trung tâm thông báo (chuông). Thêm bản mới: chèn 1 mục ĐẦU danh sách — id phải duy nhất.
 // Mỗi mục: {id, date, title, items:[các dòng ngắn]}. Trạng thái "đã đọc" lưu trên máy từng người (localStorage).
 export const NEWS = [
+  {id: 'dot1-account', date: '03/11/2026', title: 'Tài khoản & tiến trình (Đợt 1)', items: [
+    'Đăng nhập bằng Google — mỗi tài khoản gắn cố định 1 nhân vật, vào máy nào cũng đúng tiến trình',
+    'Cấp độ + XP thật, ví Xu riêng, Điểm Kiến Tạo là quỹ chung của nhà',
+    'Hộp quà (quà chào mừng 200 Xu, quà lên cấp, thành tựu) — nút sao trên thanh trên cùng',
+    'Phiên tập trung 25/50 phút (nút bàn phím): làm việc thật, hết giờ nhận Xu + XP + điểm Sáng tạo',
+    '"Việc hôm nay" đồng bộ giữa laptop và điện thoại; Cài đặt → Tài khoản để đăng xuất']},
   {id: 'ui-figma', date: '30/10/2026', title: 'Giao diện mới (bản xem thử)', items: [
     'HUD dựng theo thiết kế Figma: hồ sơ + 4 thanh chỉ số, nhạc, đồng hồ',
     'Thay thanh hành động bằng phím tắt: Q đi · R chạy · C ngồi · F làm việc · X rời ghế · Z ngủ · V dậy (đổi được trong Cài đặt → Phím tắt)',
