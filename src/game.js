@@ -40,13 +40,13 @@ export function init(ctx){
   document.body.appendChild(renderer.domElement);
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x1a2030);
   const camera=new THREE.PerspectiveCamera(18,innerWidth/innerHeight,1,900);
-  camera.position.set((MAP_CONFIGS[window.MAPID]||{}).camMirror?2:17,16,23);   // camMirror: nhìn từ bên trái (phòng Bin: cánh nhà bên phải sẽ che nếu nhìn từ phải)
+  camera.position.set((MAP_CONFIGS[window.MAPID]||{}).camMirror?-7:17,16,23);   // camMirror: nhìn từ bên trái (phòng Bin: cánh nhà bên phải sẽ che nếu nhìn từ phải)
   const controls=new OrbitControls(camera,renderer.domElement);
   controls.target.set(5,2,-4);controls.enableDamping=true;controls.minDistance=14;controls.maxDistance=38;controls.enablePan=true;controls.screenSpacePanning=false;controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.PAN};controls.update();
   {const az=controls.getAzimuthalAngle(),po=controls.getPolarAngle();controls.minAzimuthAngle=az-CFG.camPan;controls.maxAzimuthAngle=az+CFG.camPan;controls.minPolarAngle=po-CFG.camTilt;controls.maxPolarAngle=po+CFG.camTilt;}
   // phòng Vy / phòng Bin nằm sát cánh nhà bên cạnh (Vy: bên trái, Bin: bên phải): không cho xoay camera vòng sang phía đó
   // — xoay sang là tường nhà bên chắn ngang cầu thang (nhân vật bị khoét/nhấp nháy trong tường, trông như đi xuyên)
-  {const mc=MAP_CONFIGS[window.MAPID]||{},dx=mc.ext&&mc.ext.dx;if(dx){const az=controls.getAzimuthalAngle();if(dx<0)controls.minAzimuthAngle=az-0.06;else{controls.maxAzimuthAngle=az+0.06;controls.minAzimuthAngle=Math.max(controls.minAzimuthAngle,az-0.3)}}}   // phòng Bin: nhìn gần chính diện (xoay trái nhiều là thấy mặt ngoài tường hông)
+  {const mc=MAP_CONFIGS[window.MAPID]||{},dx=mc.ext&&mc.ext.dx;if(dx){const az=controls.getAzimuthalAngle();if(dx<0)controls.minAzimuthAngle=az-0.06;else controls.maxAzimuthAngle=az+0.06}}   // vỏ ngoài hông + sau của chính cánh đang đứng được ẩn (MC.ext.hide) → nhìn chéo từ bên ngoài vẫn thấy rõ trong phòng
 
   // lights
   const hemi=new THREE.HemisphereLight(0xdfe8ff,0x8a7f73,0.9);scene.add(hemi);
@@ -199,6 +199,14 @@ ${FRAG_COLOR}
     const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
     const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null,indoor:true};
     EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat});EXTV.setLevel(TP.quality==='low'?'low':'indoor');
+    // cây/bụi lẻ (không nằm trong ô instancing) ở XA nhà: bỏ hẳn — từ camera trên cao nhìn xuống chỉ thấy khối thô xấu; gần nhà giữ nguyên
+    {const C=new THREE.Vector3(5,0,-4),sp=new THREE.Sphere();let n=0;extG.updateMatrixWorld(true);env.updateMatrixWorld(true);
+     [extG,env].forEach(R=>R&&R.traverse(o=>{if(!o.isMesh||!o.visible)return;for(let p=o;p;p=p.parent)if(p.name==='EXT_CELLS')return;
+       const fol=[].concat(o.material).some(m=>m&&/^Poly(Foliage|Shader)|Stylized\s+wood|^ROCK$/i.test(m.name||''));if(!fol)return;
+       const g=o.geometry;if(!g.boundingSphere)g.computeBoundingSphere();sp.copy(g.boundingSphere).applyMatrix4(o.matrixWorld);
+       if(o.isInstancedMesh){if(sp.radius>40)return}           // instancing rải rộng: để nguyên (ô của setupExterior đã lo)
+       if(Math.hypot(sp.center.x-C.x,sp.center.z-C.z)-sp.radius*0.3>26){o.visible=false;n++}}));
+     console.log('[ext] bỏ cây/bụi lẻ ở xa: '+n)}
     extG.traverse(o=>{if(o.isMesh&&/^Stylized Grass$/.test((o.material&&o.material.name)||''))o.visible=false;if(o.isMesh&&/^\.SF_/.test(o.name))o.visible=false});extG.updateMatrixWorld(true);
     console.log('[ext] ngoại cảnh cho map trong nhà '+Math.round(performance.now()-_t0)+'ms')}
   // kính cửa sổ/cửa chính nhìn từ ngoài: đặc (không thấy nội thất), màu xanh trời theo giờ & thời tiết, hơi bóng

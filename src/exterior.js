@@ -12,7 +12,7 @@ export const LEVELS = {
   medium: {dens: 0.55, dist: 0.85, shadowR: 9,  grassShadowR: 4,  haze: 2, rain: 4200, far: 0.60},
   high:   {dens: 0.72, dist: 1.00, shadowR: 11, grassShadowR: 6,  haze: 2, rain: 6000, far: 0.80},
   // map trong nhà (phòng khách / phòng Vy / phòng Bin): vườn chỉ thấy qua khung cửa → thưa hơn, gần hơn, cây cỏ không đổ bóng
-  indoor: {dens: 0.42, dist: 1.00, shadowR: 0,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.45},
+  indoor: {dens: 0.80, dist: 1.00, shadowR: 0,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.45},
 };
 // theo loại: tầm nhìn tối đa (m), đường cong mật độ theo khoảng cách (d0 = bắt đầu thưa, d1 = còn tối thiểu), có đổ bóng không
 // "Đẹp chỗ cần đẹp": khoảng cách tính từ NHÂN VẬT (chỗ mắt người chơi nhìn). Quanh nhân vật đủ dày + đủ chi tiết;
@@ -24,13 +24,14 @@ const CLASS_OUT = {
   tree:   {maxD: 200, d0: 30, d1: 180, min: 0.30, shadow: true,  cell: 14, lod: 18},
   rock:   {maxD: 110, d0: 25, d1: 100, min: 0.20, shadow: true,  cell: 12, lod: 25},
 };
-// 3 phòng trong nhà: vườn chỉ là phông nền nhìn qua mặt cắt → rất thưa ở xa, đổi hình nhẹ sớm, ô to (ít lượt vẽ), không cây nào "đặc" vì không đi ra được
+// 3 phòng trong nhà: chỉ giữ cây cỏ GẦN nhà, đủ chi tiết (không dùng bản giảm tam giác — nhìn từ camera trên cao thấy rõ, rất xấu);
+// cây/bụi/đá ở xa bị BỎ HẲN (sương + nền cỏ lo phần xa). Ô to → ít lượt vẽ.
 const CLASS_IN = {
-  grass:  {maxD: 24,  d0: 6,  d1: 20,  min: 0.03, shadow: false, cell: 16, lod: 7},
-  flower: {maxD: 24,  d0: 6,  d1: 20,  min: 0.02, shadow: false, cell: 16, lod: 8},
-  bush:   {maxD: 60,  d0: 10, d1: 50,  min: 0.08, shadow: false, cell: 20, lod: 12},
-  tree:   {maxD: 110, d0: 16, d1: 100, min: 0.20, shadow: false, cell: 24, lod: 14},
-  rock:   {maxD: 70,  d0: 12, d1: 60,  min: 0.15, shadow: false, cell: 20, lod: 12},
+  grass:  {maxD: 22,  d0: 8,  d1: 20,  min: 0.05, shadow: false, cell: 16, lod: 0},
+  flower: {maxD: 22,  d0: 8,  d1: 20,  min: 0.05, shadow: false, cell: 16, lod: 0},
+  bush:   {maxD: 22,  d0: 14, d1: 22,  min: 0.60, shadow: false, cell: 16, lod: 0},
+  tree:   {maxD: 26,  d0: 18, d1: 26,  min: 0.85, shadow: false, cell: 16, lod: 0},
+  rock:   {maxD: 20,  d0: 12, d1: 20,  min: 0.50, shadow: false, cell: 16, lod: 0},
 };
 let CLASS = CLASS_OUT;
 

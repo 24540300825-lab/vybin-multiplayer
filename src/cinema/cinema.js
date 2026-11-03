@@ -49,6 +49,7 @@ export function mountCinema({api, sess, voice, slot, other, toast, music}) {
       <div class="cPl" id="cnPl"></div>
       <div class="cEmpty" id="cnEmpty"></div>
       <div class="cTap" id="cnTap" hidden><button class="pb">${ic('play')}<span>Bấm để bật tiếng / phát</span></button></div>
+      <div class="cMiniRz" id="cnRz" title="Kéo để phóng to / thu nhỏ"></div>
       <div class="cMiniBar"><b id="cnMiniT">Rạp chung</b><span class="sp"></span><button class="cb" id="cnBack" title="Vào xem lại">${ic('expand')}<span>Vào lại</span></button><button class="cb off" id="cnOff2" title="Tắt TV">${ic('power')}</button></div>
     </div>
   </main>
@@ -88,6 +89,14 @@ export function mountCinema({api, sess, voice, slot, other, toast, music}) {
   </aside>
   <div class="cAsk" id="cnAsk" hidden></div>`;
   document.body.appendChild(root); paintIcons(root);
+  // khung phim thu nhỏ (tạm rời): kéo góc trên-phải để đổi cỡ, nhớ cỡ cho lần sau
+  {const rz = $('cnRz'); const setW = w => { root.style.setProperty('--miniW', w + 'px'); };
+   const w0 = lsGet('vyCineMiniW', 0); if (w0) setW(w0);
+   rz.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); rz.setPointerCapture(e.pointerId);
+     const r = root.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY, wStart = r.width;
+     const mv = ev => { const d = Math.max(ev.clientX - x0, (y0 - ev.clientY) * 16 / 9); const w = Math.round(Math.min(innerWidth * 0.7, Math.max(220, wStart + d))); setW(w); };
+     const up = ev => { rz.removeEventListener('pointermove', mv); rz.removeEventListener('pointerup', up); rz.removeEventListener('pointercancel', up); lsSet('vyCineMiniW', Math.round(root.getBoundingClientRect().width)); };
+     rz.addEventListener('pointermove', mv); rz.addEventListener('pointerup', up); rz.addEventListener('pointercancel', up); });}
   const el = {scr: $('cnScr'), pl: $('cnPl'), empty: $('cnEmpty'), now: $('cnNow'), who: $('cnWho'), play: $('cnPlay'), seek: $('cnSeek'), t: $('cnT'), d: $('cnD'), vol: $('cnVol'), sync: $('cnSync'),
     lib: $('cnLib'), ask: $('cnAsk'), tap: $('cnTap'), hostB: $('cnHostB'), hostT: $('cnHostT'), libT: $('cnLibT'), libH: $('cnLibH'), miniT: $('cnMiniT')};
   el.vol.value = vol;

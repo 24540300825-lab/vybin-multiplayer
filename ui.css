@@ -813,7 +813,12 @@ html.shell,html.shell body{margin:0;width:100%;height:100%;overflow:hidden;backg
 #cine .cAsk{position:absolute;left:50%;top:5.25rem;transform:translateX(-50%);display:flex;align-items:center;gap:.75rem;padding:.625rem .75rem;border-radius:1.25rem;background:var(--panel);border:1px solid var(--line);z-index:4;box-shadow:0 .75rem 2rem rgba(0,0,0,.5)}
 #cine .cAsk img{width:2.5rem;height:2.5rem;border-radius:50%}#cine .cAsk div{display:flex;flex-direction:column}#cine .cAsk small{color:var(--ink2);font-size:var(--t0)}
 /* tạm rời: khung nhỏ góc dưới trái, trên HUD (không che 3D) */
-#cine.mini{inset:auto auto 7.5rem 1rem;width:min(22rem,calc(100vw - 2rem));pointer-events:none}
+#cine.mini{inset:auto auto 7.5rem 1rem;width:min(var(--miniW,22rem),calc(100vw - 2rem));pointer-events:none}
+/* kéo góc trên-phải để phóng to / thu nhỏ khung phim */
+#cine .cMiniRz{display:none}
+#cine.mini .cMiniRz{display:block;position:absolute;right:0;top:0;width:1.75rem;height:1.75rem;cursor:nesw-resize;touch-action:none;z-index:3;
+  background:linear-gradient(225deg,rgba(255,255,255,.85) 0 2px,transparent 2px 5px,rgba(255,255,255,.85) 5px 7px,transparent 7px);border-top-right-radius:1rem;opacity:.7}
+#cine.mini .cMiniRz:hover{opacity:1}
 #cine.mini .cBack,#cine.mini .cTop,#cine.mini .cBar,#cine.mini .cLib,#cine.mini .cAsk{display:none}
 #cine.mini .cStage{position:static;padding:0;display:block}
 #cine.mini .cScreen{width:100%;border-radius:1rem;pointer-events:auto;box-shadow:0 .75rem 2rem rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.12)}
@@ -823,7 +828,9 @@ html.shell,html.shell body{margin:0;width:100%;height:100%;overflow:hidden;backg
 #cine.mini .cMiniBar b{font-size:var(--t0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 #cine.mini .cMiniBar .cb{height:2rem;padding:0 .625rem}
 /* đang trong rạp / cutscene: ẩn HUD game + ghim 3D cho gọn màn */
-html.cineOn .col,html.cineOn #pins,html.cineOn #kSide,html.cineOn #hCall:not(.full),html.cineCut .col,html.cineCut #pins,html.cineCut #kSide{visibility:hidden}
+html.cineOn .col,html.cineOn #pins,html.cineOn #kSide,html.cineCut .col,html.cineCut #pins,html.cineCut #kSide{visibility:hidden}
+/* đang gọi video mà mở rạp: khung cuộc gọi nổi TRÊN màn rạp (không bị che) */
+html.cineOn #hCall,html.cineOn #ringPop{z-index:11}
 #cine:fullscreen{background:#000}
 @media (max-width:760px){#cine .cWho{display:none}#cine .cAct .cb span{display:none}#cine .cVol,#cine .cSync{display:none}#cine .cStage{padding:0 .75rem}}
 html[data-fx="lite"] #cine .cLib{transition:none}
