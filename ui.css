@@ -914,3 +914,5 @@ html.vy-arrange #hMusic,html.vy-arrange #hBR{opacity:.35;pointer-events:none}
 @media(max-width:640px){#hTop .tbg{flex-direction:column;gap:.5rem;border-left:0;padding:.5rem 0 0;border-top:1px solid rgba(255,255,255,.28)}#hTop .tbg[data-g="0"]{border-top:0;padding-top:0}#hRes{margin:0 0 .25rem}.tbMenu{right:calc(100% + .5rem);top:0}}
 #hRes:has(#rXu:empty){display:none}
 #hTop #iLamp.lampOff{opacity:.55}#hTop #iLamp.lampOff .ic{filter:grayscale(1) drop-shadow(var(--sh))}
+#kSide .ks{padding:0 .5rem 0 .875rem}
+#hTop .tbg .mlb{display:none}

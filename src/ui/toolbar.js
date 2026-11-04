@@ -39,5 +39,6 @@ export function organizeToolbar() {
   };
   run();
   new MutationObserver(() => { if (!busy) queueMicrotask(run); }).observe(top, {childList: true});
+  new MutationObserver(() => { if (!busy) queueMicrotask(run); }).observe(menu, {childList: true});   // module chèn nút cạnh #iSet (đang nằm trong menu) → xếp lại về đúng nhóm
   new MutationObserver(() => { const dot = [...menu.querySelectorAll('.dot,.bdg')].some(d => !d.hidden && d.style.display !== 'none'); const m = $('moDot'); if (m) m.hidden = !dot; }).observe(menu, {subtree: true, attributes: true, attributeFilter: ['hidden', 'style']});
 }

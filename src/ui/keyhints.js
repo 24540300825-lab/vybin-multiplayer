@@ -10,7 +10,7 @@ export function mountKeyHints(keys) {
   const render = () => {
     const run = !!(window.__runMode && window.__runMode.v);
     const h = LIST.filter(([id]) => keys[id] && !(id === 'walk' && !run)).map(([id, t]) =>
-      `<button type="button" class="ks${id === 'run' && run ? ' on' : ''}" data-a="${id}" title="${t}"><kbd>${keyName(keys[id])}</kbd><span>${id === 'run' && run ? 'Đang chạy' : t}</span></button>`).join('');
+      `<button type="button" class="ks${id === 'run' && run ? ' on' : ''}" data-a="${id}" title="${t}"><span>${id === 'run' && run ? 'Đang chạy' : t}</span><kbd>${keyName(keys[id])}</kbd></button>`).join('');
     if (h !== last) { last = h; el.innerHTML = h; }
   };
   el.addEventListener('pointerdown', e => e.stopPropagation());

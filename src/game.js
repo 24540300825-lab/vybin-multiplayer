@@ -157,7 +157,7 @@ ${FRAG_COLOR}
          {float lp=0.0;for(int li=0;li<10;li++){if(float(li)>=uLN)break;vec3 ld=uLP[li].xyz-vWP;float q=clamp(1.0-dot(ld,ld)/(uLP[li].w*uLP[li].w),0.0,1.0);lp+=q*q;}
           lp=min(lp,1.4);
           col*=1.0-0.15*uLK*inH*(1.0-min(lp,1.0));
-          col*=1.0-0.16*uLOff*inH;
+          col*=1.0-0.3*uLOff*inH;
           col+=diffuseColor.rgb*vec3(1.0,0.8,0.52)*lp*uLK*0.85;}
          outgoingLight=col+totalEmissiveRadiance;}
         #include <opaque_fragment>`)};
