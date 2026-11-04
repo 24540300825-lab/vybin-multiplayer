@@ -133,3 +133,10 @@ Toàn bộ hiệu ứng âm thanh nằm trong `src/sfx.js`, tổng hợp bằng 
 - Thêm món mới: copy glb vào `assets/furniture/`, thêm 1 dòng vào `items` (+ `shop`/`recipes` nếu bán/chế tạo). Đo kích thước: `python3 tools/…` hoặc mở model, tính scale = cỡ thật / cỡ model.
 - Máy chủ: `game_placed` (vị trí), RPC `game_placed / game_place / game_place_move / game_place_pickup / game_place_use`. Quyền: `game_config.place.maps` (phòng Vy chỉ Vy, phòng Bin chỉ Bin, phòng khách + vườn cả hai).
 - Game: `api.seatSet/seatDel/seatFree` (chỗ ngồi thêm, id chuỗi 'f<id>:<k>'), `api.pickHook` (giành cú bấm khi đang đặt đồ), `api.toonMat`.
+
+## 10. Cây & vườn rải ngoài trời — Poly Nature Pack
+- File: `assets/nature/glb/<id>.glb` (mỗi file nhiều biến thể, node `v0…vN`) + texture dùng chung `assets/nature/tex/`. Xuất từ .blend bằng `tools/blend2glb/` (không cần Blender).
+- Danh mục: `game_config.items` trường `glb`, `variants`, `out` (chỉ trồng ngoài Vườn), `scatter {n, r, gap, s:[min,max]}`, `solidR` / `solidBox` (chặn đường).
+- Mỗi cây = 1 dòng `game_placed`, `state = {v: biến thể, s: tỉ lệ}`. RPC `game_place_many` (rải ≤ 12 món/lần), `game_place_pickup_many` (chổi cất).
+- Vẽ: `InstancedMesh` theo (loại, biến thể, mảnh mesh) trong `src/build/furniture.js` → `rebuildInst()`. Vật liệu giữ tên `PolyFoliage_*_Wind` để shader toon cho lá đung đưa; `flatShading` cho chất low-poly.
+- Thêm loại cây mới: thêm nhóm vào `tools/blend2glb/groups.json` → chạy lại `build_glb.py` → thêm 1 dòng `items` + `shop` (migration mới).

@@ -32,13 +32,13 @@ export function createShop({prog, toast, rerender, errText, onClose}) {
     if (L) {
       const maxW = L.week_limit ? Math.max(0, L.week_limit - (L.bought_week || 0)) : 99;
       const nIn = Math.max(1, Math.min(99, maxW || 1, parseInt(($('shN') || {}).value, 10) || 1));
-      const F = window.__vyFurn, canPlace = !!(F && F.placeable(L.item) && F.canHere());
+      const F = window.__vyFurn, canPlace = !!(F && F.placeable(L.item) && F.canHere() && (!(F.isGarden && F.isGarden(L.item)) || F.isOutdoor()));
       let dstH = ($('shDst') && $('shDst').dataset.h) || '0'; if (dstH === '2' && !canPlace) dstH = '0';
       const cost = L.price * nIn, after = shop.xu - cost, toHouse = dstH === '1';
       const why = L.locked ? `Mở khi đạt cấp ${L.lv}` : L.week_limit && maxW <= 0 ? 'Đã mua đủ giới hạn tuần này' : after < 0 ? `Còn thiếu ${nf(-after)} Xu` : '';
       det = `<div class="bg-big r-${esc(it.rarity || 'common')}">${esc(icon(L.item))}</div><b>${esc(nm(L.item))}</b>
         <small>${esc(C.name || '')} · đang có ${nf(L.mine)} trong túi${L.house ? ', ' + nf(L.house) + ' trong kho nhà' : ''}</small><p>${esc(it.desc || '')}</p>
-        ${it.group === 'furniture' ? '<small class="sh-soon">Mua xong: tab Túi của tôi → chọn món → Đặt vào phòng.</small>' : ''}
+        ${it.group === 'furniture' ? '<small class="sh-soon">Mua xong: tab Túi của tôi → chọn món → Đặt vào phòng.</small>' : it.group === 'garden' ? `<small class="sh-soon">Mua 1 loại, rải ra vườn thành ${it.variants || 'nhiều'} dáng khác nhau${it.scatter && it.scatter.n > 1 ? ' · mỗi lần bấm rải ' + it.scatter.n + ' khóm (mỗi khóm tốn 1)' : ''}.</small>` : ''}
         ${L.week_limit ? `<small>Giới hạn ${L.week_limit} / tuần · đã mua ${nf(L.bought_week || 0)}</small>` : ''}
         ${confirm && !why ? `<div class="sh-cf"><b>Xác nhận mua?</b><span>${nIn} × ${esc(nm(L.item))} → ${toHouse ? 'Kho nhà' : 'Túi của tôi'}</span>
             <span>Giá: <b>${nf(cost)} Xu</b> · Số dư sau mua: <b>${nf(after)} Xu</b></span>

@@ -6,6 +6,10 @@
 // ORIGIN: model Kenney có gốc ở góc → dời về TÂM ĐÁY để đặt/xoay quanh tâm. Mặt trước model = +Z cục bộ = hướng yaw của nhân vật khi ngồi.
 // CÔNG DỤNG (trường "use"): sit = ngồi được (dùng clip ngồi lùi của sofa; seat {n, y: độ cao đệm theo % chiều cao, z/x: lệch tâm theo % sâu/rộng}),
 //   light = bật/tắt đèn (chao phát sáng + quầng sáng hắt xuống sàn, đồng bộ 2 máy), music = bật/tắt nhạc của game.
+// CÂY & VƯỜN (trường "glb", Poly Nature Pack → assets/nature/glb/<id>.glb, mỗi file nhiều biến thể v0..vN): bán 1 loại, khi RẢI ra vườn
+//   mỗi cây tự lấy 1 biến thể + tỉ lệ + góc xoay ngẫu nhiên (lưu trong state {v, s}). Vẽ bằng InstancedMesh (vài trăm cây vẫn nhẹ).
+//   scatter.n > 1 (cỏ, hoa, nấm…): chổi tròn bán kính r, mỗi lần bấm rải n khóm cách nhau ≥ gap. n = 1 (cây, bụi): đặt từng cây, đặt liên tục tới khi hết.
+//   solidR = bán kính thân chặn đường (cỏ/hoa đi xuyên được). Chỉ trồng ngoài Vườn (out).
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {MAP_CONFIGS} from '../map-configs.js';
@@ -13,7 +17,7 @@ import {ic} from '../ui/icons.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
-const ERR = {not_your_room: 'Đây là phòng riêng của người kia — chỉ chủ phòng sắp xếp được.', room_full: 'Phòng đã đủ số món tối đa.', bad_spot: 'Chỗ này không đặt được.',
+const ERR = {outdoor_only: 'Cây cối chỉ trồng được ngoài Vườn.', not_your_room: 'Đây là phòng riêng của người kia — chỉ chủ phòng sắp xếp được.', room_full: 'Phòng đã đủ số món tối đa.', bad_spot: 'Chỗ này không đặt được.',
   insufficient: 'Bạn không còn món này trong túi hay kho nhà.', bag_full: 'Túi và kho nhà đều đầy — dọn bớt rồi cất lại.', gone: 'Món này vừa được người kia cất đi.', not_placeable: 'Món này không đặt vào nhà được.'};
 const errText = e => { const m = String(e && e.message || e); const k = Object.keys(ERR).find(k => m.includes(k)); return k ? ERR[k] : 'Có lỗi, thử lại sau. (' + m + ')'; };
 const ROT = Math.PI / 4;
@@ -38,6 +42,32 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
   const glowTex = () => _glow ||= (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
     gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
   const loadModel = name => cache[name] ||= loader.loadAsync('assets/furniture/' + name + '.glb?v=1').then(g => g.scene);
+  const glbReady = {};   // file cây đã tải xong (để dựng InstancedMesh đồng bộ)
+  const loadGlb = path => cache['@' + path] ||= loader.loadAsync('assets/' + path + '.glb?v=1').then(g => (glbReady[path] = g.scene));
+  const isG = def => !!(def && def.glb);
+  // biến thể cây: node v<k> trong file; vật liệu toon + đổ bóng phẳng low-poly (làm 1 lần cho mỗi vật liệu)
+  async function variantOf(def, v) {
+    const sc = await loadGlb(def.glb), n = sc.children.length || 1, node = sc.children[((v | 0) % n + n) % n];
+    if (!node.userData.prep) {
+      node.userData.prep = 1; node.updateMatrixWorld(true);
+      node.traverse(o => { if (o.isMesh) [].concat(o.material).forEach(m => { if (m && !toonDone.has(m)) { toonDone.add(m); m.flatShading = true; if (api.toonMat && m.isMeshStandardMaterial) { try { api.toonMat(m); } catch (e) {} } m.needsUpdate = true; } }); });
+      node.userData.tb = new THREE.Box3().setFromObject(node);   // khung bao cục bộ (gốc thân cây = 0,0,0)
+    }
+    return node;
+  }
+  const castOf = def => !!(def.solidR || def.solidBox) || def.id === 'g_rock';
+  async function buildG(def, ghost, v, sc) {
+    const node = await variantOf(def, v), g = new THREE.Group();
+    g.userData.def = def; g.userData.v = v; g.userData.tb = node.userData.tb;
+    const sz = node.userData.tb.getSize(new THREE.Vector3()); g.userData.H = sz.y * sc; g.userData.W = sz.x * sc; g.userData.D = sz.z * sc;
+    g.scale.setScalar(sc);
+    if (ghost) {
+      const inner = node.clone(true); inner.position.set(0, 0, 0);
+      inner.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = false; o.material = [].concat(o.material).map(m => { const q = new THREE.MeshStandardMaterial({color: 0xffffff, map: m.map || null, transparent: true, opacity: 0.6, depthWrite: false, flatShading: true}); q.userData.ghost = 1; return q; }); if (o.material.length === 1) o.material = o.material[0]; } });
+      g.add(inner); g.userData.inner = inner;
+    }
+    return g;   // món thật: KHÔNG có mesh riêng — vẽ bằng InstancedMesh chung (xem rebuildInst)
+  }
   async function build(def, ghost) {
     const src = await loadModel(def.model);
     const inner = src.clone(true);
@@ -80,10 +110,10 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     return out;
   };
   function block(rec) {
-    if (!rec.obj.userData.def.solid) return;
-    rec.obj.updateMatrixWorld(true);
-    const b = new THREE.Box3().setFromObject(body(rec.obj)), lv = rec.lv;
-    rec.cells = cellsOf(b, G.R);
+    const d = rec.obj.userData.def; if (!d.solid && !d.solidR && !d.solidBox) return;
+    const lv = rec.lv;
+    if (d.solidR) rec.cells = cellsCircle(rec.obj.position.x, rec.obj.position.z, d.solidR * (rec.obj.scale.x || 1) + G.R);
+    else rec.cells = cellsOf(boxOf(rec.obj), G.R);
     for (const k of rec.cells) { const n = (cnt[lv].get(k) || 0) + 1; cnt[lv].set(k, n); if (n === 1 && !blocked[lv][k]) { blocked[lv][k] = 1; owned[lv].add(k); } }
   }
   function unblock(rec) {
@@ -92,6 +122,10 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     rec.cells = null;
   }
   const shadows = () => { try { renderer.shadowMap.needsUpdate = true; } catch (e) {} };
+  // khung bao thế giới: cây vườn dùng khung bao biến thể × ma trận (không có mesh riêng); nội thất dùng mesh thân
+  function boxOf(o) { o.updateMatrixWorld(true); return o.userData.tb ? o.userData.tb.clone().applyMatrix4(o.matrixWorld) : new THREE.Box3().setFromObject(body(o)); }
+  const cellsCircle = (x, z, r) => { const out = []; const i0 = Math.max(0, Math.floor((x - r - G.x0) / G.c)), i1 = Math.min(G.W - 1, Math.floor((x + r - G.x0) / G.c)), j0 = Math.max(0, Math.floor((z - r - G.z0) / G.c)), j1 = Math.min(G.H - 1, Math.floor((z + r - G.z0) / G.c));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const cx = G.x0 + (i + 0.5) * G.c, cz = G.z0 + (j + 0.5) * G.c; if ((cx - x) ** 2 + (cz - z) ** 2 <= r * r) out.push(j * G.W + i); } return out; };
 
   // ---------- công dụng: chỗ ngồi + đèn ----------
   const seatIds = rec => { const d = rec.obj.userData.def; return d.use === 'sit' && d.seat ? Array.from({length: d.seat.n || 1}, (_, k) => 'f' + rec.id + ':' + k) : []; };
@@ -125,18 +159,39 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
       for (const r of d.items || []) {
         seen.add(r.id);
         const cur = placed.get(r.id);
-        if (cur && cur.row.x === r.x && cur.row.z === r.z && cur.row.y === r.y && cur.row.rot === r.rot) { cur.row = r; if (cur.obj) paintLight(cur); continue; }
+        if (cur && cur.row.x === r.x && cur.row.z === r.z && cur.row.y === r.y && cur.row.rot === r.rot) { cur.row = r; if (cur.obj && !cur.g) paintLight(cur); continue; }
         if (cur && cur.obj) { if (sel && sel.id === r.id) continue; unblock(cur); detach(cur); cur.obj.position.set(r.x, r.y, r.z); cur.obj.rotation.y = r.rot; cur.lv = lvOf(r.y); cur.row = r; block(cur); attach(cur); continue; }
         const def = defs[r.item]; if (!def) continue;
-        const rec = {id: r.id, row: r, obj: null, lv: lvOf(r.y)}; placed.set(r.id, rec);
-        try { rec.obj = await build(def, false); } catch (e) { console.warn('[furn] model', def.model, e); placed.delete(r.id); continue; }
+        const rec = {id: r.id, row: r, obj: null, lv: lvOf(r.y), g: isG(def)}; placed.set(r.id, rec);
+        const st = r.state || {};
+        try { rec.obj = rec.g ? await buildG(def, false, st.v | 0, +st.s || 1) : await build(def, false); } catch (e) { console.warn('[furn] model', def.model || def.glb, e); placed.delete(r.id); continue; }
         if (!placed.has(r.id)) continue;
-        rec.obj.position.set(r.x, r.y, r.z); rec.obj.rotation.y = r.rot; rec.obj.userData.pid = r.id; root.add(rec.obj); block(rec); attach(rec);
+        rec.obj.position.set(r.x, r.y, r.z); rec.obj.rotation.y = r.rot; rec.obj.userData.pid = r.id; if (!rec.g) root.add(rec.obj); block(rec); attach(rec);
       }
       for (const [id, rec] of [...placed]) if (!seen.has(id) && !(sel && sel.id === id && sel.fresh)) { unblock(rec); if (rec.obj) { detach(rec); root.remove(rec.obj); } placed.delete(id); if (sel && sel.id === id) endSel(); }
-      shadows(); paintBar();
+      rebuildInst(); shadows(); paintBar();
     })().finally(() => { loading = null; });
     return loading;
+  }
+  // ---------- vẽ cây vườn: 1 InstancedMesh cho mỗi (loại, biến thể, mảnh mesh) ----------
+  const instRoot = new THREE.Group(); instRoot.name = 'PlacedGarden'; scene.add(instRoot);
+  let instMeshes = [];
+  function rebuildInst() {
+    instMeshes.forEach(m => { instRoot.remove(m); m.dispose && m.dispose(); }); instMeshes = [];
+    const groups = new Map();
+    placed.forEach(rec => { if (!rec.g || !rec.obj || rec.hidden) return; const k = rec.row.item + ':' + (rec.obj.userData.v | 0); (groups.get(k) || groups.set(k, []).get(k)).push(rec); });
+    const M = new THREE.Matrix4();
+    groups.forEach(list => {
+      const def = list[0].obj.userData.def, sc = glbReady[def.glb]; if (!sc) return;
+      const n = sc.children.length || 1, node = sc.children[((list[0].obj.userData.v | 0) % n + n) % n]; if (!node) return;
+      const parts = []; node.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(node.matrixWorld).invert();
+      node.traverse(o => { if (o.isMesh) parts.push({g: o.geometry, m: o.material, l: new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)}); });
+      for (const p of parts) {
+        const im = new THREE.InstancedMesh(p.g, p.m, list.length); im.castShadow = castOf(def); im.receiveShadow = true; im.userData.ids = list.map(r => r.id);
+        list.forEach((rec, i) => { rec.obj.updateMatrix(); M.multiplyMatrices(rec.obj.matrix, p.l); im.setMatrixAt(i, M); });
+        im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); im.computeBoundingBox && im.computeBoundingBox(); instRoot.add(im); instMeshes.push(im);
+      }
+    });
   }
   const poke = () => { try { sess && sess.send({k: 'furn', map: mapId}); } catch (e) {} };
   sess && sess.on && sess.on('msg', m => { if (m && m.k === 'furn' && m.map === mapId) reload(); });
@@ -158,7 +213,23 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
   }
   const onStair = (x, z) => stairs.some(S => x > S.x0 - 0.15 && x < S.x1 + 0.15 && z > S.z0 - 0.3 && z < S.z1 + 0.3);
   // chỗ đặt hợp lệ: nằm trong vùng đi được của tầng, không đè lên đồ cố định / món khác / cầu thang
+  const inNoPlant = (x, z) => (MAP_CONFIGS.exterior && OUTD ? (MAP_CONFIGS.exterior.noPlant || []) : []).some(b => x > b[0] && x < b[1] && z > b[2] && z < b[3]);
+  function validPoint(def, x, z, sc, selfId, extra) {   // cây vườn: 1 điểm gốc
+    const w = MC.walk0; if (w && (x < w[0] || x > w[1] || z < w[2] || z > w[3])) return false;
+    if (onStair(x, z) || inNoPlant(x, z)) return false;
+    const self = selfId && placed.get(selfId), mine = self && self.cells ? new Set(self.cells) : null;
+    const free = k => !blocked[0][k] || (mine && mine.has(k) && owned[0].has(k));
+    const cells = cellsCircle(x, z, def.solidR ? def.solidR * sc : 0.06); if (!cells.length) return false;
+    for (const k of cells) if (!free(k)) return false;
+    const gap = ((def.scatter && def.scatter.gap) || 0.4) * 0.6;
+    for (const rec of placed.values()) if (rec.id !== selfId && rec.row.item === def.id && Math.hypot(rec.obj.position.x - x, rec.obj.position.z - z) < gap) return false;
+    for (const q of extra || []) if (Math.hypot(q.x - x, q.z - z) < ((def.scatter && def.scatter.gap) || 0.4)) return false;
+    const L = api.local && api.local.P; if (L && def.solidR && Math.hypot(L.pos.x - x, L.pos.z - z) < def.solidR * sc + 0.35) return false;
+    return true;
+  }
   function validSpot(obj, selfId) {
+    if (obj.userData.ring) return true;
+    if (obj.userData.tb && isG(obj.userData.def)) return validPoint(obj.userData.def, obj.position.x, obj.position.z, obj.scale.x || 1, selfId);
     obj.updateMatrixWorld(true);
     const b = new THREE.Box3().setFromObject(body(obj)), lv = lvOf(obj.position.y), def = obj.userData.def;
     const x = obj.position.x, z = obj.position.z;
@@ -181,15 +252,35 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
   let placing = null, sel = null, arrange = false, lastPtr = 'mouse';
   function endPlacing() { if (placing && placing.ghost) root.remove(placing.ghost); placing = null; }
   function endSel() {
-    if (sel && sel.ghost) { root.remove(sel.ghost); const rec = placed.get(sel.id); if (rec && rec.obj) rec.obj.visible = true; }
+    if (sel && sel.ghost) { root.remove(sel.ghost); const rec = placed.get(sel.id); if (rec && rec.obj) { rec.obj.visible = true; if (rec.hidden) { rec.hidden = false; rebuildInst(); } } }
     sel = null;
+  }
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const scaleOf = def => { const s = (def.scatter && def.scatter.s) || [0.9, 1.1]; return rnd(s[0], s[1]); };
+  async function countOf(itemId) { try { const b = await prog.bag(); const f = l => ((l || []).find(x => x.id === itemId) || {}).n || 0; return f(b.mine) + f(b.house); } catch (e) { return 0; } }
+  async function newGhostG(def) {
+    const v = Math.floor(Math.random() * (def.variants || 1)), sc = scaleOf(def), g = await buildG(def, true, v, sc);
+    g.rotation.y = Math.random() * Math.PI * 2; return g;
+  }
+  function ringGhost(def) {
+    const r = (def.scatter && def.scatter.r) || 1.2, g = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.07, r, 56).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({color: 0xffd581, transparent: true, opacity: 0.85, depthWrite: false, depthTest: false}));
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(r, 56).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({color: 0xffd581, transparent: true, opacity: 0.12, depthWrite: false, depthTest: false}));
+    ring.renderOrder = disc.renderOrder = 998; ring.position.y = disc.position.y = 0.04; g.add(disc, ring); g.userData.ring = true; g.userData.def = def; g.userData.r = r; return g;
   }
   async function startPlace(itemId) {
     const def = defs[itemId] || (await reload(), defs[itemId]);
     if (!def) { toast('Món này chưa có hình 3D để đặt.'); return; }
+    if (def.out && mapId !== 'exterior') { toast(ERR.outdoor_only); return; }
     if (!can) { toast(ERR.not_your_room); return; }
     if (placed.size >= max) { toast(ERR.room_full); return; }
     endSel(); endPlacing();
+    if (isG(def)) {      // cây vườn: chổi rải (nhiều khóm) hoặc đặt từng cây, đặt liên tục tới khi hết
+      const left = await countOf(itemId); if (left < 1) { toast(ERR.insufficient); return; }
+      const multi = ((def.scatter && def.scatter.n) || 1) > 1, ghost = multi ? ringGhost(def) : await newGhostG(def);
+      const L = api.local && api.local.P; ghost.position.set(L ? L.pos.x + Math.sin(L.yaw) * 2 : 5, A.L0, L ? L.pos.z + Math.cos(L.yaw) * 2 : 5);
+      root.add(ghost); placing = {item: itemId, def, ghost, multi, left}; if (!multi) tint(ghost, validSpot(ghost)); setArrange(true); paintBar(); return;
+    }
     const ghost = await build(def, true); ghost.userData.def = def;
     // xuất hiện ngay trước mặt nhân vật
     const L = api.local && api.local.P; const p = L ? {x: L.pos.x + Math.sin(L.yaw) * 1.2, y: L.level ? A.L1 : A.L0, z: L.pos.z + Math.cos(L.yaw) * 1.2} : {x: 5, y: A.L0, z: -4};
@@ -203,8 +294,8 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
   }
   async function startMove() {
     if (!sel) return; const rec = sel.rec;
-    sel.moving = true; sel.ghost = await build(rec.obj.userData.def, true); sel.ghost.position.copy(rec.obj.position); sel.ghost.rotation.y = rec.obj.rotation.y;
-    rec.obj.visible = false; root.add(sel.ghost); tint(sel.ghost, true); paintBar();
+    sel.moving = true; sel.ghost = rec.g ? await buildG(rec.obj.userData.def, true, rec.obj.userData.v | 0, rec.obj.scale.x || 1) : await build(rec.obj.userData.def, true); sel.ghost.position.copy(rec.obj.position); sel.ghost.rotation.y = rec.obj.rotation.y;
+    rec.obj.visible = false; if (rec.g) { rec.hidden = true; rebuildInst(); } root.add(sel.ghost); tint(sel.ghost, true); paintBar();
   }
   function rotate(d) {
     const g = placing ? placing.ghost : sel && (sel.ghost || null);
@@ -213,7 +304,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
       const rec = sel.rec, old = rec.obj.rotation.y; if (seated(rec)) { toast('Đang có người ngồi — đứng dậy rồi hãy xoay.'); return; }
       unblock(rec); detach(rec); rec.obj.rotation.y = old + d * ROT;
       if (!validSpot(rec.obj, null)) { rec.obj.rotation.y = old; block(rec); attach(rec); toast('Xoay chỗ này bị vướng — thử Di chuyển ra chỗ rộng hơn.'); return; }
-      block(rec); attach(rec); shadows(); saveMove(rec);
+      block(rec); attach(rec); if (rec.g) rebuildInst(); shadows(); saveMove(rec);
     }
   }
   let saveT = null;
@@ -224,8 +315,47 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
       catch (e) { toast(errText(e)); reload(); }
     }, 400);
   }
+  // rải: chọn ngẫu nhiên n điểm trong chổi, mỗi điểm 1 biến thể + tỉ lệ + góc xoay
+  async function confirmScatter() {
+    const P = placing, def = P.def, g = P.ghost, S = def.scatter || {}, n = Math.min(12, S.n || 1, P.left), r = S.r || 1.2, pts = [];
+    if (P.multi) {
+      for (let t = 0; t < n * 14 && pts.length < n; t++) {
+        const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r, x = g.position.x + Math.cos(a) * d, z = g.position.z + Math.sin(a) * d, sc = scaleOf(def);
+        if (validPoint(def, x, z, sc, null, pts)) pts.push({x, z, y: g.position.y, rot: Math.random() * Math.PI * 2, v: Math.floor(Math.random() * (def.variants || 1)), s: +sc.toFixed(3)});
+      }
+      if (!pts.length) { toast('Chỗ này kín rồi — rê sang chỗ trống hơn.'); return; }
+    } else {
+      if (!validSpot(g)) { toast('Chỗ này bị vướng — chọn chỗ trống trên đất.'); return; }
+      pts.push({x: g.position.x, z: g.position.z, y: g.position.y, rot: g.rotation.y, v: g.userData.v | 0, s: +g.scale.x.toFixed(3)});
+    }
+    busy(true);
+    try {
+      const res = await rpc('game_place_many', {p_item: P.item, p_map: mapId, p_pts: pts, p_idem: idem()});
+      await reload(); poke(); prog.refresh();
+      window.SFX && window.SFX.play && window.SFX.play('click');
+      if (placing === P) {
+        P.left = res && res.left != null ? res.left : P.left - pts.length;
+        if (P.left <= 0) { endPlacing(); toast('Đã dùng hết ' + def.name + ' — mua thêm ở Cửa hàng nhé'); }
+        else if (!P.multi) { const pos = g.position.clone(); root.remove(g); P.ghost = await newGhostG(def); P.ghost.position.copy(pos); root.add(P.ghost); tint(P.ghost, validSpot(P.ghost)); }
+      }
+    } catch (e) { toast(errText(e)); }
+    busy(false); paintBar();
+  }
+  async function reroll() { const P = placing; if (!P || P.multi || !isG(P.def)) return; const pos = P.ghost.position.clone(), rot = P.ghost.rotation.y; root.remove(P.ghost); P.ghost = await newGhostG(P.def); P.ghost.position.copy(pos); P.ghost.rotation.y = rot; root.add(P.ghost); tint(P.ghost, validSpot(P.ghost)); }
+  function startErase() { endSel(); endPlacing(); const g = ringGhost({scatter: {r: 1.5}}); const L = api.local && api.local.P; g.position.set(L ? L.pos.x : 5, A.L0, L ? L.pos.z + 2 : 5); root.add(g); placing = {erase: true, ghost: g, def: {name: 'Chổi'}}; paintBar(); }
+  async function confirmErase() {
+    const g = placing.ghost, ids = [];
+    placed.forEach(rec => { if (rec.g && Math.hypot(rec.obj.position.x - g.position.x, rec.obj.position.z - g.position.z) <= 1.5) ids.push(rec.id); });
+    if (!ids.length) { toast('Trong vòng tròn không có cây cỏ nào'); return; }
+    busy(true);
+    try { const r = await rpc('game_place_pickup_many', {p_ids: ids.slice(0, 40)}); await reload(); poke(); prog.refresh(); toast('Đã cất ' + (r.n || 0) + ' món về túi' + (r.kept ? ' · ' + r.kept + ' món chưa cất được (túi và kho đầy)' : '')); }
+    catch (e) { toast(errText(e)); }
+    busy(false); paintBar();
+  }
   async function confirmPlace() {
     if (!placing) return; const g = placing.ghost;
+    if (placing.erase) return confirmErase();
+    if (isG(placing.def)) return confirmScatter();
     if (!validSpot(g)) { toast('Chỗ này bị vướng — chọn chỗ trống trên sàn.'); return; }
     const it = placing.item, p = g.position.clone(), rot = g.rotation.y, def = placing.def;
     busy(true);
@@ -242,13 +372,13 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     if (!validSpot(g, rec.id)) { toast('Chỗ này bị vướng — chọn chỗ trống trên sàn.'); return; }
     if (seated(rec)) { toast('Đang có người ngồi — đứng dậy rồi hãy dời.'); return; }
     unblock(rec); detach(rec); rec.obj.position.copy(g.position); rec.obj.rotation.y = g.rotation.y; rec.lv = lvOf(g.position.y); block(rec); attach(rec); shadows();
-    root.remove(g); rec.obj.visible = true; sel.ghost = null; sel.moving = false; saveMove(rec); paintBar();
+    root.remove(g); rec.obj.visible = true; sel.ghost = null; sel.moving = false; if (rec.g) { rec.hidden = false; rebuildInst(); } saveMove(rec); paintBar();
   }
   async function pickup() {
     if (!sel) return; const rec = sel.rec; if (seated(rec)) { toast('Đang có người ngồi — đứng dậy rồi hãy cất.'); return; } busy(true);
     try {
       const r = await rpc('game_place_pickup', {p_id: rec.id});
-      endSel(); unblock(rec); detach(rec); if (rec.obj) root.remove(rec.obj); placed.delete(rec.id); shadows(); poke(); prog.refresh();
+      endSel(); unblock(rec); detach(rec); if (rec.obj) root.remove(rec.obj); placed.delete(rec.id); if (rec.g) rebuildInst(); shadows(); poke(); prog.refresh();
       toast('Đã cất ' + rec.obj.userData.def.name + (r && r.to === 'house' ? ' vào kho nhà (túi đầy)' : ' vào túi'));
     } catch (e) { toast(errText(e)); }
     busy(false); paintBar();
@@ -260,12 +390,13 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
   cv.addEventListener('pointerdown', e => { lastPtr = e.pointerType || 'mouse'; }, true);
   cv.addEventListener('pointermove', e => {
     const g = placing ? placing.ghost : sel && sel.ghost; if (!g || e.pointerType === 'touch') return;
-    const p = floorAt(e.clientX, e.clientY); if (!p) return; g.position.set(p.x, p.y, p.z); tint(g, validSpot(g, sel && sel.id));
+    const p = floorAt(e.clientX, e.clientY); if (!p) return; g.position.set(p.x, p.y, p.z); if (!g.userData.ring) tint(g, validSpot(g, sel && sel.id));
   });
   function hitFurniture(e) {
     const r = cv.getBoundingClientRect(); mv.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(mv, camera);
-    const objs = []; placed.forEach(rec => { if (rec.obj && rec.obj.visible) objs.push(body(rec.obj)); });
+    const objs = [...instMeshes]; placed.forEach(rec => { if (rec.obj && rec.obj.visible && !rec.g) objs.push(body(rec.obj)); });
     const h = ray.intersectObjects(objs, true)[0]; if (!h) return null;
+    if (h.object.isInstancedMesh && h.instanceId != null) return h.object.userData.ids[h.instanceId] || null;
     let o = h.object; while (o && !o.userData.pid) o = o.parent; return o ? o.userData.pid : null;
   }
   api.pickHook = e => {
@@ -287,6 +418,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     const t = e.target; if (t && /INPUT|TEXTAREA|SELECT/.test(t.tagName)) return;
     const hold = placing || (sel && sel.ghost);
     if (e.code === 'KeyR') { e.preventDefault(); e.stopImmediatePropagation(); rotate(e.shiftKey ? -1 : 1); }
+    else if (e.code === 'KeyV' && placing && isG(placing.def)) { e.preventDefault(); e.stopImmediatePropagation(); reroll(); }
     else if (e.code === 'Escape') { e.stopImmediatePropagation(); if (hold) { if (placing) endPlacing(); else { endSel(); } paintBar(); } else setArrange(false); }
     else if (e.code === 'Enter' && hold) { e.preventDefault(); if (placing) confirmPlace(); else confirmMove(); }
     else if ((e.code === 'Delete' || e.code === 'Backspace') && sel && !sel.ghost) { e.preventDefault(); pickup(); }
@@ -347,7 +479,12 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     bar.hidden = false;
     const B = (id, label, icon, cls = 'pl') => `<button class="${cls}" id="${id}"${isBusy ? ' disabled' : ''}>${icon ? `<i class="ic">${ic(icon)}</i>` : ''}${label}</button>`;
     const rotBtns = `<button class="rb" id="fnL" title="Xoay trái (Shift+R)" aria-label="Xoay trái">⟲</button><button class="rb" id="fnR" title="Xoay phải (R)" aria-label="Xoay phải">⟳</button>`;
-    if (placing) {
+    if (placing && placing.erase) {
+      bar.innerHTML = `<div class="fn-t"><b>Chổi cất cây cỏ</b><small>${lastPtr === 'touch' ? 'Chạm chỗ muốn dọn rồi bấm Cất' : 'Bấm lên chỗ muốn dọn — cây, cỏ, hoa trong vòng tròn về lại túi · Esc xong'}</small></div>${B('fnOk', 'Cất', '', 'pb')}${B('fnNo', 'Xong')}`;
+    } else if (placing && isG(placing.def)) {
+      const P = placing, n = (P.def.scatter && P.def.scatter.n) || 1;
+      bar.innerHTML = `<div class="fn-t"><b>${P.multi ? 'Rải' : 'Trồng'} ${esc(P.def.name)} · còn ${P.left}</b><small>${P.multi ? (lastPtr === 'touch' ? `Chạm chỗ muốn rải rồi bấm Rải (${n} khóm / lần)` : `Bấm lên đất để rải ${n} khóm, bấm tiếp để rải thêm · Esc xong`) : (lastPtr === 'touch' ? 'Chạm chỗ trồng rồi bấm Trồng · Đổi dáng để chọn cây khác' : 'Bấm lên đất để trồng · R xoay · V đổi dáng · Esc xong')}</small></div>${P.multi ? '' : rotBtns + B('fnVar', 'Đổi dáng')}${B('fnOk', P.multi ? 'Rải' : 'Trồng', '', 'pb')}${B('fnNo', 'Xong')}`;
+    } else if (placing) {
       bar.innerHTML = `<div class="fn-t"><b>Đặt ${esc(placing.def.name)}</b><small>${lastPtr === 'touch' ? 'Chạm lên sàn để dời, rồi bấm Đặt' : 'Rê chuột lên sàn, bấm để đặt · R xoay · Esc huỷ'}</small></div>${rotBtns}${B('fnOk', 'Đặt', '', 'pb')}${B('fnNo', 'Huỷ')}`;
     } else if (sel) {
       const d = sel.rec.obj.userData.def;
@@ -355,28 +492,29 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
         ? `<div class="fn-t"><b>Dời ${esc(d.name)}</b><small>${lastPtr === 'touch' ? 'Chạm chỗ mới rồi bấm Xong' : 'Bấm chỗ mới trên sàn · R xoay · Esc huỷ'}</small></div>${rotBtns}${B('fnMvOk', 'Xong', '', 'pb')}${B('fnMvNo', 'Huỷ')}`
         : `<div class="fn-t"><b>${esc(d.name)}</b><small>${sel.rec.row.by ? 'Do ' + (sel.rec.row.by === 'bin' ? 'Bin' : 'Vy') + ' đặt' : ''}</small></div>${rotBtns}${B('fnMv', 'Di chuyển')}${B('fnUp', 'Cất vào túi')}${B('fnDone', 'Xong', '', 'pb')}`;
     } else {
-      bar.innerHTML = `<div class="fn-t"><b>Sắp xếp ${esc(ROOM_NAME[mapId] || 'phòng')}</b><small>${can ? `Bấm vào món đồ đã đặt để dời / xoay / cất · ${placed.size}/${max} món` : 'Phòng riêng của người kia — bạn chỉ xem được'}</small></div>${can ? B('fnBag', 'Lấy đồ từ túi', 'bag') : ''}${B('fnDone', 'Xong', '', 'pb')}`;
+      bar.innerHTML = `<div class="fn-t"><b>Sắp xếp ${esc(ROOM_NAME[mapId] || 'phòng')}</b><small>${can ? `Bấm vào món đồ đã đặt để dời / xoay / cất · ${placed.size}/${max} món` : 'Phòng riêng của người kia — bạn chỉ xem được'}</small></div>${can ? B('fnBag', OUTD ? 'Lấy cây từ túi' : 'Lấy đồ từ túi', 'bag') : ''}${can && OUTD ? B('fnErase', 'Chổi cất') : ''}${B('fnDone', 'Xong', '', 'pb')}`;
     }
     const on = (id, f) => { const el = $(id); if (el) el.onclick = f; };
-    on('fnL', () => rotate(-1)); on('fnR', () => rotate(1));
+    on('fnL', () => rotate(-1)); on('fnR', () => rotate(1)); on('fnVar', reroll);
     on('fnOk', confirmPlace); on('fnNo', () => { endPlacing(); paintBar(); });
     on('fnMv', startMove); on('fnUp', pickup); on('fnDone', () => setArrange(false));
     on('fnMvOk', confirmMove); on('fnMvNo', () => { endSel(); paintBar(); });
-    on('fnBag', () => { window.__vyQuests && window.__vyQuests.openBag('mine', 'furniture'); });
+    on('fnBag', () => { window.__vyQuests && window.__vyQuests.openBag('mine', OUTD ? 'garden' : 'furniture'); });
+    on('fnErase', startErase);
   }
 
   // khung viền món đang chọn
   const box = new THREE.Box3Helper(new THREE.Box3(), 0xffd581); box.visible = false; scene.add(box);
   (function loop() {
     requestAnimationFrame(loop);
-    const o = sel && !sel.ghost && sel.rec.obj; box.visible = !!o; if (o) box.box.setFromObject(body(o));
+    const o = sel && !sel.ghost && sel.rec.obj; box.visible = !!o; if (o) box.box.copy(boxOf(o));
     paintPins(false);
   })();
 
   await reload();
   return {
     reload, canHere: () => can, mapName: ROOM_NAME[mapId] || mapId,
-    placeable: id => !!defs[id],
+    placeable: id => !!defs[id], isGarden: id => !!(defs[id] && defs[id].out), isOutdoor: () => mapId === 'exterior',
     place: id => startPlace(id),
     arrange: () => setArrange(true),
   };

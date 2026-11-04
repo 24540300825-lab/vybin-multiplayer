@@ -1,6 +1,12 @@
 // Thông báo "cập nhật game" hiện trong trung tâm thông báo (chuông). Thêm bản mới: chèn 1 mục ĐẦU danh sách — id phải duy nhất.
 // Mỗi mục: {id, date, title, items:[các dòng ngắn]}. Trạng thái "đã đọc" lưu trên máy từng người (localStorage).
 export const NEWS = [
+  {id: 'garden-scatter', date: '04/11/2026', title: 'Cây & vườn: tự trồng, tự rải', items: [
+    'Cửa hàng có mục mới "Cây & vườn": cỏ, hoa dại, nấm, đá cuội, bụi cây, cây non, cây xanh, cây lá kim, cây lá thu, cây dừa, cây cổ thụ…',
+    'Mua 1 loại — rải ra vườn mỗi cây một dáng khác nhau (nhiều biến thể, tỉ lệ, hướng ngẫu nhiên)',
+    'Cỏ / hoa / nấm: chổi tròn, mỗi lần bấm rải cả khóm. Cây / bụi: trồng từng cây, R xoay, V đổi dáng, trồng liên tục tới khi hết',
+    'Ra Vườn → Túi đồ → chọn cây → "Rải ra vườn". Sắp xếp vườn có "Chổi cất" để dọn cả vùng về lại túi',
+    'Thân cây chặn đường đi như cây thật; cỏ, hoa đi xuyên qua được. Cả hai người cùng thấy một khu vườn']},
   {id: 'furniture-place', date: '04/11/2026', title: 'Đặt nội thất vào nhà', items: [
     '22 món nội thất 3D (bộ Kenney Furniture Kit, miễn phí CC0): sofa, ghế, đèn, kệ sách, cây cảnh, thảm…',
     'Túi đồ → chọn món → "Đặt vào phòng": rê chuột lên sàn, R để xoay, bấm để đặt (điện thoại: chạm chỗ rồi bấm Đặt). Mua ở cửa hàng có thêm "Mua & đặt luôn"',

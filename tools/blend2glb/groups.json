@@ -1,0 +1,202 @@
+[
+ {
+  "id": "g_sapling",
+  "variants": [
+   "tree-acacia-senegal-generic-sapling-a",
+   "tree-baobab-african-generic-sapling-a",
+   "tree-beech-european-generic-sapling-a",
+   "tree-birch-silver-generic-sapling-a",
+   "tree-cypress-mediterranean-generic-sapling-a",
+   "tree-juniper-common-generic-sapling-a",
+   "tree-kapok-tree-generic-sapling-a",
+   "tree-oak-english-generic-sapling-a",
+   "tree-pine-scots-generic-sapling-a",
+   "tree-poplar-black-generic-sapling-a",
+   "tree-spruce-norway-generic-sapling-a",
+   "tree-willow-weeping-generic-sapling-a",
+   "tree-juniper-common-generic-sapling-b"
+  ]
+ },
+ {
+  "id": "g_tree",
+  "variants": [
+   "tree-oak-english-generic-young-a",
+   "tree-beech-european-generic-young-a",
+   "tree-birch-silver-generic-young-a",
+   "tree-kapok-tree-generic-young-a",
+   "tree-poplar-black-generic-young-a",
+   "tree-willow-weeping-generic-young-a",
+   "tree-acacia-senegal-generic-young-a"
+  ]
+ },
+ {
+  "id": "g_conifer",
+  "variants": [
+   "tree-pine-scots-generic-young-a",
+   "tree-spruce-norway-generic-young-a",
+   "tree-cypress-mediterranean-generic-young-a",
+   "tree-juniper-common-generic-young-a"
+  ]
+ },
+ {
+  "id": "g_autumn",
+  "variants": [
+   "tree-oak-english-dry-young-a",
+   "tree-beech-european-dry-young-a",
+   "tree-birch-silver-dry-young-a",
+   "tree-kapok-tree-dry-young-a",
+   "tree-willow-weeping-dry-young-a",
+   "tree-poplar-black-dry-young-a",
+   "tree-acacia-senegal-dry-young-a"
+  ]
+ },
+ {
+  "id": "g_palm",
+  "variants": [
+   "tree-palm-coconut-generic-young-a",
+   "tree-palm-coconut-generic-mature-b",
+   "tree-palm-coconut-generic-mature-c"
+  ]
+ },
+ {
+  "id": "g_bigtree",
+  "variants": [
+   "tree-oak-english-generic-mature-a",
+   "tree-beech-european-generic-mature-a",
+   "tree-birch-silver-generic-mature-a",
+   "tree-birch-silver-generic-mature-b",
+   "tree-willow-weeping-generic-mature-a"
+  ]
+ },
+ {
+  "id": "g_bush",
+  "variants": [
+   "bush-basic-generic-mature-a",
+   "bush-basic-generic-sapling-a",
+   "bush-yew-european-generic-mature-a",
+   "bush-yew-european-generic-mature-b",
+   "bush-yew-european-generic-mature-c",
+   "bush-magnolia-southern-generic-mature-a",
+   "bush-magnolia-southern-generic-flowering-mature-a",
+   "bush-burdock-generic-mature-a",
+   "bush-burdock-generic-mature-flowering-a"
+  ]
+ },
+ {
+  "id": "g_fern",
+  "variants": [
+   "bush-fern-generic-mature-a",
+   "bush-fern-generic-mature-b",
+   "bush-aloevera-generic-mature-a",
+   "bush-aloevera-generic-sapling-a"
+  ]
+ },
+ {
+  "id": "g_reed",
+  "variants": [
+   "bush-cattail-generic-group-a",
+   "bush-cattail-generic-single-mature-a",
+   "bush-cattail-generic-single-mature-b",
+   "bush-reed-generic-mature-a",
+   "bush-reed-generic-mature-b"
+  ]
+ },
+ {
+  "id": "g_grass",
+  "variants": [
+   "grass-generic-big-clump-a",
+   "grass-generic-big-clump-b",
+   "grass-generic-middle-clump-a",
+   "grass-generic-middle-sprig-a",
+   "grass-generic-round-clump-a",
+   "grass-generic-round-sprig-a",
+   "grass-generic-small-clump-a",
+   "grass-generic-small-sprig-a",
+   "grass-generic-thick-clump-a",
+   "grass-generic-thick-sprig-a",
+   "grass-generic-clover-clump-a",
+   "grass-generic-clover-flowering-clump-a",
+   "grass-generic-shamrock-clump-a"
+  ]
+ },
+ {
+  "id": "g_flower",
+  "variants": [
+   "flower-calendula-single-mature-a",
+   "flower-calendula-group-mature-a",
+   "flower-clover-tall-group-a",
+   "flower-cornflower-single-mature-a",
+   "flower-cornflower-group-a",
+   "flower-daisy-mature-a",
+   "flower-daisy-single-mature-a",
+   "flower-dandelion-mature-a",
+   "flower-dandelion-bloomed-a",
+   "flower-poppy-mature-a",
+   "flower-poppy-single-mature-a",
+   "flower-st-johns-wort-group-mature-a",
+   "flower-yarrow-group-a",
+   "flower-yarrow-single-mature-a",
+   "flower-random-mature-a"
+  ]
+ },
+ {
+  "id": "g_mushroom",
+  "variants": [
+   "mushroom-birch-bolete-mature-a",
+   "mushroom-bolete-summer-mature-a",
+   "mushroom-chanterelle-mature-a",
+   "mushroom-chanterelle-mature-b",
+   "mushroom-fly-agaric-mature-a",
+   "mushroom-fly-agaric-mature-b",
+   "mushroom-fly-agaric-mature-c",
+   "mushroom-parasol-mature-a",
+   "mushroom-polypore-mature-a",
+   "mushroom-polypore-mature-b"
+  ]
+ },
+ {
+  "id": "g_rock",
+  "variants": [
+   "rock-generic-small-a",
+   "rock-generic-small-b",
+   "rock-generic-small-c",
+   "rock-generic-small-d",
+   "rock-generic-small-e",
+   "rock-generic-small-f"
+  ]
+ },
+ {
+  "id": "g_stump",
+  "variants": [
+   "tree-beech-european-part-stump-a",
+   "tree-birch-silver-part-stump-b",
+   "tree-oak-english-part-stump-a",
+   "tree-pine-scots-part-stump-a",
+   "tree-spruce-norway-part-stump-a",
+   "tree-beech-european-part-broken-a"
+  ]
+ },
+ {
+  "id": "g_log",
+  "variants": [
+   "tree-beech-european-part-log-a",
+   "tree-birch-silver-part-log-a",
+   "tree-oak-english-part-log-a",
+   "tree-beech-european-part-log-pile-a",
+   "tree-oak-english-part-log-pile-a"
+  ]
+ },
+ {
+  "id": "g_cactus",
+  "variants": [
+   "succulent-cactus-round-flowering-a",
+   "succulent-cactus-round-flowering-b",
+   "succulent-cactus-round-flowering-c",
+   "succulent-cactus-tall-mature-a",
+   "succulent-cactus-tall-mature-b",
+   "succulent-cactus-tall-sapling-a",
+   "succulent-cactus-tall-sapling-b",
+   "succulent-opuntia-mature-a"
+  ]
+ }
+]
