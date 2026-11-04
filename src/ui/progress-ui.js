@@ -60,6 +60,7 @@ export function mountProgressUi({prog, toast, sess}) {
     const L = d.level, span = Math.max(1, L.next - L.floor), into = Math.max(0, L.xp - L.floor);
     $('pLv') && ($('pLv').textContent = 'Lv.' + L.level);
     $('pXu') && ($('pXu').textContent = nf(d.xu) + ' Xu');
+    $('rXu') && ($('rXu').textContent = nf(d.xu));
     if ($('pXpF')) { $('pXpF').style.width = Math.min(100, into / span * 100).toFixed(1) + '%'; $('pXpT').textContent = nf(into) + ' / ' + nf(span) + ' XP'; $('pXpb').title = 'Còn ' + nf(L.next - L.xp) + ' XP để lên cấp ' + (L.level + 1); }
     const t = d.player.title && (d.achievements || []).find(a => a.id === d.player.title);
     if ($('pTi')) { $('pTi').hidden = !t; $('pTi').textContent = t ? (t.title || t.name) : ''; }

@@ -46,7 +46,7 @@ export function init(ctx){
   {const az=controls.getAzimuthalAngle(),po=controls.getPolarAngle();controls.minAzimuthAngle=az-CFG.camPan;controls.maxAzimuthAngle=az+CFG.camPan;controls.minPolarAngle=po-CFG.camTilt;controls.maxPolarAngle=po+CFG.camTilt;}
   // phòng Vy / phòng Bin nằm sát cánh nhà bên cạnh (Vy: bên trái, Bin: bên phải): không cho xoay camera vòng sang phía đó
   // — xoay sang là tường nhà bên chắn ngang cầu thang (nhân vật bị khoét/nhấp nháy trong tường, trông như đi xuyên)
-  {const mc=MAP_CONFIGS[window.MAPID]||{},dx=mc.ext&&mc.ext.dx;if(dx){const az=controls.getAzimuthalAngle();if(dx<0)controls.minAzimuthAngle=az-0.06;else controls.maxAzimuthAngle=az+0.06}}   // vỏ ngoài hông + sau của chính cánh đang đứng được ẩn (MC.ext.hide) → nhìn chéo từ bên ngoài vẫn thấy rõ trong phòng
+  {const mc=MAP_CONFIGS[window.MAPID]||{},dx=mc.ext&&mc.ext.dx;if(dx){const az=controls.getAzimuthalAngle();if(dx<0)controls.minAzimuthAngle=az-0.24;else controls.maxAzimuthAngle=az+0.24}}   // vỏ ngoài hông + sau của chính cánh đang đứng được ẩn (MC.ext.hide) → nhìn chéo từ bên ngoài vẫn thấy rõ trong phòng
 
   // lights
   const hemi=new THREE.HemisphereLight(0xdfe8ff,0x8a7f73,0.9);scene.add(hemi);
@@ -87,7 +87,7 @@ export function init(ctx){
           vWP=(modelMatrix*_p).xyz;}`);
         if(F2||GB){sh.uniforms.uCenter={value:m.userData.center||new THREE.Vector3(0,0.65,0)};sh.uniforms.uHInv={value:m.userData.hInv||0.66};sh.uniforms.uWindDir=FU.uWindDir;sh.uniforms.uHybrid=FU.uHybrid;sh.uniforms.uBaseShade=FU.uBaseShade;sh.uniforms.uFolEmi=FU.uFolEmi;sh.uniforms.uGMap=FU.uGMap;sh.uniforms.uGK=FU.uGK;sh.uniforms.uGTint=FU.uGTint;if(m.userData.occW&&!(F2||GB)){sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}sh.uniforms.uPl=FU.uPl;sh.uniforms.uFolTint=FU.uFolTint;sh.uniforms.uFolVar=FU.uFolVar;sh.uniforms.uGrTint=FU.uGrTint;sh.uniforms.uGrVar=FU.uGrVar;sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}
         sh.vertexShader=(SW?'#define SWAYX\n':'')+'varying vec3 vWP;uniform float uWindT,uWindA;\n'+VS0;
-        sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uDesat={value:m.userData.desat==null?1:m.userData.desat};sh.fragmentShader='uniform float uDesat;uniform vec3 uGTint;\n'+(FOL?'#define FOLIAGE\n':'')+(F2?'#define FOL2\n':'')+(m.userData.bush?'#define BUSHF\n':'')+(GB?'#define GRASSB\n':'')+(GRD?'#define GROUNDX\n':'')+((F2||GB)?FRAG_PARS:(m.userData.occW?'uniform vec4 uOcc;uniform vec3 uOccPl;\n':''))+'uniform float uInHK;uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <normal_fragment_begin>',(F2||GB)?'#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\nnormal*=(gl_FrontFacing?1.0:-1.0);\n#endif\n'+(m.userData.occ?OCC_GLSL:''):'#include <normal_fragment_begin>'+(m.userData.occW?OCCW_GLSL:'')).replace('#include <opaque_fragment>',`
+        sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uDesat={value:m.userData.desat==null?1:m.userData.desat};sh.fragmentShader='uniform float uDesat;uniform vec3 uGTint;\n'+(FOL?'#define FOLIAGE\n':'')+(F2?'#define FOL2\n':'')+(m.userData.bush?'#define BUSHF\n':'')+(GB?'#define GRASSB\n':'')+(GRD?'#define GROUNDX\n':'')+((F2||GB)?FRAG_PARS:(m.userData.occW?'uniform vec4 uOcc;uniform vec3 uOccPl;\n':''))+'uniform float uInHK;uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK,uLOff;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <normal_fragment_begin>',(F2||GB)?'#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\nnormal*=(gl_FrontFacing?1.0:-1.0);\n#endif\n'+(m.userData.occ?OCC_GLSL:''):'#include <normal_fragment_begin>'+(m.userData.occW?OCCW_GLSL:'')).replace('#include <opaque_fragment>',`
         {float I=1.0,Ih=1.0,vis=1.0,Ig=0.0;
          #ifdef FOLIAGE
          {float lm=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));vec3 lf=mix(uLeafA,uLeafB,smoothstep(0.03,0.4,lm));
@@ -157,6 +157,7 @@ ${FRAG_COLOR}
          {float lp=0.0;for(int li=0;li<10;li++){if(float(li)>=uLN)break;vec3 ld=uLP[li].xyz-vWP;float q=clamp(1.0-dot(ld,ld)/(uLP[li].w*uLP[li].w),0.0,1.0);lp+=q*q;}
           lp=min(lp,1.4);
           col*=1.0-0.15*uLK*inH*(1.0-min(lp,1.0));
+          col*=1.0-0.16*uLOff*inH;
           col+=diffuseColor.rgb*vec3(1.0,0.8,0.52)*lp*uLK*0.85;}
          outgoingLight=col+totalEmissiveRadiance;}
         #include <opaque_fragment>`)};
@@ -254,6 +255,9 @@ ${FRAG_COLOR}
   A.stairs=stairs;
   const pickStair=(x0,z0,x1,z1,up)=>{let best=stairs[0],bd=1e9;for(const S of stairs){const a=up?S.botZ:S.topZ,b=up?S.topZ:S.botZ,d=Math.hypot(x0-S.cx,z0-a)+Math.hypot(S.cx-x1,b-z1);if(d<bd){bd=d;best=S}}return best};
   // ===== đèn trong nhà → các "vũng sáng" cục bộ (đèn thả bếp, đèn sàn, đèn bàn…): gần đèn sáng ấm, xa đèn tối dần =====
+  // công tắc đèn trong nhà (nhớ lại giữa các lần chơi): tắt → chỉ còn ánh nắng/ánh trời
+  const LI={on:true,k:1,mats:null};try{LI.on=localStorage.getItem('vyLamps')!=='0'}catch(e){}LI.k=LI.on?1:0;
+  api.lamps=v=>{if(v===undefined)return LI.on;LI.on=!!v;try{localStorage.setItem('vyLamps',v?'1':'0')}catch(e){}window.dispatchEvent(new CustomEvent('vylamps',{detail:LI.on}));return LI.on};
   const LAMPS=[];
   {env.updateMatrixWorld(true);const pend=[],other=[],studioP=[],studioO=[];
    env.traverse(o=>{const n=o.name||'';
@@ -289,7 +293,7 @@ ${FRAG_COLOR}
     for(let t=0;t<n;t+=3){const ia=idx?idx.getX(t):t,ib=idx?idx.getX(t+1):t+1,ic=idx?idx.getX(t+2):t+2;
       a.fromBufferAttribute(pa,ia).applyMatrix4(M);b.fromBufferAttribute(pa,ib).applyMatrix4(M);c.fromBufferAttribute(pa,ic).applyMatrix4(M);
       const y0=Math.min(a.y,b.y,c.y),y1=Math.max(a.y,b.y,c.y);
-      [A.L0,A.L1].forEach((fy,lv)=>{const lo=fy+0.12,hi=fy+0.9;if(y1<lo||y0>hi)return;
+      [A.L0,A.L1].forEach((fy,lv)=>{const lo=fy+0.06,hi=fy+1.0;if(y1<lo||y0>hi)return;
         const e=Math.max(a.distanceTo(b),b.distanceTo(c),c.distanceTo(a)),k=Math.max(1,Math.ceil(e/0.05));
         for(let i=0;i<=k;i++)for(let j=0;j<=k-i;j++){const u=i/k,v=j/k,w=1-u-v;p.set(a.x*w+b.x*u+c.x*v,a.y*w+b.y*u+c.y*v,a.z*w+b.z*u+c.z*v);
           if(p.y<lo||p.y>hi)continue;const ci=Math.floor((p.x-G.x0)/G.c),cj=Math.floor((p.z-G.z0)/G.c);if(ci>=0&&cj>=0&&ci<G.W&&cj<G.H)triRaw[lv][cj*G.W+ci]=1}})}}
@@ -340,7 +344,10 @@ ${FRAG_COLOR}
     for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;if(Math.abs(z-zF)<0.1&&(x-S.cx)*dir>=-0.05&&(x-lx)*dir<=0.05)blocked[0][j*G.W+i]=0}
     console.log('[stair] chân thang sát tường → đi dọc mép trước',JSON.stringify(S.front))});
   function los(lv,x0,z0,x1,z1,skipA,skipB){const d=Math.hypot(x1-x0,z1-z0),n=Math.max(1,Math.ceil(d/0.05));
-    for(let k=0;k<=n;k++){const t=k/n,dd=t*d;if((skipA&&dd<0.25)||(skipB&&d-dd<0.25))continue;const [i,j]=cell(x0+(x1-x0)*t,z0+(z1-z0)*t);if(!free(lv,i,j))return false}return true}
+    // skipA/skipB: chỉ bỏ qua đoạn ô KẸT liền ngay điểm đầu/cuối (đang đứng/đích nằm sát vật cản, tối đa 0.25 m) — không cho cắt xuyên đồ đạc giữa đường
+    let a=0,b=n;if(skipA)while(a<n&&a/n*d<0.25){const [i,j]=cell(x0+(x1-x0)*a/n,z0+(z1-z0)*a/n);if(free(lv,i,j))break;a++}
+    if(skipB)while(b>a&&(n-b)/n*d<0.25){const [i,j]=cell(x0+(x1-x0)*b/n,z0+(z1-z0)*b/n);if(free(lv,i,j))break;b--}
+    for(let k=a;k<=b;k++){const t=k/n;const [i,j]=cell(x0+(x1-x0)*t,z0+(z1-z0)*t);if(!free(lv,i,j))return false}return true}
   function findPath(x0,z0,x1,z1,lv,exact){
     let [gi,gj]=cell(x1,z1),gx=x1,gz=z1;
     if(!free(lv,gi,gj)&&!exact){let best=null,bd=1e9;
@@ -352,13 +359,15 @@ ${FRAG_COLOR}
     const h=(i,j)=>{const dx=Math.abs(i-gi),dz=Math.abs(j-gj);return (dx+dz)+(1.414-2)*Math.min(dx,dz)};
     const heap=[];const push=(f,k)=>{heap.push([f,k]);let c=heap.length-1;while(c>0){const p=(c-1)>>1;if(heap[p][0]<=heap[c][0])break;[heap[p],heap[c]]=[heap[c],heap[p]];c=p}};
     const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let c=0;for(;;){let l=2*c+1,r=l+1,m=c;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===c)break;[heap[m],heap[c]]=[heap[c],heap[m]];c=m}}return top};
-    const s0=sj*G.W+si;g[s0]=0;push(h(si,sj),s0);let found=false;const gk=gj*G.W+gi;
+    const s0=sj*G.W+si;g[s0]=0;push(h(si,sj),s0);let found=false,gk=gj*G.W+gi,bk=s0,bh=1e9;
     while(heap.length){const [,k]=pop();if(done[k])continue;done[k]=1;if(k===gk){found=true;break}
+      {const hh=h(k%G.W,(k/G.W)|0);if(hh<bh){bh=hh;bk=k}}
       const i=k%G.W,j=(k/G.W)|0;
       for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){if(!di&&!dj)continue;const ni=i+di,nj=j+dj;
         if(!free(lv,ni,nj))continue;if(di&&dj&&(!free(lv,i+di,j)||!free(lv,i,j+dj)))continue;
         const nk=nj*G.W+ni,ng=g[k]+(di&&dj?1.414:1);if(ng<g[nk]){g[nk]=ng;par[nk]=k;push(ng+h(ni,nj),nk)}}}
-    if(!found)return [{x:gx,z:gz}];
+    // không tới được đích (vùng bị chặn kín): đi tới ô gần đích nhất với tới được — KHÔNG đi thẳng xuyên tường/đồ đạc như trước
+    if(!found){if(bk===s0)return [];gk=bk;gx=G.x0+((bk%G.W)+.5)*G.c;gz=G.z0+(((bk/G.W)|0)+.5)*G.c}
     const cs=[];for(let k=gk;k!==-1&&k!==s0;k=par[k])cs.push({x:G.x0+((k%G.W)+.5)*G.c,z:G.z0+(((k/G.W)|0)+.5)*G.c});
     cs.reverse();cs.push({x:gx,z:gz});
     const pts=[{x:x0,z:z0},...cs],out=[];let a=0;
@@ -686,9 +695,13 @@ ${FRAG_COLOR}
     if(L===0&&lv===1){const S=pickStair(x0,z0,x,z,true),cx=S.cx;
       if(S.front){const F=S.front;add(findPath(x0,z0,F.lx,F.zF,0,true));it.slice(-1).forEach(w=>w.strict=1);it.push(wp(cx,F.zF,null,run,1),wp(cx,S.z1-0.05,null,run,1),wp(cx,S.midZ,1,run),wp(cx,S.topZ,null,run));x0=cx;z0=S.topZ}
       else{const ap=approachZ(cx,S.botZ,1,0);add(findPath(x0,z0,cx,ap,0,true));it.slice(-2).forEach(w=>w.strict=1);it.push(wp(cx,S.botZ,null,run,1),wp(cx,S.midZ,1,run),wp(cx,S.topZ,null,run));x0=cx;z0=S.topZ}}
-    else if(L===1&&lv===0){const S=pickStair(x0,z0,x,z,false),cx=S.cx,ok=approachZ(cx,S.topZ,-1,1);add(findPath(x0,z0,cx,ok,1,true));it.slice(-2).forEach(w=>w.strict=1);
-      if(S.front){const F=S.front;it.push(wp(cx,S.topZ,null,run,1),wp(cx,S.midZ,0,run),wp(cx,F.zF,null,run,1),wp(F.lx,F.zF,null,run,1));x0=F.lx;z0=F.zF}
-      else{it.push(wp(cx,S.topZ,null,run,1),wp(cx,S.midZ,0,run),wp(cx,S.botZ,null,run),wp(cx,approachZ(cx,S.botZ,1,0),null,run,1));x0=cx;z0=approachZ(cx,S.botZ,1,0)}}
+    else if(L===1&&lv===0){const S=pickStair(x0,z0,x,z,false),cx=S.cx,ok=approachZ(cx,S.topZ,-1,1);
+      // đã đứng sát đầu thang, gần trục (≤0.45 m): xuống thẳng — trước đây vẫn lùi ra điểm tiếp cận phía sau (~0.5 m) rồi mới quay lại → khựng 1–2 s lúc bắt đầu
+      if(Math.abs(x0-cx)<0.45&&z0>ok-0.05&&z0<S.z0+0.6){if(Math.abs(x0-cx)>0.05||z0<S.topZ-0.05)it.push(wp(cx,Math.max(z0,S.topZ),null,run,1))}
+      else{add(findPath(x0,z0,cx,ok,1,true));it.slice(-2).forEach(w=>w.strict=1)}
+      const near=Math.abs(x0-cx)<0.45&&z0>S.topZ+0.02,top0=near?[]:[wp(cx,S.topZ,null,run,1)];
+      if(S.front){const F=S.front;it.push(...top0,wp(cx,S.midZ,0,run),wp(cx,F.zF,null,run,1),wp(F.lx,F.zF,null,run,1));x0=F.lx;z0=F.zF}
+      else{it.push(...top0,wp(cx,S.midZ,0,run),wp(cx,S.botZ,null,run),wp(cx,approachZ(cx,S.botZ,1,0),null,run,1));x0=cx;z0=approachZ(cx,S.botZ,1,0)}}
     add(findPath(x0,z0,x,z,lv,exact));return it;}
   const leave=()=>{const k=busy&&busy.kind;return (P.mode==='bed'||k==='climbBed')?[{t:'offBed'}]:(P.mode==='sit'||P.mode==='type'||k==='climbChair')?[{t:'offChair'}]:(P.mode==='watch'||k==='climbWatch')?[{t:'offWatch'}]:[]};
   function cmdMove(x,z,lv,run){
@@ -1213,6 +1226,21 @@ ${FRAG_COLOR}
     // texture: anisotropy cao để cảnh ngoài cửa sổ không bị sạn/nhấp nháy
     const tex=new Set();env.traverse(o=>{if(!o.isMesh)return;(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{if(!m)return;['map','normalMap','emissiveMap','roughnessMap','metalnessMap','aoMap'].forEach(k=>{if(m[k])tex.add(m[k])})})});
     tex.forEach(t=>{t.anisotropy=maxAniso;t.generateMipmaps=true;t.minFilter=THREE.LinearMipmapLinearFilter;t.needsUpdate=true});
+    // chống z-fighting: tấm mỏng nằm áp lên mặt khác (thảm, tranh, bảng ghim, khung, tấm lót…) → vật liệu riêng có polygonOffset
+    // (kéo về phía camera trong bộ đệm sâu, không dời hình). Tấm chồng lên tấm khác (thảm trong trên thảm ngoài) được đẩy mạnh thêm 1 bậc.
+    {const T=[],bb=new THREE.Box3(),sz=new THREE.Vector3();
+     env.traverse(o=>{if(!o.isMesh||!o.visible||o.isSkinnedMesh||o.isInstancedMesh||!o.material||Array.isArray(o.material)||o.userData.glass||outsideRoot(o))return;
+       bb.setFromObject(o);bb.getSize(sz);const a=[sz.x,sz.y,sz.z],ax=a.indexOf(Math.min(...a)),o2=a.filter((_,i)=>i!==ax);
+       if(a[ax]>0.035||Math.min(...o2)<0.06)return;const area=o2[0]*o2[1];if(area>14)return;   // sàn/tường lớn = mặt nền, không đẩy
+       T.push({o,ax,b:bb.clone(),area})});
+     const mc=new Map();let nz=0;
+     T.forEach(t=>{const c=t.b.min.getComponent(t.ax)+t.b.max.getComponent(t.ax);let L=1;
+       T.forEach(u=>{if(u===t||u.ax!==t.ax||u.area<=t.area)return;const d=Math.abs((u.b.min.getComponent(u.ax)+u.b.max.getComponent(u.ax))-c)/2;if(d>0.03)return;
+         const ex=t.b.clone().expandByScalar(0.01);if(u.b.intersectsBox(ex))L++});
+       L=Math.min(L,4);const m=t.o.material,k=m.uuid+'|'+L;let mm=mc.get(k);
+       if(!mm){mm=m.clone();mm.polygonOffset=true;mm.polygonOffsetFactor=-1.5*L;mm.polygonOffsetUnits=-4*L;mm.userData={...m.userData};if(m.onBeforeCompile)mm.onBeforeCompile=m.onBeforeCompile;if(m.customProgramCacheKey)mm.customProgramCacheKey=m.customProgramCacheKey;mc.set(k,mm)}
+       t.o.material=mm;nz++});
+     console.log('z-fight: '+nz+' tấm mỏng được đẩy lên')}
     const groups=new Map();const out=[];let before=0;
     env.traverse(o=>{if(!o.isMesh)return;before++;
       if(outsideRoot(o)){o.castShadow=false;o.receiveShadow=false;return}
@@ -1623,7 +1651,10 @@ ${FRAG_COLOR}
     const des=c=>c.clone().lerp(grayOf(c),WC.des);
     const sunC=des(k.sun),aS=des(k.ambS),aG=des(k.ambG);const sI=Math.min(1.15,(0.35+0.65*k.sunI)*(0.4+0.6*WC.dim)*Math.max(fade,0.2))*(1+flash*1.2),aI=0.95+flash*0.5;
     const raw=(c,v)=>{const w=c.clone().convertLinearToSRGB();v.value.set(w.r,w.g,w.b)};raw(sunC,TU.uSunC);TU.uSunC.value.multiplyScalar(sI);raw(aS,TU.uAmbS);TU.uAmbS.value.multiplyScalar(aI);raw(aG,TU.uAmbG);TU.uAmbG.value.multiplyScalar(aI);
-    const lamp=Math.max(k.lamp,WC.dim<0.5?0.3:0)*0.95;TU.uLampC.value.set(1.0*lamp,0.62*lamp,0.3*lamp);TU.uLK.value=0.7+0.5*Math.min(1,Math.max(k.lamp,WC.dim<0.5?0.3:0));
+    LI.k+=((LI.on?1:0)-LI.k)*(dt>0?Math.min(1,dt*5):1);   // bật/tắt đèn nhà: mờ dần ~0.4s
+    const lamp=Math.max(k.lamp,WC.dim<0.5?0.3:0)*0.95*LI.k;TU.uLampC.value.set(1.0*lamp,0.62*lamp,0.3*lamp);TU.uLK.value=(0.7+0.5*Math.min(1,Math.max(k.lamp,WC.dim<0.5?0.3:0)))*LI.k;TU.uLOff.value=1-LI.k;
+    if(LI.mats===null){LI.mats=[];if(!OUTD)env.traverse(o=>{if(!o.isMesh)return;[].concat(o.material).forEach(m=>{if(m&&/^(CH_lampshade|CH_bulb|FWS_lamp_glow)$/.test(m.name)&&!LI.mats.some(q=>q.m===m))LI.mats.push({m,e:m.emissiveIntensity})})})}
+    LI.mats.forEach(q=>{q.m.emissiveIntensity=q.e*(0.06+0.94*LI.k)});
     // sky
     skyU.cTop.value.copy(des(k.top));skyU.cMid.value.copy(des(k.mid));skyU.cPink.value.copy(des(k.pink));skyU.cHor.value.copy(des(k.hor));
     const dayB=0.25+0.75*k.day;skyU.cCl.value.copy(des(k.hor).lerp(new THREE.Color('#ffffff'),0.45*k.day)).multiplyScalar(dayB*(1-0.25*WC.des));

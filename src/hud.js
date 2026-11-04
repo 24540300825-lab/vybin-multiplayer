@@ -149,3 +149,23 @@ import {Fx} from './ui/fx.js';
       ['pointerdown','keydown','touchstart'].forEach(ev=>addEventListener(ev,go,true));toast('Bấm vào đâu đó để nhạc chạy tiếp')}}}
   showT();
 })();
+// ===== thanh công cụ gọn theo nhóm + cửa sổ nổi kéo/đổi cỡ được =====
+import('./ui/toolbar.js').then(m=>m.organizeToolbar()).catch(e=>console.warn('[toolbar]',e));
+import('./ui/float.js').then(({float})=>{
+  // [id, chỗ nắm kéo, phóng to/nhỏ đều?] — khung phim nhỏ đổi cỡ bằng góc riêng (giữ tỉ lệ video) nên chỉ cần kéo
+  const L=[['hChat','.ph',1],['hTasks','.ph',1],['hNote','.ph',1],['hYt','.ph',1],['fcPill',null,1],['cine','.cMiniBar',0]];
+  const bind=()=>{let left=0;L.forEach(([id,h,sc])=>{const el=document.getElementById(id);if(!el){left++;return}if(el._fl)return;
+    if(h&&!el.querySelector(h)){left++;return}float(el,{key:id,handle:h,scale:!!sc})});return left};
+  if(bind()){let q=0;const mo=new MutationObserver(()=>{if(q)return;q=requestAnimationFrame(()=>{q=0;if(!bind())mo.disconnect()})});mo.observe(document.body,{childList:true,subtree:true});setTimeout(()=>mo.disconnect(),120000)}
+}).catch(e=>console.warn('[float]',e));
+// ===== công tắc đèn nhà (chỉ map trong nhà): bật/tắt toàn bộ đèn — tắt thì nắng/ánh trời nổi hơn. Phím tắt: L =====
+(function(){const A=()=>window.VY&&VY.api&&VY.api.lamps;let tries=0;
+  const t=setInterval(()=>{if(A()||++tries>200)clearInterval(t);if(!A())return;
+    if(window.VY.EXT){clearInterval(t);return}   // map ngoài vườn: không có đèn nhà
+    const top=document.getElementById('hTop');if(!top||document.getElementById('iLamp'))return;
+    const b=document.createElement('button');b.className='ib';b.id='iLamp';b.setAttribute('aria-label','Đèn trong nhà');b.innerHTML='<i class="ic">'+ic('bulb')+'</i>';top.appendChild(b);
+    const paint=()=>{const on=VY.api.lamps();b.classList.toggle('lampOff',!on);b.title=(on?'Tắt':'Bật')+' đèn trong nhà (L)';b.setAttribute('aria-pressed',on)};paint();
+    const tog=()=>{VY.api.lamps(!VY.api.lamps());paint();window.__vyToast&&window.__vyToast(VY.api.lamps()?'Đã bật đèn':'Đã tắt đèn — chỉ còn ánh sáng tự nhiên');try{SFX.play('click')}catch(e){}};
+    b.onclick=tog;addEventListener('vylamps',paint);
+    addEventListener('keydown',e=>{if(e.code!=='KeyL'||e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;const T=e.target;if(T&&(/INPUT|TEXTAREA|SELECT/.test(T.tagName)||T.isContentEditable))return;if(document.querySelector('.modal.on,#mpGate.on,#cine.on'))return;tog()});
+  },300)})();
