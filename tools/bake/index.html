@@ -40,7 +40,7 @@ function matFor(m, leaf, y0, y1) {
   mats.set(k, sm); return sm;
 }
 const byName = n => g.scene.getObjectByName(n);
-const nodeOf = {pine: 'TREE_PROTOTYPE', round1: 'TREE_ROUND', round2: 'TREE_ROUND_2'};
+const nodeOf = {pine: 'TREE_PROTOTYPE', round1: 'TREE_ROUND', round2: 'TREE_ROUND_2', round3: 'TREE_ROUND_3', round4: 'TREE_ROUND_4', round5: 'TREE_ROUND_5'};
 let box = new THREE.Box3();
 if (what === 'grass') {
   const proto = byName('GRASS_PROTOTYPE'); proto.position.set(0, 0, 0); proto.updateMatrixWorld(true);
@@ -65,11 +65,13 @@ scene.traverse(o => { if (!o.isMesh) return; const leaf = /Plant_01|Leaves/.test
 // khung ortho: chân = đáy ảnh; giữ đúng tỉ lệ ảnh W:H, căn giữa ngang
 const asp = W / H, bw = box.max.x - box.min.x, bh = box.max.y - box.min.y;
 let fh = bh * 1.02, fw = fh * asp; if (fw < bw * 1.02) { fw = bw * 1.02; fh = fw / asp; }
-if (what === 'grass') { fw = 8.0; fh = fw / asp; }
-const cx = what === 'grass' ? 0 : (box.min.x + box.max.x) / 2;
+// dải cỏ: khung ôm trọn mọi cụm (không cắt ngọn / cắt hai đầu) → canvas đổi cao theo đúng tỉ lệ
+if (what === 'grass') { fw = bw * 1.02; fh = bh * 1.05; R.setSize(W, Math.round(W * fh / fw / 4) * 4); }
+else { fh = bh * 1.02; fw = bw * 1.04; R.setSize(Math.round(H * fw / fh / 4) * 4, H); }   // cây: canvas ôm đúng dáng cây (không phí điểm ảnh)
+const cx = (box.min.x + box.max.x) / 2;
 const cam = new THREE.OrthographicCamera(-fw / 2, fw / 2, fh, 0, 0.1, 200);
 cam.position.set(cx, box.min.y, 60); cam.lookAt(cx, box.min.y, 0);
 R.render(scene, cam);
-window.__info = {fw, fh, bw, bh, y0, cx, bx0: box.min.x, bx1: box.max.x};
+window.__info = {cw: R.domElement.width, ch: R.domElement.height, fw, fh, bw, bh, y0, cx, bx0: box.min.x, bx1: box.max.x};
 window.__done = true;
 </script></body></html>

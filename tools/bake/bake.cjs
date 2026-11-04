@@ -3,9 +3,9 @@ const {chromium} = require('playwright'); const fs = require('fs'); const path =
 (async () => {
   const b = await chromium.launch({args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']});
   const out = path.join(__dirname, 'out'); fs.mkdirSync(out, {recursive: true}); const info = {};
-  const jobs = [['grass', 2048, 512], ['pine', 512, 1024], ['round1', 512, 840], ['round2', 512, 760]];
+  const jobs = [['grass', 2048, 512], ['pine', 1024, 1024], ['round1', 1024, 1024], ['round2', 1024, 1024], ['round3', 1024, 1024], ['round4', 1024, 1024], ['round5', 1024, 1024]];
   for (const [what, w, h] of jobs) for (const pass of ['alb', 'nrm']) {
-    const p = await b.newPage({viewport: {width: w, height: h}}); p.on('pageerror', e => console.log('ERR', e.message));
+    const p = await b.newPage({viewport: {width: w, height: what === 'grass' ? 1400 : h}}); p.on('pageerror', e => console.log('ERR', e.message));
     await p.goto(`http://localhost:8124/tools/bake/index.html?w=${w}&h=${h}&what=${what}&pass=${pass}`);
     await p.waitForFunction(() => window.__done, null, {timeout: 300000});
     const url = await p.evaluate(() => document.querySelector('canvas').toDataURL('image/png'));

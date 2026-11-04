@@ -362,7 +362,7 @@ export function setupExterior(c) {
   farN.flower = scatter('flower', Math.round(300 * F), 0.9, 14, d => rnd() < 1.0 - d / 20);
   // ---- 4c) DECAL: dải cỏ um tùm phủ khắp vườn + ra xa (hiện từ ~15 m), cây xa = tấm cây (hiện từ ~30 m) ----
   const decGrass = [];
-  { const step0 = INDOOR ? 2.4 : 1.6, step1 = INDOOR ? 4.2 : 2.7, ext = INDOOR ? 70 : 95, y = MC.floorY || 0, np = MC.noPlant || [];
+  { const step0 = INDOOR ? 2.0 : 1.45, step1 = INDOOR ? 3.6 : 2.35, ext = INDOOR ? 70 : 95, y = MC.floorY || 0, np = MC.noPlant || [];
     for (let z = R0[2] - ext; z < R0[3] + ext; z += 1) {
       const inZ = z > R0[2] && z < R0[3];
       for (let x = R0[0] - ext; x < R0[1] + ext; x += 1) {
@@ -370,8 +370,8 @@ export function setupExterior(c) {
         if (rnd() > 1 / (st * st)) continue;                 // mật độ ~ 1 tấm / st² m²
         const jx = x + rnd(), jz = z + rnd();
         if (np.some(b => jx > b[0] - 1.2 && jx < b[1] + 1.2 && jz > b[2] - 1.2 && jz < b[3] + 1.2)) continue;
-        const w = 1.6 + rnd() * 1.5;
-        decGrass.push({x: jx, y: y - 0.04, z: jz, s: w / 8, hue: (rnd() - 0.5) * 0.04, val: (rnd() - 0.5) * 0.12});
+        const w = 2.0 + rnd() * 1.9;
+        decGrass.push({x: jx, y: y - 0.04, z: jz, s: w / 8.932, hue: 0, val: (rnd() - 0.5) * 0.04});   // lệch màu rất nhẹ: cỏ phải tệp màu thảm
       }
     }
   }
