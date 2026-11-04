@@ -275,17 +275,19 @@ export function setupExterior(c) {
     for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
     let cx = 0, cz = 0; arr.forEach(mm => { V3.setFromMatrixPosition(mm); cx += V3.x; cz += V3.z; }); cx /= arr.length; cz /= arr.length;
     for (const src of set) {
-      const mat = styleMat(Array.isArray(src.material) ? src.material[0] : src.material, src.geometry, cls);
+      // src.raw: vật cứng do người chơi rải (đá, gốc cây, nấm, xương rồng) — giữ vật liệu toon gốc, KHÔNG cờ lá (không lay gió / không cúi khi đi qua)
+      const mat = src.raw ? src.material : styleMat(Array.isArray(src.material) ? src.material[0] : src.material, src.geometry, cls);
       const im = new THREE.InstancedMesh(src.geometry, mat, arr.length);
       arr.forEach((mm, i) => im.setMatrixAt(i, mm));
       im.instanceMatrix.needsUpdate = true; im.matrixAutoUpdate = false; im.castShadow = false; im.receiveShadow = cls === 'tree' || cls === 'rock';     // cỏ chỉ ĐỔ bóng xuống thảm, không nhận bóng của chính cỏ → đồng màu, hoà vào thảm
       im.computeBoundingSphere();
+      { const ids = arr.map(mm => mm.pid); if (ids[0] !== undefined) im.userData.ids = ids; }     // cây người chơi rải: id từng bản thể (bấm chọn được)
       if (mat.userData.grass) { if (!grassDepth) grassDepth = makeDepthMat(grassMask()); im.customDepthMaterial = grassDepth; }
       else if (mat.userData.fol2) im.customDepthMaterial = depthMat;
       group.add(im);
       // mức LOD xa: cùng ma trận (dùng chung buffer), hình học đã giảm ~85% tam giác
       let im1 = null; const lg = CLASS[cls].lod ? simplified(src.geometry, cls === 'tree' || cls === 'bush' ? 0.12 : 0.16) : null;
-      if (lg) { im1 = new THREE.InstancedMesh(lg, mat, arr.length); im1.instanceMatrix = im.instanceMatrix; im1.matrixAutoUpdate = false; im1.castShadow = false; im1.receiveShadow = cls === 'tree' || cls === 'rock'; im1.boundingSphere = im.boundingSphere; im1.visible = false;
+      if (lg) { im1 = new THREE.InstancedMesh(lg, mat, arr.length); im1.instanceMatrix = im.instanceMatrix; im1.matrixAutoUpdate = false; im1.castShadow = false; im1.receiveShadow = cls === 'tree' || cls === 'rock'; im1.boundingSphere = im.boundingSphere; im1.visible = false; im1.userData.ids = im.userData.ids;
         if (im.customDepthMaterial) im1.customDepthMaterial = im.customDepthMaterial; group.add(im1); }
       cells.push({im, im1, cls, n: arr.length, cx, cz, far: !!far});
     }
@@ -352,6 +354,26 @@ export function setupExterior(c) {
   farN.grass = scatter('grass', Math.round(5200 * F), 0.9, 44, d => rnd() < 1.0 - d / 50);
   farN.flower = scatter('flower', Math.round(900 * F), 0.9, 36, d => rnd() < 1.0 - d / 42);
 
+  // ---- 4b) lớp CÂY NGƯỜI CHƠI RẢI (src/build/furniture.js): đi CHUNG đường ống với cây vườn — styleMat (gió, tâm tán, bụi, cúi khi đi qua,
+  //      mờ khi chắn camera, giảm rực), bóng lá riêng, chia ô + frustum cull, LOD giảm tam giác, chỉ ô gần đổ bóng. Không bao giờ bị thưa theo khoảng cách.
+  const userCells = new Map();
+  function removeUser(key) {
+    const l = userCells.get(key); if (!l) return;
+    l.forEach(ce => { group.remove(ce.im); if (ce.im1) group.remove(ce.im1); const i = cells.indexOf(ce); if (i >= 0) cells.splice(i, 1); });
+    userCells.delete(key);
+  }
+  // set = [{geometry, material}] (các mảnh của 1 biến thể, ma trận cục bộ = đơn vị), mats = ma trận thế giới (mm.pid = id món)
+  function setUser(key, set, cls, mats) {
+    removeUser(key); if (!mats.length || !CLASS[cls]) return;
+    const CL = CLASS[cls], before = cells.length, buckets = new Map();
+    mats.forEach(mm => { V3.setFromMatrixPosition(mm); const k = Math.floor(V3.x / CL.cell) + ',' + Math.floor(V3.z / CL.cell); (buckets.get(k) || buckets.set(k, []).get(k)).push(mm); });
+    for (const arr of buckets.values()) makeCells(set, cls, arr);
+    const mine = cells.slice(before); mine.forEach(ce => { ce.user = true; });
+    userCells.set(key, mine);
+  }
+  const userKeys = () => [...userCells.keys()];
+  const userMeshes = () => { const o = []; userCells.forEach(l => l.forEach(ce => { if (ce.im.visible) o.push(ce.im); if (ce.im1 && ce.im1.visible) o.push(ce.im1); })); return o; };
+
   // ---- 5) "haze ring": lớp sương thấp xa, đậm ở chân và tan dần lên cao → cây xa chìm vào sương, cảm giác không gian rộng ----
   const hazes = [];
   const hazeMat = (H, A) => new THREE.ShaderMaterial({
@@ -387,7 +409,7 @@ export function setupExterior(c) {
       if (ce.im1 && ce.im1.visible !== v1) ce.im1.visible = v1;
       if (!vis) continue;
       // cây/đá trong hàng rào có VẬT CẢN → luôn đủ bản (không thưa) để không "va vào cây tàng hình"; còn lại thưa dần theo khoảng cách
-      const solid = !INDOOR && !ce.far && (ce.cls === 'tree' || ce.cls === 'rock');
+      const solid = ce.user || (!INDOOR && !ce.far && (ce.cls === 'tree' || ce.cls === 'rock'));
       const f = solid ? 1 : Math.min(1, Math.max(CL.min, 1 - (d - CL.d0) / (CL.d1 - CL.d0) * (1 - CL.min))) * lv.dens;
       const dens = ce.cls === 'tree' && ce.far ? Math.max(f, lv.far * 0.4) : f;
       const n = Math.max(1, Math.ceil(ce.n * Math.min(1, dens)));
@@ -397,7 +419,7 @@ export function setupExterior(c) {
     }
     for (const h of hazes) { h.position.x = target.x; h.position.z = target.z; if (fogColor) h.material.uniforms.uCol.value.copy(fogColor);  }
   }
-  return {tintMats, colliders, update, setLevel, getLevel: () => level, cells, hazes, group, depthMat, walkHeight: buildWalkHeight(scene, MC)};
+  return {tintMats, colliders, update, setLevel, getLevel: () => level, cells, hazes, group, depthMat, walkHeight: buildWalkHeight(scene, MC), setUser, removeUser, userKeys, userMeshes, indoor: INDOOR};
 }
 
 // ---- độ cao mặt đi được (hiên / bục thềm / bậc) -------------------------------------------------------------

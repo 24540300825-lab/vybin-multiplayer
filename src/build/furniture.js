@@ -49,11 +49,41 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
   async function variantOf(def, v) {
     const sc = await loadGlb(def.glb), n = sc.children.length || 1, node = sc.children[((v | 0) % n + n) % n];
     if (!node.userData.prep) {
-      node.userData.prep = 1; node.updateMatrixWorld(true);
-      node.traverse(o => { if (o.isMesh) [].concat(o.material).forEach(m => { if (m && !toonDone.has(m)) { toonDone.add(m); m.flatShading = true; if (api.toonMat && m.isMeshStandardMaterial) { try { api.toonMat(m); } catch (e) {} } m.needsUpdate = true; } }); });
+      node.userData.prep = 1; node.position.set(0, 0, 0); node.rotation.set(0, 0, 0); node.scale.set(1, 1, 1); node.updateMatrixWorld(true);
       node.userData.tb = new THREE.Box3().setFromObject(node);   // khung bao cục bộ (gốc thân cây = 0,0,0)
     }
     return node;
+  }
+  // lớp vẽ của vườn (exterior.js): cây → 'tree', bụi/dương xỉ → 'bush', cỏ/hoa/lau → 'flower' (lay gió, cúi khi đi qua);
+  // đá, gốc, khúc gỗ, nấm, xương rồng → 'rock' + vật liệu cứng (không lay gió)
+  const CLS = {g_sapling: 'tree', g_tree: 'tree', g_conifer: 'tree', g_autumn: 'tree', g_palm: 'tree', g_bigtree: 'tree', g_bush: 'bush', g_fern: 'bush',
+    g_grass: 'flower', g_flower: 'flower', g_reed: 'flower', g_rock: 'rock', g_stump: 'rock', g_log: 'rock', g_mushroom: 'rock', g_cactus: 'rock'};
+  const clsOf = def => def.cls || CLS[def.id] || 'bush';
+  const rawOf = def => clsOf(def) === 'rock';
+  // các mảnh của 1 biến thể: {geometry, material, raw}. Hình học đã "nướng" ma trận cục bộ (nếu có) → ma trận bản thể = ma trận món.
+  // Vật liệu: lớp vườn (styleMat) tự nhân bản + gắn cờ; vật cứng (raw) và đường dự phòng dùng bản toon riêng (làm 1 lần)
+  const partCache = new Map(), rawMat = new Map();
+  function partsOf(def, v) {
+    const sc = glbReady[def.glb]; if (!sc) return null;
+    const n = sc.children.length || 1, k = def.id + ':' + (((v | 0) % n + n) % n); if (partCache.has(k)) return partCache.get(k);
+    const node = sc.children[((v | 0) % n + n) % n]; node.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(node.matrixWorld).invert(), out = [];
+    node.traverse(o => {
+      if (!o.isMesh) return;
+      const l = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld); let g = o.geometry;
+      if (!l.equals(new THREE.Matrix4())) { g = g.clone(); g.applyMatrix4(l); }
+      [].concat(o.material).forEach((m, i) => out.push({geometry: g, material: m, raw: rawOf(def)}));
+    });
+    partCache.set(k, out); return out;
+  }
+  function toonOf(m, def) {   // bản toon riêng (vật cứng / dự phòng)
+    const stone = def && def.id === 'g_rock', key = stone ? 'stone' : m;
+    let r = rawMat.get(key); if (r) return r;
+    r = m.clone(); r.name = m.name; r.metalness = 0; r.roughness = 1;
+    // đá cuội: cùng màu kem + độ rực với đá/đá lát của vườn (exterior.js PATHC, desat 0.82) thay vì xám đậm của atlas
+    if (stone) { r.map = null; r.color.setRGB(0.86, 0.84, 0.74).multiplyScalar(1.14); r.userData.desat = 0.82; r.name = 'ROCK_user'; }
+    else r.userData.desat = 0.85;
+    if (api.toonMat && r.isMeshStandardMaterial) { try { api.toonMat(r); } catch (e) {} }
+    rawMat.set(key, r); return r;
   }
   const castOf = def => !!(def.solidR || def.solidBox) || def.id === 'g_rock';
   async function buildG(def, ghost, v, sc) {
@@ -176,25 +206,43 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
   // ---------- vẽ cây vườn: 1 InstancedMesh cho mỗi (loại, biến thể, mảnh mesh) ----------
   const instRoot = new THREE.Group(); instRoot.name = 'PlacedGarden'; scene.add(instRoot);
   let instMeshes = [];
+  const EXT = api.ext && api.ext.setUser ? api.ext : null, OFF = api.extOff || {dx: 0, dz: 0};
+  let outdoorView = [];     // map trong nhà: cây đã rải ngoài vườn (chỉ để vẽ qua khung cửa — không chặn, không chọn)
   function rebuildInst() {
     instMeshes.forEach(m => { instRoot.remove(m); m.dispose && m.dispose(); }); instMeshes = [];
-    const groups = new Map();
-    placed.forEach(rec => { if (!rec.g || !rec.obj || rec.hidden) return; const k = rec.row.item + ':' + (rec.obj.userData.v | 0); (groups.get(k) || groups.set(k, []).get(k)).push(rec); });
-    const M = new THREE.Matrix4();
-    groups.forEach(list => {
-      const def = list[0].obj.userData.def, sc = glbReady[def.glb]; if (!sc) return;
-      const n = sc.children.length || 1, node = sc.children[((list[0].obj.userData.v | 0) % n + n) % n]; if (!node) return;
-      const parts = []; node.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(node.matrixWorld).invert();
-      node.traverse(o => { if (o.isMesh) parts.push({g: o.geometry, m: o.material, l: new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)}); });
-      for (const p of parts) {
-        const im = new THREE.InstancedMesh(p.g, p.m, list.length); im.castShadow = castOf(def); im.receiveShadow = true; im.userData.ids = list.map(r => r.id);
-        list.forEach((rec, i) => { rec.obj.updateMatrix(); M.multiplyMatrices(rec.obj.matrix, p.l); im.setMatrixAt(i, M); });
-        im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); im.computeBoundingBox && im.computeBoundingBox(); instRoot.add(im); instMeshes.push(im);
+    const groups = new Map(), add = (rec, dx, dz) => { const k = rec.row.item + ':' + (rec.obj.userData.v | 0); (groups.get(k) || groups.set(k, {def: rec.obj.userData.def, v: rec.obj.userData.v | 0, list: []}).get(k)).list.push({rec, dx, dz}); };
+    placed.forEach(rec => { if (rec.g && rec.obj && !rec.hidden) add(rec, 0, 0); });
+    outdoorView.forEach(rec => add(rec, OFF.dx, OFF.dz));
+    const M = new THREE.Matrix4(), T = new THREE.Matrix4();
+    const want = new Set();
+    groups.forEach((G0, key) => {
+      const parts = partsOf(G0.def, G0.v); if (!parts || !parts.length) return;
+      const mats = G0.list.map(({rec, dx, dz}) => { rec.obj.updateMatrix(); const m = rec.obj.matrix.clone(); if (dx || dz) m.premultiply(T.makeTranslation(dx, 0, dz)); m.pid = rec.id; return m; });
+      if (EXT) {      // đi chung đường ống cây cối của vườn
+        EXT.setUser('u:' + key, parts.map(p => ({geometry: p.geometry, material: p.raw ? toonOf(p.material, G0.def) : p.material, raw: p.raw})), clsOf(G0.def), mats); want.add('u:' + key);
+        return;
+      }
+      for (const p of parts) {   // dự phòng (không có lớp vườn): InstancedMesh riêng, vật liệu toon
+        const im = new THREE.InstancedMesh(p.geometry, toonOf(p.material, G0.def), mats.length); im.castShadow = castOf(G0.def); im.receiveShadow = true; im.userData.ids = mats.map(m => m.pid);
+        mats.forEach((m, i) => im.setMatrixAt(i, m)); im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); instRoot.add(im); instMeshes.push(im);
       }
     });
+    if (EXT) EXT.userKeys().forEach(k => { if (!want.has(k)) EXT.removeUser(k); });
+  }
+  // map trong nhà: tải cây đã rải ngoài vườn để thấy qua cửa sổ / mặt cắt (đúng chỗ, dời theo ngoại cảnh)
+  async function loadOutdoorView() {
+    if (mapId === 'exterior' || !EXT) return;
+    let d; try { d = await rpc('game_placed', {p_map: 'exterior'}); } catch (e) { return; }
+    const D = {}; (d.defs || []).forEach(x => { D[x.id] = x; });
+    const out = [];
+    for (const r of d.items || []) {
+      const def = D[r.item]; if (!isG(def)) continue;
+      const st = r.state || {}; try { const o = await buildG(def, false, st.v | 0, +st.s || 1); o.position.set(r.x, r.y, r.z); o.rotation.y = r.rot; out.push({id: r.id, row: r, obj: o, g: true}); } catch (e) {}
+    }
+    outdoorView = out; rebuildInst();
   }
   const poke = () => { try { sess && sess.send({k: 'furn', map: mapId}); } catch (e) {} };
-  sess && sess.on && sess.on('msg', m => { if (m && m.k === 'furn' && m.map === mapId) reload(); });
+  sess && sess.on && sess.on('msg', m => { if (m && m.k === 'furn' && m.map === mapId) reload(); else if (m && m.k === 'furn' && m.map === 'exterior') loadOutdoorView(); });
 
   // ---------- tia chuột → điểm trên sàn ----------
   const ray = new THREE.Raycaster(), mv = new THREE.Vector2();
@@ -394,7 +442,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
   });
   function hitFurniture(e) {
     const r = cv.getBoundingClientRect(); mv.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(mv, camera);
-    const objs = [...instMeshes]; placed.forEach(rec => { if (rec.obj && rec.obj.visible && !rec.g) objs.push(body(rec.obj)); });
+    const objs = [...instMeshes, ...(EXT && mapId === 'exterior' ? EXT.userMeshes() : [])]; placed.forEach(rec => { if (rec.obj && rec.obj.visible && !rec.g) objs.push(body(rec.obj)); });
     const h = ray.intersectObjects(objs, true)[0]; if (!h) return null;
     if (h.object.isInstancedMesh && h.instanceId != null) return h.object.userData.ids[h.instanceId] || null;
     let o = h.object; while (o && !o.userData.pid) o = o.parent; return o ? o.userData.pid : null;
@@ -511,7 +559,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     paintPins(false);
   })();
 
-  await reload();
+  await reload(); loadOutdoorView();
   return {
     reload, canHere: () => can, mapName: ROOM_NAME[mapId] || mapId,
     placeable: id => !!defs[id], isGarden: id => !!(defs[id] && defs[id].out), isOutdoor: () => mapId === 'exterior',

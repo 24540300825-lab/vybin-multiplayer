@@ -1832,5 +1832,7 @@ ${FRAG_COLOR}
     return p.then(done,done)};
   api.dispose=()=>{try{remote&&remote.dispose();local.dispose()}catch(e){}renderer.dispose()};
   api.toonMat=toonMat;   // để nội thất đặt thêm (src/build/furniture.js) cùng kiểu đổ bóng toon với nhà
+  // cây người chơi rải ngoài vườn đi chung đường ống cây cối của vườn (exterior.js setUser); map trong nhà: ngoại cảnh dời theo MC.ext
+  api.ext=EXT||EXTV;api.extOff=extG?{dx:extG.position.x,dz:extG.position.z}:{dx:0,dz:0};
   window.__FU=FU;window.VY={EXT,Perf,local,get remote(){return remote},api,A,scene,camera,renderer,controls,tick,THREE,doorList,toggleDoor,occ,TP,envApply,rain,ripples,garden,WC};
 }
