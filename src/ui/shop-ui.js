@@ -20,7 +20,7 @@ export function createShop({prog, toast, rerender, errText, onClose}) {
   // ======================= CỬA HÀNG =======================
   function renderShop(B, sub) {
     if (!shop) { B.innerHTML = '<p class="pg-empty">Đang mở cửa hàng…</p>'; sub.textContent = ''; return; }
-    sub.textContent = nf(shop.xu) + ' Xu';
+    sub.textContent = 'Cấp ' + shop.level + ' · ' + nf(shop.xu) + ' Xu';
     const cats = shop.cats || [];
     if (!cat) cat = (cats.find(c => c.live) || cats[0] || {}).id;
     const C = cats.find(c => c.id === cat) || {};
@@ -53,7 +53,7 @@ export function createShop({prog, toast, rerender, errText, onClose}) {
         <label class="bg-search"><span class="ic">${ic('search')}</span><input id="shQ" placeholder="Tìm món…" value="${esc(query)}" autocomplete="off"></label></div>
       ${C.live === false ? `<div class="sh-empty"><span class="ic">${ic('bag')}</span><b>${esc(C.name)} — Sắp có</b><p>${esc(C.soon || 'Danh mục này sẽ mở ở bản sau.')}</p></div>` :
       `<div class="bg-wrap"><div class="sh-list" id="shList">${list.map(l => `<button class="sh-item${l.item === sel ? ' on' : ''}${l.locked ? ' lock' : ''}" data-i="${esc(l.item)}">
-          <span class="sh-ic r-${esc((ITEMS[l.item] || {}).rarity || 'common')}">${esc(icon(l.item))}</span><span class="sh-nm">${esc(nm(l.item))}<small>${l.locked ? 'Cấp ' + l.lv : l.week_limit ? 'Còn ' + Math.max(0, l.week_limit - (l.bought_week || 0)) + '/tuần' : l.mine ? 'Đang có ' + nf(l.mine) : ''}</small></span>
+          <span class="sh-ic r-${esc((ITEMS[l.item] || {}).rarity || 'common')}">${esc(icon(l.item))}</span><span class="sh-nm">${esc(nm(l.item))}<small>${l.locked ? '🔒 Mở ở cấp ' + l.lv : l.week_limit ? 'Còn ' + Math.max(0, l.week_limit - (l.bought_week || 0)) + '/tuần' : l.mine ? 'Đang có ' + nf(l.mine) : ''}</small></span>
           <em class="${shop.xu < l.price ? 'no' : ''}">${nf(l.price)} Xu</em></button>`).join('') || '<p class="pg-empty">Không có món phù hợp.</p>'}</div>
         <div class="bg-det">${det}</div></div>`}`;
     $('shCat').onclick = e => { const c = e.target.closest('.chip'); if (c) { cat = c.dataset.c; sel = null; confirm = false; rerender(); } };
