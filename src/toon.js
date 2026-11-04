@@ -29,10 +29,10 @@ export const V3=(r,g,b)=>new THREE.Vector3(r,g,b);
 export const TU={uSh:{value:V3(1,1,1)},uMid:{value:V3(1,1,1)},uHi:{value:V3(1,1,1)},uGCol:{value:V3(1,1,1)},uRimCol:{value:V3(1,1,1)},
   uSunC:{value:V3(1,1,1)},uAmbS:{value:V3(1,1,1)},uAmbG:{value:V3(1,1,1)},uLampC:{value:V3(0,0,0)},uLP:{value:Array.from({length:10},()=>new THREE.Vector4(0,-99,0,1))},uLN:{value:0},uLK:{value:0},uLOff:{value:0},
   uDS:{value:.6},uDM:{value:.1},uHiS:{value:.5},uGS:{value:.12},uGM:{value:.04},uGStr:{value:.1},uRim:{value:0},uRimPow:{value:3},
-  uLeafA:{value:V3(.36,.5,.17)},uLeafB:{value:V3(.7,.8,.3)},uLeafMix:{value:.7},uGrassA:{value:V3(.42,.6,.2)},uGrassB:{value:V3(.7,.8,.33)},uWindT:{value:0},uWindA:{value:0.4},uWet:{value:0},uCloudSh:{value:0.5},uInHK:{value:1}};
+  uLeafA:{value:V3(.36,.5,.17)},uLeafB:{value:V3(.7,.8,.3)},uLeafMix:{value:.7},uGrassA:{value:V3(.42,.6,.2)},uGrassB:{value:V3(.7,.8,.33)},uWindT:{value:0},uWindA:{value:0.4},uWet:{value:0},uCloudSh:{value:0.5},uInHK:{value:1},uAOK:{value:0}};
 export const TOON_DEF={sh:'#a08fae',mid:'#f8e4cc',hi:'#fff8e8',dSize:0.8,dSmooth:0.12,hiSize:0.45,gStr:0.12,gSize:0.1,gSmooth:0.05,gCol:'#fff2cf',rim:0.25,rimCol:'#ffd9a8',rimPow:3.5,
   leafA:'#5d7f2a',leafB:'#b2c850',leafMix:0.7,grassA:'#6b9a33',grassB:'#b3c957',
-  expo:1.0,con:1.08,sat:1.12,temp:0.12,tintSh:'#6c5aa0',tintHi:'#ffb878',tintAmt:0.35,vig:0.18,bloom:0.22,bloomTh:0.85,post:true,
+  ao:0.7,expo:1.0,con:1.08,sat:1.12,temp:0.12,tintSh:'#6c5aa0',tintHi:'#ffb878',tintAmt:0.35,vig:0.18,bloom:0.22,bloomTh:0.85,post:true,
   rays:1,motes:1,time:17.6,auto:false,speed:0.15,weather:'clear',garden:true,quality:'auto'};
 export const TOON_PRESETS={
   'Golden hour (ref)':{},
@@ -47,7 +47,7 @@ export const hexV=h=>V3(parseInt(h.slice(1,3),16)/255,parseInt(h.slice(3,5),16)/
 export function applyToon(save=true){
   TU.uSh.value.copy(hexV(TP.sh));TU.uMid.value.copy(hexV(TP.mid));TU.uHi.value.copy(hexV(TP.hi));TU.uGCol.value.copy(hexV(TP.gCol));TU.uRimCol.value.copy(hexV(TP.rimCol));
   TU.uDS.value=TP.dSize;TU.uDM.value=TP.dSmooth;TU.uHiS.value=TP.hiSize;TU.uGS.value=TP.gSize;TU.uGM.value=TP.gSmooth;TU.uGStr.value=TP.gStr;
-  TU.uRim.value=TP.rim;TU.uRimPow.value=TP.rimPow;TU.uLeafA.value.copy(hexV(TP.leafA));TU.uLeafB.value.copy(hexV(TP.leafB));TU.uLeafMix.value=TP.leafMix;TU.uGrassA.value.copy(hexV(TP.grassA));TU.uGrassB.value.copy(hexV(TP.grassB));
+  TU.uRim.value=TP.rim;if(TU.uAOK){TU.uAOK.value=TP.ao==null?0.7:TP.ao;if(TU.uAOK.value>0&&window.__aoEnsure)window.__aoEnsure()}TU.uRimPow.value=TP.rimPow;TU.uLeafA.value.copy(hexV(TP.leafA));TU.uLeafB.value.copy(hexV(TP.leafB));TU.uLeafMix.value=TP.leafMix;TU.uGrassA.value.copy(hexV(TP.grassA));TU.uGrassB.value.copy(hexV(TP.grassB));
   if(window.__envApply)window.__envApply(0);
   const ta=document.getElementById('tj');if(ta&&save)ta.value=JSON.stringify(TP);
   if(save)try{localStorage.setItem('vyLook5',JSON.stringify(TP))}catch(e){}
@@ -61,7 +61,7 @@ export function applyToon(save=true){
     ['h','Cây / lá / cỏ (đồng màu)'],['leafA','Lá — tối','c'],['leafB','Lá — sáng','c'],['leafMix','Độ đồng màu lá','n',0,1,0.01],['grassA','Cỏ — tối','c'],['grassB','Cỏ — sáng','c'],
     ['h','Glossy / Rim'],['gStr','Glossy strength','n',0,2,0.01],['gSize','Glossy size','n',0,1,0.005],['gSmooth','Glossy smooth','n',0,1,0.005],['gCol','Glossy color','c'],
     ['rim','Rim strength','n',0,2,0.01],['rimCol','Rim color','c'],['rimPow','Rim power','n',1,8,0.1],
-    ['h','Grade (post)'],['post','Bật post-fx (bloom/grade)','b'],['expo','Exposure','n',0.3,2.5,0.01],['con','Contrast','n',0.5,2,0.01],['sat','Saturation','n',0,2,0.01],['temp','Temperature','n',-0.3,0.4,0.005],
+    ['h','Ambient occlusion'],['ao','AO (0 = tắt)','n',0,1.5,0.01],['h','Grade (post)'],['post','Bật post-fx (bloom/grade)','b'],['expo','Exposure','n',0.3,2.5,0.01],['con','Contrast','n',0.5,2,0.01],['sat','Saturation','n',0,2,0.01],['temp','Temperature','n',-0.3,0.4,0.005],
     ['tintSh','Split-tone shadow','c'],['tintHi','Split-tone highlight','c'],['tintAmt','Split-tone amount','n',0,1,0.01],
     ['vig','Vignette','n',0,1,0.01],['bloom','Bloom','n',0,2,0.01],['bloomTh','Bloom threshold','n',0.3,1.5,0.01],
     ['h','Ngày / đêm · thời tiết'],['time','Giờ (0–24)','n',0,24,0.05],['auto','Tự chạy ngày đêm','b'],['speed','Tốc độ (giờ/giây)','n',0.01,2,0.01],['weather','Thời tiết','s',WEA],

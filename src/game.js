@@ -19,6 +19,7 @@ import {makeStylizer} from './stylize.js';
 import {patchDecal} from './decals.js';
 import './hud.js';
 import {SFX} from './sfx.js';
+import {makeAO,aoGrid,AOU} from './ao.js';
 import {initPins} from './ui/pins.js';
 import {LazyMouth} from './lazyrig.js';
 
@@ -71,8 +72,9 @@ export function init(ctx){
     (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{
       if(m&&m.userData&&m.userData.leafMask&&!o.customDepthMaterial){o.customDepthMaterial=DEPTH_LEAF}
       if(!m||done.has(m)||!m.isMeshStandardMaterial)return;done.add(m);toonMat(m)})})}
+  const aoOn=m=>!m.userData.fol2&&!m.userData.grass&&!m.userData.vyDec&&!m.userData.noAO&&!m.userData.ground&&!m.userData.leaf&&!/PolyFoliage|Leaves|Plant_|Fern|Stylized Grass/i.test(m.name||'');
   function toonMat(m){
-      m.onBeforeCompile=sh=>{if(m.userData.leafMask)patchLeafMask(sh);Object.assign(sh.uniforms,TU);
+      m.onBeforeCompile=sh=>{if(m.userData.leafMask)patchLeafMask(sh);Object.assign(sh.uniforms,TU);if(aoOn(m))Object.assign(sh.uniforms,AOU);
         const F2=!!m.userData.fol2,GB=!!m.userData.grass,FOL=!F2&&!GB&&(/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf,SW=!F2&&!GB&&(/Wind/i.test(m.name||'')||m.userData.sway||FOL),GRD=!!m.userData.ground||/Stylized Grass/i.test(m.name||'');
         const VS0=(F2||GB)?vertFol2(sh.vertexShader,!!m.userData.cloudV,NOISE_GLSL,GB||!!m.userData.squash):sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
           #ifdef SWAYX
@@ -90,7 +92,7 @@ export function init(ctx){
           vWP=(modelMatrix*_p).xyz;}`);
         if(F2||GB){sh.uniforms.uCenter={value:m.userData.center||new THREE.Vector3(0,0.65,0)};sh.uniforms.uHInv={value:m.userData.hInv||0.66};sh.uniforms.uWindDir=FU.uWindDir;sh.uniforms.uHybrid=FU.uHybrid;sh.uniforms.uBaseShade=FU.uBaseShade;sh.uniforms.uFolEmi=FU.uFolEmi;sh.uniforms.uGMap=FU.uGMap;sh.uniforms.uGK=FU.uGK;sh.uniforms.uGTint=FU.uGTint;if(m.userData.occW&&!(F2||GB)){sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}sh.uniforms.uPl=FU.uPl;sh.uniforms.uFolTint=FU.uFolTint;sh.uniforms.uFolVar=FU.uFolVar;sh.uniforms.uGrTint=FU.uGrTint;sh.uniforms.uGrVar=FU.uGrVar;sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}
         sh.vertexShader=(SW?'#define SWAYX\n':'')+'varying vec3 vWP;uniform float uWindT,uWindA;\n'+VS0;
-        sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uDesat={value:m.userData.desat==null?1:m.userData.desat};sh.fragmentShader='uniform float uDesat;uniform vec3 uGTint;\n'+(FOL?'#define FOLIAGE\n':'')+(F2?'#define FOL2\n':'')+(m.userData.bush?'#define BUSHF\n':'')+(GB?'#define GRASSB\n':'')+(GRD?'#define GROUNDX\n':'')+((F2||GB)?FRAG_PARS:(m.userData.occW?'uniform vec4 uOcc;uniform vec3 uOccPl;\n':''))+'uniform float uInHK;uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK,uLOff;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <normal_fragment_begin>',(F2||GB)?'#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\nnormal*=(gl_FrontFacing?1.0:-1.0);\n#endif\n'+(m.userData.occ?OCC_GLSL:''):'#include <normal_fragment_begin>'+(m.userData.occW?OCCW_GLSL:'')).replace('#include <opaque_fragment>',`
+        sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uDesat={value:m.userData.desat==null?1:m.userData.desat};sh.fragmentShader='uniform float uDesat;uniform vec3 uGTint;\n'+(FOL?'#define FOLIAGE\n':'')+(F2?'#define FOL2\n':'')+(m.userData.bush?'#define BUSHF\n':'')+(GB?'#define GRASSB\n':'')+(GRD?'#define GROUNDX\n':'')+((F2||GB)?FRAG_PARS:(m.userData.occW?'uniform vec4 uOcc;uniform vec3 uOccPl;\n':''))+(aoOn(m)?'#define VY_AO\nuniform sampler2D uAOT;uniform vec3 uAOB,uAOS,uAOC;uniform vec4 uAOG;uniform vec2 uAOA;uniform float uAOK;\nfloat aoFetch(vec3 q){float fy=clamp(q.y*uAOG.w-0.5,0.0,uAOG.w-1.0);float i0=floor(fy),a=fy-i0,i1=min(i0+1.0,uAOG.w-1.0);vec2 t=vec2(clamp(q.x*uAOG.x,0.5,uAOG.x-0.5),clamp(q.z*uAOG.y,0.5,uAOG.y-0.5));vec2 o0=vec2(mod(i0,uAOG.z),floor(i0/uAOG.z))*uAOG.xy,o1=vec2(mod(i1,uAOG.z),floor(i1/uAOG.z))*uAOG.xy;return mix(texture2D(uAOT,(o0+t)/uAOA).r,texture2D(uAOT,(o1+t)/uAOA).r,a);}\n':'')+'uniform float uInHK;uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK,uLOff;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <normal_fragment_begin>',(F2||GB)?'#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\nnormal*=(gl_FrontFacing?1.0:-1.0);\n#endif\n'+(m.userData.occ?OCC_GLSL:''):'#include <normal_fragment_begin>'+(m.userData.occW?OCCW_GLSL:'')).replace('#include <opaque_fragment>',`
         {float I=1.0,Ih=1.0,vis=1.0,Ig=0.0;
          #ifdef FOLIAGE
          {float lm=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));vec3 lf=mix(uLeafA,uLeafB,smoothstep(0.03,0.4,lm));
@@ -165,9 +167,16 @@ ${FRAG_COLOR}
           col*=1.0-0.15*uLK*inH*(1.0-min(lp,1.0));
           col*=1.0-0.3*uLOff*inH;
           col+=diffuseColor.rgb*vec3(1.0,0.8,0.52)*lp*uLK*0.85;}
+         #ifdef VY_AO
+         if(uAOK>0.001){// AO bake sẵn (nhân vào TỔNG màu, sau cả ánh đèn nội thất) (khối 3D, src/ao.js): đọc tại vị trí + pháp tuyến×0.12 m; mờ dần ra ngoài khối; yếu hơn ở chỗ đang có nắng để nổi highlight
+          vec3 qA=(vWP+wn*0.12-uAOB)*uAOS;
+          float wA=smoothstep(0.0,0.03,qA.x)*smoothstep(1.0,0.97,qA.x)*smoothstep(0.0,0.03,qA.y)*smoothstep(1.0,0.97,qA.y)*smoothstep(0.0,0.03,qA.z)*smoothstep(1.0,0.97,qA.z);
+          float dA=clamp(aoFetch(qA)*1.7,0.0,1.0)*wA*uAOK*mix(1.0,0.6,I*vis);
+          col*=mix(vec3(1.0),uAOC,clamp(dA,0.0,1.0));}
+         #endif
          outgoingLight=col+totalEmissiveRadiance;}
         #include <opaque_fragment>`);if(STY)STY.patch(sh,m);if(m.userData.vyDec)patchDecal(sh,m)};
-      m.customProgramCacheKey=()=>'vytoon9'+(STY?STY.key(m):'')+(m.userData.vyDec?'D'+m.userData.vyDec:'')+(m.userData.occW?'W':'')+(m.userData.fol2?'F':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
+      m.customProgramCacheKey=()=>'vytoon10'+(aoOn(m)?'A':'')+(STY?STY.key(m):'')+(m.userData.vyDec?'D'+m.userData.vyDec:'')+(m.userData.occW?'W':'')+(m.userData.fol2?'F':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
 
   // mái ngói cánh Vy/Bin: GLB ngoại cảnh chỉ có mái cánh phòng khách (Roof_Living) → nhân bản sang 2 cánh kia
   // (khớp kích thước mái gốc Roof_Vy/Roof_Bin trong LIVING_ROOM.glb: rộng 10.85, lệch tâm ±0.425, cao 6.4). skipX = x tâm cánh đang ở (giữ hở để nhìn vào)
@@ -1893,6 +1902,11 @@ ${FRAG_COLOR}
     let p;try{p=renderer.compileAsync?renderer.compileAsync(scene,camera):Promise.resolve(renderer.compile(scene,camera))}catch(e){p=Promise.resolve()}
     return p.then(done,done)};
   api.dispose=()=>{try{remote&&remote.dispose();local.dispose()}catch(e){}renderer.dispose()};
+  {const getM=()=>{const l=envMeshes.slice();const pf=scene.getObjectByName('PlacedFurniture');if(pf)pf.traverse(o=>{if(o.isMesh)l.push(o)});return l};
+   const ao=makeAO(TU,{getMeshes:getM,groundY:OUTD?ground.position.y:null});api.ao=ao;ao.setStrength(TP.ao==null?0.7:TP.ao);
+   let bb;if(OUTD){bb=new THREE.Box3();const t=new THREE.Box3(),sz=new THREE.Vector3();for(const o of envMeshes){if(!o.isMesh||o===ground||o.visible===false||(o.material&&o.material.userData&&o.material.userData.ground))continue;t.setFromObject(o);if(t.isEmpty())continue;t.getSize(sz);if(sz.x>90||sz.z>90)continue;bb.union(t)}bb.expandByScalar(1);bb.min.y=A.L0-0.5;bb.max.y=Math.min(bb.max.y,A.L0+10)}
+   else bb=new THREE.Box3(new THREE.Vector3(-0.3,-0.5,-8.3),new THREE.Vector3(10.3,6.7,1.6));
+   const cell=aoGrid(bb,0.15);{const cf={bounds:bb,cell,R:0.9,rays:OUTD?24:36};if((TP.ao==null?0.7:TP.ao)>0)setTimeout(()=>ao.bake(cf),400);else ao.bake(Object.assign({},cf,{sync:false,defer:true}));window.__aoEnsure=()=>ao.ensure();}window.__aoDirty=()=>ao.dirty();}
   api.toonMat=toonMat;   // để nội thất đặt thêm (src/build/furniture.js) cùng kiểu đổ bóng toon với nhà
   // cây người chơi rải ngoài vườn đi chung đường ống cây cối của vườn (exterior.js setUser); map trong nhà: ngoại cảnh dời theo MC.ext
   api.ext=EXT||EXTV;api.extOff=extG?{dx:extG.position.x,dz:extG.position.z}:{dx:0,dz:0};

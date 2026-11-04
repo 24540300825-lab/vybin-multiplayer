@@ -141,6 +141,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     return out;
   };
   function block(rec) {
+    try { window.__aoDirty && window.__aoDirty(); } catch (e) {}   // AO bake sẵn: đồ mới → bake lại
     const d = rec.obj.userData.def; if (!d.solid && !d.solidR && !d.solidBox) return;
     const lv = rec.lv;
     if (d.solidR) rec.cells = cellsCircle(rec.obj.position.x, rec.obj.position.z, d.solidR * (rec.obj.scale.x || 1) + G.R);
@@ -148,6 +149,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     for (const k of rec.cells) { const n = (cnt[lv].get(k) || 0) + 1; cnt[lv].set(k, n); if (n === 1 && !blocked[lv][k]) { blocked[lv][k] = 1; owned[lv].add(k); } }
   }
   function unblock(rec) {
+    try { window.__aoDirty && window.__aoDirty(); } catch (e) {}
     if (!rec.cells) return; const lv = rec.lv;
     for (const k of rec.cells) { const n = (cnt[lv].get(k) || 1) - 1; if (n <= 0) { cnt[lv].delete(k); if (owned[lv].has(k)) { blocked[lv][k] = 0; owned[lv].delete(k); } } else cnt[lv].set(k, n); }
     rec.cells = null;

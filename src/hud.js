@@ -37,12 +37,14 @@ import {Fx} from './ui/fx.js';
    $('mpList').onmouseover=e=>{const c=e.target.closest('.mapc');if(c&&window.__prefetchMap)window.__prefetchMap(c.dataset.m)}}
   addEventListener('keydown',e=>{if(e.code==='Escape'){$('hMap').classList.remove('on')}if(e.code==='Escape')$('hSet').classList.remove('on')});
   // --- preset đồ họa
-  const GFX={'Tiết kiệm':{quality:'low',post:false,rays:0,motes:0,bloom:0,garden:true},'Cân bằng':{quality:'medium',post:true,rays:0.6,motes:0.5,bloom:0.15},'Đẹp':{quality:'high',post:true,rays:1,motes:1,bloom:0.22},'Điện ảnh':{quality:'high',post:true,rays:1.7,motes:1.6,bloom:0.4,vig:0.3},'Tự động':{quality:'auto',post:true,rays:1,motes:1,bloom:0.22}};
+  const GFX={'Tiết kiệm':{quality:'low',post:false,rays:0,motes:0,bloom:0,garden:true,ao:0},'Cân bằng':{quality:'medium',post:true,rays:0.6,motes:0.5,bloom:0.15,ao:0.6},'Đẹp':{quality:'high',post:true,rays:1,motes:1,bloom:0.22,ao:0.75},'Điện ảnh':{quality:'high',post:true,rays:1.7,motes:1.6,bloom:0.4,vig:0.3,ao:0.85},'Tự động':{quality:'auto',post:true,rays:1,motes:1,bloom:0.22,ao:0.7}};
   const gfxCur=load('vyGfx','Tự động');
   function chips(el,items,cur,fn){el.innerHTML='';items.forEach(([k,l])=>{const c=document.createElement('div');c.className='chip'+(k===cur?' on':'');c.textContent=l;c.onclick=()=>{[...el.children].forEach(x=>x.classList.remove('on'));c.classList.add('on');fn(k)};el.appendChild(c)})}
   function syncOld(){try{window.__tpSync&&window.__tpSync()}catch(e){}}
-  function setGfx(n){Object.assign(window.TPX,GFX[n]);save('vyGfx',n);syncOld();window.__applyToon()}
-  chips($('sGfx'),Object.keys(GFX).map(k=>[k,k]),gfxCur,setGfx);
+  const AOV=[['0','Tắt'],['0.4','Nhẹ'],['0.7','Vừa'],['1','Mạnh']];
+  function aoChips(){const cur=AOV.reduce((b,x)=>Math.abs(+x[0]-(window.TPX.ao==null?0.7:window.TPX.ao))<Math.abs(+b[0]-(window.TPX.ao==null?0.7:window.TPX.ao))?x:b,AOV[0])[0];chips($('sAO'),AOV,cur,k=>{window.TPX.ao=+k;syncOld();window.__applyToon()})}
+  function setGfx(n){Object.assign(window.TPX,GFX[n]);save('vyGfx',n);syncOld();window.__applyToon();aoChips()}
+  chips($('sGfx'),Object.keys(GFX).map(k=>[k,k]),gfxCur,setGfx);aoChips();
   {const FXH={lite:'Nhẹ: mọi thứ đổi tức thì, tắt làm mờ nền kính và animation — hợp máy yếu / muốn phản hồi nhanh nhất.',high:'Đồ họa cao (Smart Animate): chữ, biểu tượng, avatar, thẻ và panel chuyển trạng thái có chuyển động mượt (chỉ dùng hiệu ứng nhẹ cho GPU).'};
    const showFx=()=>{$('sFxH').textContent=FXH[Fx.mode]};
    chips($('sFx'),[['lite','⚡ Nhẹ (tức thì)'],['high','✨ Đồ họa cao (Smart Animate)']],Fx.mode,k=>{Fx.set(k);showFx()});showFx()}
