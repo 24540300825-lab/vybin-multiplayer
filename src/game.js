@@ -59,7 +59,7 @@ export function init(ctx){
   sun.shadow.bias=-0.0003;sun.shadow.normalBias=0.025;
   scene.add(sun,sun.target);
   window.__L={sun,hemi,amb};
-  const STY=makeStylizer(THREE,{aniso:Math.min(8,renderer.capabilities.getMaxAnisotropy())});api.stylize=r=>{try{const n=STY.apply(r);return n}catch(e){console.warn('[stylize]',e);return 0}};
+  const STY=makeStylizer(THREE,{aniso:Math.min(8,renderer.capabilities.getMaxAnisotropy())});window.__roofPH=STY.roofPH;api.stylize=r=>{try{const n=STY.apply(r);return n}catch(e){console.warn('[stylize]',e);return 0}};
 
   // Toon painterly 3 tông (Shadow/Mid/Highlight) + ambient bounce + noise cọ theo world-space; giữ texture gốc
   const NOISE_GLSL=`
@@ -171,9 +171,9 @@ ${FRAG_COLOR}
   // mái ngói cánh Vy/Bin: GLB ngoại cảnh chỉ có mái cánh phòng khách (Roof_Living) → nhân bản sang 2 cánh kia
   // (khớp kích thước mái gốc Roof_Vy/Roof_Bin trong LIVING_ROOM.glb: rộng 10.85, lệch tâm ±0.425, cao 6.4). skipX = x tâm cánh đang ở (giữ hở để nhìn vào)
   function addWingRoofs(root,skipX){const L=root.getObjectByName('Roof_Living');if(!L)return;
-    const fit={WING_VY:[0.425,15],WING_BIN:[-0.425,-5]};
+    const fit={WING_VY:[0.575,15],WING_BIN:[-0.575,-5]};   // mép trong lùi 0.3 m khỏi tường cánh phòng khách (trước đây mái chĩa xuyên đỉnh tường → lộ răng cưa ngói trong phòng)
     for(const w in fit){const W=root.getObjectByName(w);if(!W||W.getObjectByName('Roof_'+w.slice(5,6)+w.slice(6).toLowerCase()))continue;if(skipX!=null&&Math.abs(fit[w][1]-skipX)<3)continue;
-      const R=new THREE.Group();R.name='Roof_'+w.slice(5,6)+w.slice(6).toLowerCase();R.position.set(fit[w][0],6.4,0.015);R.scale.set(10.85/11,1,1);
+      const R=new THREE.Group();R.name='Roof_'+w.slice(5,6)+w.slice(6).toLowerCase();R.position.set(fit[w][0],6.4,0.015);R.scale.set(10.55/11,1,1);
       const parts=L.isMesh?[L]:L.children.filter(c=>c.isMesh&&!/Gable/i.test(c.name));
       parts.forEach(m=>{const c=new THREE.Mesh(m.geometry,m.material);c.name=R.name+'_'+m.name.split('_').pop();c.position.copy(m.position);c.quaternion.copy(m.quaternion);c.scale.copy(m.scale);c.castShadow=m.castShadow;c.receiveShadow=m.receiveShadow;R.add(c)});
       W.add(R)}
@@ -189,7 +189,7 @@ ${FRAG_COLOR}
 
   // anchors
   const MAPS=MAP_CONFIGS;
-  const MC=MAPS[MAPID]||MAPS.living;const OUTD=!!MC.outdoor;if(!OUTD)sun.shadow.mapSize.set(2048,2048);TU.uInHK.value=OUTD?0:1;bindTU(TU);
+  const MC=MAPS[MAPID]||MAPS.living;const OUTD=!!MC.outdoor;STY.setWallNames(MC.wallMats);if(!OUTD)sun.shadow.mapSize.set(2048,2048);TU.uInHK.value=OUTD?0:1;bindTU(TU);
   if(OUTD){const sp=MC.spawn.vy;controls.target.set(sp[0],A0y(MC)+1,sp[1]);camera.fov=30;camera.updateProjectionMatrix();camera.position.set(sp[0]+7.2,A0y(MC)+9,sp[1]+11.4);controls.minDistance=5;controls.maxDistance=28;controls.update();
     controls.minAzimuthAngle=-Infinity;controls.maxAzimuthAngle=Infinity;controls.minPolarAngle=0.12;controls.maxPolarAngle=1.5;CFG.camPan=Math.PI*2;CFG.camTilt=0.9}
   function A0y(c){return c.floorY||0}
