@@ -64,7 +64,8 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
     const n = m.name || '';
     if (/^Stylized\s+Concrete/i.test(n) || wallNames.has(n)) return 'wall';
     if (/^Stylized Brick Wall/i.test(n)) return 'roof';
-    if (/^(Stylized Stone Tiles|M_Fence_stoneDk)/i.test(n)) return 'brick';   // tường rào quanh nhà → Stylized Dark Brick
+    if (/^Stylized Stone Tiles/i.test(n)) return 'brick';   // thân tường rào quanh nhà → Stylized Dark Brick
+    if (/^M_Fence_stoneDk/i.test(n)) return 'wall';        // khối đỉnh tường rào / đỉnh trụ cổng → concrete trắng như vỏ nhà
     if (/^ROCK$/i.test(n)) return 'rock';                                     // đá rời (không phải đá dẫn đường) → cliff rocks (triplanar)
     if (m.map || m.transparent || m.opacity < 1 || m.metalness >= 0.5) return null;
     if (m.userData.fol2 || m.userData.grass || m.userData.leaf || m.userData.ground || m.userData.keepEmi) return null;
@@ -111,15 +112,15 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
       {// STYLIZED WOOD: màu lấy từ texture gỗ; độ sáng đi theo gỗ gốc (gỗ sáng vẫn sáng hơn gỗ vừa), bớt bão hoà nhẹ cho hợp tông toon
        vec3 b0=diffuseColor.rgb;float l0=dot(b0,vec3(0.2126,0.7152,0.0722));
        vec3 t=texture2D(map,vMapUv).rgb;float lt=dot(t,vec3(0.2126,0.7152,0.0722));
-       float f=mix(1.0,clamp(l0/uRef,0.6,1.9),0.5);
-       diffuseColor.rgb=mix(vec3(lt),t,0.8)*f;}
+       float f=mix(1.0,clamp(l0/uRef,0.85,1.9),0.5);
+       diffuseColor.rgb=mix(vec3(lt),t,0.45)*f*1.22;}   // bớt bão hoà mạnh + sáng lên (đỡ đậm, đỡ gắt)
       #endif`);
     } else if (k === 'brick') {
       sh.uniforms.uHM = {value: m.userData.vyHM};
       sh.fragmentShader = 'uniform sampler2D uHM;\n' + sh.fragmentShader.replace('#include <map_fragment>', `
       #ifdef USE_MAP
       {vec3 t=texture2D(map,vMapUv).rgb;float h=texture2D(uHM,vMapUv).r;
-       diffuseColor.rgb*=t*mix(0.62,1.0,smoothstep(0.55,0.95,h))*0.82;}   // mạch vữa tối lại theo height; tông gạch trầm (dark brick)
+       float lt=dot(t,vec3(0.2126,0.7152,0.0722));diffuseColor.rgb*=mix(vec3(lt),t,0.4)*mix(0.78,1.0,smoothstep(0.55,0.95,h))*1.12;}   // bớt bão hoà mạnh, sáng hơn; mạch vữa tối nhẹ theo height
       #endif`);
     } else if (k === 'rock') {
       sh.vertexShader = 'varying vec3 vRkP,vRkN;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
