@@ -9,27 +9,27 @@ import {makeFoliageDecals} from './decals.js';
 
 // ---- mức chất lượng: mật độ, tầm nhìn, bóng, số lớp sương, hạt mưa -----------------------------------------
 export const LEVELS = {
-  low:    {dens: 0.35, dist: 0.62, shadowR: 8,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.40},
-  medium: {dens: 0.55, dist: 0.85, shadowR: 9,  grassShadowR: 4,  haze: 2, rain: 4200, far: 0.60},
-  high:   {dens: 0.72, dist: 1.00, shadowR: 11, grassShadowR: 6,  haze: 2, rain: 6000, far: 0.80},
+  low:    {dens: 0.35, dist: 0.62, shadowR: 8,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.40, gNear: 0.45},
+  medium: {dens: 0.55, dist: 0.85, shadowR: 9,  grassShadowR: 4,  haze: 2, rain: 4200, far: 0.60, gNear: 0.85},
+  high:   {dens: 0.72, dist: 1.00, shadowR: 11, grassShadowR: 6,  haze: 2, rain: 6000, far: 0.80, gNear: 1.0},
   // map trong nhà (phòng khách / phòng Vy / phòng Bin): vườn chỉ thấy qua khung cửa → thưa hơn, gần hơn, cây cỏ không đổ bóng
-  indoor: {dens: 0.80, dist: 1.00, shadowR: 0,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.45},
+  indoor: {dens: 0.80, dist: 1.00, shadowR: 0,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.45, gNear: 0.9},
 };
 // theo loại: tầm nhìn tối đa (m), đường cong mật độ theo khoảng cách (d0 = bắt đầu thưa, d1 = còn tối thiểu), có đổ bóng không
 // "Đẹp chỗ cần đẹp": khoảng cách tính từ NHÂN VẬT (chỗ mắt người chơi nhìn). Quanh nhân vật đủ dày + đủ chi tiết;
 // ra xa nhanh chóng thưa dần và đổi sang hình giảm tam giác (lod: từ khoảng này trở ra dùng bản ~12–16% tam giác).
 const CLASS_OUT = {
   // KHÔNG còn mesh LOD giảm tam giác ở xa: cỏ/hoa/bụi thật chỉ trong ~15 m, cây/đá thật trong ~30 m; xa hơn là decal (src/decals.js)
-  grass:  {maxD: 15,  d0: 8,  d1: 15,  min: 0.25, shadow: true,  cell: 9,  lod: 0},
-  flower: {maxD: 15,  d0: 8,  d1: 15,  min: 0.25, shadow: false, cell: 10, lod: 0},
+  grass:  {maxD: 15,  d0: 7,  d1: 15,  min: 0.30, shadow: true,  cell: 9,  lod: 0},   // cỏ: ×2 bản thể, đủ dày trong ~7 m quanh nhân vật rồi thưa dần tới chỗ decal
+  flower: {maxD: 9,   d0: 4,  d1: 9,   min: 0.20, shadow: false, cell: 10, lod: 0},   // hoa (938 tam giác/bông) chỉ hiện sát nhân vật
   bush:   {maxD: 18,  d0: 12, d1: 18,  min: 0.40, shadow: true,  cell: 12, lod: 0},
   tree:   {maxD: 32,  d0: 32, d1: 40,  min: 1.00, shadow: true,  cell: 14, lod: 0},
   rock:   {maxD: 34,  d0: 20, d1: 34,  min: 0.40, shadow: true,  cell: 12, lod: 0},
 };
 // 3 phòng trong nhà: chỉ giữ cây cỏ GẦN nhà, đủ chi tiết; xa hơn cũng là decal (thưa hơn)
 const CLASS_IN = {
-  grass:  {maxD: 15,  d0: 8,  d1: 15,  min: 0.25, shadow: false, cell: 16, lod: 0},
-  flower: {maxD: 15,  d0: 8,  d1: 15,  min: 0.25, shadow: false, cell: 16, lod: 0},
+  grass:  {maxD: 15,  d0: 7,  d1: 15,  min: 0.30, shadow: false, cell: 16, lod: 0},
+  flower: {maxD: 9,   d0: 4,  d1: 9,   min: 0.20, shadow: false, cell: 16, lod: 0},
   bush:   {maxD: 18,  d0: 12, d1: 18,  min: 0.60, shadow: false, cell: 16, lod: 0},
   tree:   {maxD: 26,  d0: 18, d1: 26,  min: 0.85, shadow: false, cell: 16, lod: 0},
   rock:   {maxD: 20,  d0: 12, d1: 20,  min: 0.50, shadow: false, cell: 16, lod: 0},
@@ -268,6 +268,12 @@ export function setupExterior(c) {
     if (cls === 'tree') { const hl = treeH(set); mats.forEach(mm => { V3.setFromMatrixPosition(mm); treeSpots.push({x: V3.x, y: V3.y, z: V3.z, h: hl * Math.hypot(mm.elements[4], mm.elements[5], mm.elements[6])}); }); }
     // vật cản: thân cây / đá
     if (cls === 'tree' || cls === 'rock') addColliders(cls, set, mats);
+    // cỏ um tùm: thêm 1 bản sao lệch 0.35–0.9 m / xoay / nhỏ hơn chút cho mỗi cụm cỏ (×2 mật độ; vùng xa vẫn bị thưa bớt theo khoảng cách)
+    if (cls === 'grass') { const add = [], mT = new THREE.Matrix4(), mR = new THREE.Matrix4(), mS = new THREE.Matrix4();
+      for (const mm of mats) { const a = rnd() * 6.283, r = 0.35 + rnd() * 0.55; V3.setFromMatrixPosition(mm); const x = V3.x + Math.cos(a) * r, z = V3.z + Math.sin(a) * r;
+        if (MC.noPlant && MC.noPlant.some(b => x > b[0] && x < b[1] && z > b[2] && z < b[3])) continue;
+        const sc = 0.8 + rnd() * 0.25; add.push(mm.clone().multiply(mR.makeRotationY(rnd() * 6.283)).multiply(mS.makeScale(sc, sc * (0.85 + rnd() * 0.3), sc)).premultiply(mT.makeTranslation(x - V3.x, 0, z - V3.z))); }
+      mats = mats.concat(add); }
     const buckets = new Map();
     mats.forEach(mm => { V3.setFromMatrixPosition(mm); const k = Math.floor(V3.x / CL.cell) + ',' + Math.floor(V3.z / CL.cell); let b = buckets.get(k); if (!b) { b = []; buckets.set(k, b); } b.push(mm); });
     for (const arr of buckets.values()) makeCells(set, cls, arr);
@@ -436,7 +442,9 @@ export function setupExterior(c) {
       if (!vis) continue;
       // cây/đá trong hàng rào có VẬT CẢN → luôn đủ bản (không thưa) để không "va vào cây tàng hình"; còn lại thưa dần theo khoảng cách
       const solid = ce.user || (!INDOOR && !ce.far && (ce.cls === 'tree' || ce.cls === 'rock'));
-      const f = solid ? 1 : Math.min(1, Math.max(CL.min, 1 - (d - CL.d0) / (CL.d1 - CL.d0) * (1 - CL.min))) * lv.dens;
+      const t = Math.min(1, Math.max(0, (d - CL.d0) / (CL.d1 - CL.d0)));
+      // cỏ: sát nhân vật gần đủ dày (lv.gNear), xa thưa dần về min×dens; các loại khác như cũ
+      const f = solid ? 1 : ce.cls === 'grass' ? lv.gNear + (CL.min * lv.dens - lv.gNear) * t : Math.max(CL.min, 1 - t * (1 - CL.min)) * lv.dens * (ce.cls === 'flower' ? 0.6 : 1);   // hoa: thưa bớt 40%
       const dens = ce.cls === 'tree' && ce.far ? Math.max(f, lv.far * 0.4) : f;
       const n = Math.max(1, Math.ceil(ce.n * Math.min(1, dens)));
       if (ce.im.count !== n) { ce.im.count = n; if (ce.im1) ce.im1.count = n; }

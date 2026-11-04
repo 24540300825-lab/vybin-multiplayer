@@ -8,14 +8,17 @@
 // UV: tính lại theo MÉT thật (box mapping theo pháp tuyến mặt, có tính scale của vật) → mật độ vân như nhau trên vật to/nhỏ, không méo.
 // Gỗ: trục thớ = cạnh DÀI nhất của vật (chân bàn: thớ dọc; mặt bàn/thanh dầm: thớ theo chiều dài).
 // Vân "detail" lưu dạng log quanh 0.5 (trung tính) → shader: màu *= exp((s-0.5)*k) — sáng/tối quanh màu gốc, vùng tối hơi đậm sắc hơn (giữ mood màu).
-export const STY_VER = 1;
+export const STY_VER = 2;
 const SKIP = /glass|mirror|screen|display|frost|bulb|lampshade|lamp_glow|glow|steel|gold|metal|chrome|silver|brass|soil|interior|leaf|leaves|plant|foliage|grass|flower|fern|poly|aero|water/i;   // KHÔNG lọc 'light' (oak_light, wood_light là gỗ sáng màu)
 const WOOD = /wood|oak|cane|cork|plank|timber|walnut|teak|bamboo|rattan|trim|^ch_floor$|_floor$|^floor$/i;   // trim = khung/nẹp cửa sổ & viền vỏ nhà
 
 export function makeStylizer(THREE, {aniso = 8} = {}) {
   const L = new THREE.TextureLoader();
   const tex = (f, srgb) => { const t = L.load('assets/tex/' + f + '?v=' + STY_VER); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; return t; };
-  const T = {concD: tex('concrete_d.jpg'), woodD: tex('wood_d.jpg'), concC: tex('concrete_c.jpg', true), roofC: tex('roof_c.jpg', true), roofH: tex('roof_h.jpg')};
+  const T = {concD: tex('concrete_d.jpg'), woodD: tex('wood_d.jpg'), concC: tex('concrete_c.jpg', true), roofC: tex('roof_c.jpg', true), roofH: tex('roof_h.jpg'),
+    woodC: tex('wood_c.jpg', true), woodDkC: tex('wooddk_c.jpg', true), brickC: tex('brick_c.jpg', true), brickH: tex('brick_h.jpg'), rockC: tex('rock_c.jpg', true)};
+  // độ sáng trung bình (tuyến tính) của texture màu gỗ → giữ độ sáng tương đối của gỗ gốc (gỗ sáng / gỗ vừa)
+  const REF = {wood: 0.234, wooddk: 0.147};
   // độ mạnh vân (đã chia cho hệ số mã hoá log lúc tạo file: concrete 1.6, wood 0.35)
   const roofPH = {value: 0.075};   // độ sâu parallax mái ngói (theo đơn vị UV)
   const DK = {conc: 2.0 / 1.6, wood: 0.75 / 0.35, wall: 2.5 / 1.6};
@@ -61,17 +64,23 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
     const n = m.name || '';
     if (/^Stylized\s+Concrete/i.test(n) || wallNames.has(n)) return 'wall';
     if (/^Stylized Brick Wall/i.test(n)) return 'roof';
+    if (/^(Stylized Stone Tiles|M_Fence_stoneDk)/i.test(n)) return 'brick';   // tường rào quanh nhà → Stylized Dark Brick
+    if (/^ROCK$/i.test(n)) return 'rock';                                     // đá rời (không phải đá dẫn đường) → cliff rocks (triplanar)
     if (m.map || m.transparent || m.opacity < 1 || m.metalness >= 0.5) return null;
     if (m.userData.fol2 || m.userData.grass || m.userData.leaf || m.userData.ground || m.userData.keepEmi) return null;
     if (m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0.02 && m.emissiveIntensity > 0) return null;
     if (SKIP.test(n)) return null;
-    return WOOD.test(n) ? 'wood' : 'conc';
+    if (!WOOD.test(n)) return 'conc';
+    const c = m.color, l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+    return /dark|dk/i.test(n) || l < 0.12 ? 'wooddk' : 'wood';     // gỗ tối → Stylized Wood Darker
   };
   const done = new Set(), wallNames = new Set();
   function setMat(m, k) {
     if (done.has(m)) return; done.add(m); m.userData.vySty = k;
     if (k === 'conc') { m.map = T.concD; m.userData.vyDK = DK.conc; }
-    else if (k === 'wood') { m.map = T.woodD; m.userData.vyDK = DK.wood; }
+    else if (k === 'wood' || k === 'wooddk') { m.map = k === 'wood' ? T.woodC : T.woodDkC; m.userData.vyRef = REF[k]; m.normalMap = null; m.roughnessMap = null; m.metalnessMap = null; m.aoMap = null; }
+    else if (k === 'brick') { m.map = T.brickC; m.userData.vyHM = T.brickH; m.normalMap = null; m.roughnessMap = null; m.metalnessMap = null; m.aoMap = null; m.color.setRGB(1, 1, 1); }
+    else if (k === 'rock') { m.map = T.rockC; m.normalMap = null; m.roughnessMap = null; }
     // tường nhà: trắng ngà sáng (không xám đục) + vân concrete rõ hơn đồ nội thất (mảng tường lớn, nhìn từ xa)
     else if (k === 'wall') { m.map = T.concD; m.userData.vyDK = DK.wall; m.normalMap = null; m.roughnessMap = null; m.metalnessMap = null; m.aoMap = null; m.color.setRGB(0.97, 0.95, 0.91); m.userData.desat = 1; }
     else if (k === 'roof') { m.map = T.roofC; m.userData.vyHM = T.roofH; m.normalMap = null; m.roughnessMap = null; m.metalnessMap = null; }
@@ -82,9 +91,10 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
     let n = 0;
     root.traverse(o => {
       if (!o.isMesh || o.isSkinnedMesh || !o.geometry) return;
-      const ms = [].concat(o.material); if (ms.length !== 1) { ms.forEach(m => { const k = kindOf(m, o); if (k === 'conc' || k === 'wood') setMat(m, k); }); }
+      const ms = [].concat(o.material); if (ms.length !== 1) { ms.forEach(m => { const k = kindOf(m, o); if (k === 'conc' || k === 'wood' || k === 'wooddk') setMat(m, k); }); }
       const m = ms[0], k = kindOf(m, o); if (!k) return;
-      if (k === 'wood') boxUV(o, 0.9, 2.2, true);
+      if (k === 'wood' || k === 'wooddk') boxUV(o, 1.0, 1.8, true);   // 1 ô texture = 1 m ngang × 1.8 m dọc thớ
+      else if (k === 'brick') boxUV(o, 1.5, 1.5, false);                  // ~10 hàng gạch / 1.5 m (mặt đứng: hàng gạch nằm ngang)
       else if (k === 'conc') boxUV(o, 1.6, 1.6, false);
       else if (k === 'wall') boxUV(o, 2.6, 2.6, false);
       setMat(m, k); n++;
@@ -94,7 +104,39 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
   // chèn vào shader toon (gọi trong onBeforeCompile của toonMat)
   function patch(sh, m) {
     const k = m.userData.vySty; if (!k || !m.map) return;
-    if (k === 'conc' || k === 'wood' || k === 'wall') {
+    if (k === 'wood' || k === 'wooddk') {
+      sh.uniforms.uRef = {value: m.userData.vyRef || 0.2};
+      sh.fragmentShader = 'uniform float uRef;\n' + sh.fragmentShader.replace('#include <map_fragment>', `
+      #ifdef USE_MAP
+      {// STYLIZED WOOD: màu lấy từ texture gỗ; độ sáng đi theo gỗ gốc (gỗ sáng vẫn sáng hơn gỗ vừa), bớt bão hoà nhẹ cho hợp tông toon
+       vec3 b0=diffuseColor.rgb;float l0=dot(b0,vec3(0.2126,0.7152,0.0722));
+       vec3 t=texture2D(map,vMapUv).rgb;float lt=dot(t,vec3(0.2126,0.7152,0.0722));
+       float f=mix(1.0,clamp(l0/uRef,0.6,1.9),0.5);
+       diffuseColor.rgb=mix(vec3(lt),t,0.8)*f;}
+      #endif`);
+    } else if (k === 'brick') {
+      sh.uniforms.uHM = {value: m.userData.vyHM};
+      sh.fragmentShader = 'uniform sampler2D uHM;\n' + sh.fragmentShader.replace('#include <map_fragment>', `
+      #ifdef USE_MAP
+      {vec3 t=texture2D(map,vMapUv).rgb;float h=texture2D(uHM,vMapUv).r;
+       diffuseColor.rgb*=t*mix(0.62,1.0,smoothstep(0.55,0.95,h))*0.82;}   // mạch vữa tối lại theo height; tông gạch trầm (dark brick)
+      #endif`);
+    } else if (k === 'rock') {
+      sh.vertexShader = 'varying vec3 vRkP,vRkN;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      {vec4 _w=vec4(transformed,1.0);vec3 _n=objectNormal;
+       #ifdef USE_INSTANCING
+       _w=instanceMatrix*_w;_n=mat3(instanceMatrix)*_n;
+       #endif
+       _w=modelMatrix*_w;vRkP=_w.xyz;vRkN=mat3(modelMatrix)*_n;}`);
+      sh.fragmentShader = 'varying vec3 vRkP,vRkN;\n' + sh.fragmentShader.replace('#include <map_fragment>', `
+      #ifdef USE_MAP
+      {// CLIFF ROCK: triplanar theo toạ độ thế giới (đá instanced, scale khác nhau → không cần UV, mật độ vân đều ~1.3 m / ô)
+       vec3 bw=pow(abs(normalize(vRkN)),vec3(4.0));bw/=bw.x+bw.y+bw.z;vec3 P=vRkP/1.3;
+       vec3 t=texture2D(map,P.zy).rgb*bw.x+texture2D(map,P.xz+0.37).rgb*bw.y+texture2D(map,P.xy+0.71).rgb*bw.z;
+       vec3 b0=diffuseColor.rgb;float l0=max(dot(b0,vec3(0.2126,0.7152,0.0722)),0.02);
+       diffuseColor.rgb=t*2.05*mix(vec3(1.0),b0/l0,0.15);}   // giữ chút sắc kem của đá cũ, sáng vừa với tông vườn
+      #endif`);
+    } else if (k === 'conc' || k === 'wall') {
       sh.uniforms.uDK = {value: m.userData.vyDK || 1};
       sh.fragmentShader = (k === 'wood' ? '#define VY_WOOD\n' : '') + 'uniform float uDK;\n' + sh.fragmentShader.replace('#include <map_fragment>', `
       #ifdef USE_MAP
