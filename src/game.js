@@ -15,6 +15,7 @@ import {TU,applyToon,patchLeafMask,hexV,TP,DEPTH_LEAF} from './toon.js';
 import {Perf} from './perf.js';
 import {FU,vertFol2,FRAG_PARS,FRAG_COLOR,OCC_GLSL,makeDepthMat,bindTU} from './foliage.js';
 import {setupExterior,LEVELS} from './exterior.js';
+import {makeStylizer} from './stylize.js';
 import './hud.js';
 import {SFX} from './sfx.js';
 import {initPins} from './ui/pins.js';
@@ -58,6 +59,7 @@ export function init(ctx){
   sun.shadow.bias=-0.0003;sun.shadow.normalBias=0.025;
   scene.add(sun,sun.target);
   window.__L={sun,hemi,amb};
+  const STY=makeStylizer(THREE,{aniso:Math.min(8,renderer.capabilities.getMaxAnisotropy())});api.stylize=r=>{try{const n=STY.apply(r);return n}catch(e){console.warn('[stylize]',e);return 0}};
 
   // Toon painterly 3 tông (Shadow/Mid/Highlight) + ambient bounce + noise cọ theo world-space; giữ texture gốc
   const NOISE_GLSL=`
@@ -98,6 +100,9 @@ export function init(ctx){
          #endif
          #if defined(FOL2)||defined(GRASSB)
 ${FRAG_COLOR}
+         #endif
+         #if defined(FOLIAGE)||defined(FOL2)||defined(GRASSB)||defined(GROUNDX)||defined(BUSHF)
+         diffuseColor.rgb*=vec3(0.93,1.0,1.09);   // cỏ cây lá: ngả nhẹ sang teal
          #endif
          #if ( NUM_DIR_LIGHTS > 0 )
           vec3 Ld=directionalLights[0].direction;
@@ -160,8 +165,8 @@ ${FRAG_COLOR}
           col*=1.0-0.3*uLOff*inH;
           col+=diffuseColor.rgb*vec3(1.0,0.8,0.52)*lp*uLK*0.85;}
          outgoingLight=col+totalEmissiveRadiance;}
-        #include <opaque_fragment>`)};
-      m.customProgramCacheKey=()=>'vytoon9'+(m.userData.occW?'W':'')+(m.userData.fol2?'F':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
+        #include <opaque_fragment>`);if(STY)STY.patch(sh,m)};
+      m.customProgramCacheKey=()=>'vytoon9'+(STY?STY.key(m):'')+(m.userData.occW?'W':'')+(m.userData.fol2?'F':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
 
   // mái ngói cánh Vy/Bin: GLB ngoại cảnh chỉ có mái cánh phòng khách (Roof_Living) → nhân bản sang 2 cánh kia
   // (khớp kích thước mái gốc Roof_Vy/Roof_Bin trong LIVING_ROOM.glb: rộng 10.85, lệch tâm ±0.425, cao 6.4). skipX = x tâm cánh đang ở (giữ hở để nhìn vào)
@@ -191,6 +196,11 @@ ${FRAG_COLOR}
   if(MC.tint)env.traverse(o=>{if(o.isMesh&&o.material&&MC.tint[o.material.name]!=null)o.material.color.set(MC.tint[o.material.name])});
   if(MC.hideFlat)env.traverse(o=>{if(o.isMesh&&!(o.material&&o.material.name)){const b=new THREE.Box3().setFromObject(o);if((b.max.x-b.min.x)*(b.max.z-b.min.z)>20&&b.max.y-b.min.y<1.2)o.visible=false}});
   if(MC.hide)env.traverse(o=>{if(MC.hide.test(o.name)||(o.isMesh&&o.material&&MC.hide.test(o.material.name||'')))o.visible=false});
+  // MC.cutTop={node,y}: bỏ các tam giác nằm hẳn trên cao độ y của node đó (vd. thanh ngang trên cùng của khung mặt trước phòng Bin)
+  if(MC.cutTop){env.updateMatrixWorld(true);const C=MC.cutTop,v=new THREE.Vector3();env.traverse(o=>{if(!o.isMesh)return;let hit=false;for(let q=o;q&&q!==env;q=q.parent)if(C.node.test(q.name))hit=true;if(!hit)return;
+    const g=o.geometry.index?o.geometry.clone():o.geometry.clone().toNonIndexed();const pa=g.attributes.position;let ix=g.index?[...g.index.array]:[...Array(pa.count).keys()];
+    const out=[];for(let t=0;t<ix.length;t+=3){let lo=1e9;for(let k=0;k<3;k++){v.fromBufferAttribute(pa,ix[t+k]).applyMatrix4(o.matrixWorld);lo=Math.min(lo,v.y)}if(lo<C.y)out.push(ix[t],ix[t+1],ix[t+2])}
+    g.setIndex(out);o.geometry=g;console.log('[cutTop] '+o.name+': '+(ix.length-out.length)/3+' tam giác bỏ')})}
   env.updateMatrixWorld(true);
   let EXT=null;
   if(OUTD){const _t0=performance.now();EXT=setupExterior({scene,env,MC,toonMat});console.log('[ext] setup '+Math.round(performance.now()-_t0)+'ms');if(/[?&]tune\b/.test(location.search))import('./tune.js').then(m=>m.mountTune(EXT,FU));for(let i=envMeshes.length-1;i>=0;i--)if(!envMeshes[i].parent)envMeshes.splice(i,1);
@@ -212,7 +222,7 @@ ${FRAG_COLOR}
        const f=m=>{if(!m)return m;let c=cl.get(m);if(!c){c=m.clone();c.userData={...m.userData,noOcc:true};cl.set(m,c)}return c};o.material=Array.isArray(o.material)?o.material.map(f):f(o.material)})}
     extG.traverse(o=>{if(!o.isMesh||!o.visible||o.isInstancedMesh)return;let p=o.parent,inHouse=false,roof=/Roof|Tile/i.test(o.name);for(;p;p=p.parent){if(/^HOUSE_L1/.test(p.name))inHouse=true;if(/Roof|Tile/i.test(p.name))roof=true}
       if(inHouse&&!roof)[].concat(o.material).forEach(mm=>{if(mm&&!mm.userData.noOcc&&!/Roof|Tile/i.test(mm.name||''))mm.userData.occW=true})});
-    toonify(extG);scene.add(extG);extG.updateMatrixWorld(true);
+    toonify(extG);console.log('[sty] ngoại cảnh: '+api.stylize(extG));scene.add(extG);extG.updateMatrixWorld(true);
     const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
     const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null,indoor:true};
     EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat});EXTV.setLevel(TP.quality==='low'?'low':'indoor');
@@ -1204,6 +1214,15 @@ ${FRAG_COLOR}
     if(GLASS.top){const d=cam.y-GLASS.top.T.y;GLASS.top.mat.uniforms.uA.value=Math.min(1,Math.max(0,(d-1)/4))}               // camera thấp hơn nóc thì nóc biến mất
   }
   buildGlass();
+  // MC.seam: mép tường phòng giáp nhà chính bị hở (vỏ ngoài phía trước của chính phòng bị ẩn để nhìn vào) → khối tường lấp kín,
+  // mặt trong cùng chất liệu tường phòng, các mặt ngoài cùng chất liệu tường nhà chính → nhìn như một mảng tường liền
+  if(MC.seam&&extG){const S=MC.seam;let wallM=null,innM=null;
+    extG.traverse(o=>{if(!wallM&&o.isMesh&&o.material&&/^Stylized\s+Concrete/i.test(o.material.name||''))wallM=o.material});
+    env.traverse(o=>{if(!innM&&o.isMesh&&o.material&&o.material.name===S.inner)innM=o.material});
+    if(wallM){const w=S.x1-S.x0,h=S.y1-S.y0,d=S.z1-S.z0,g=new THREE.BoxGeometry(w,h,d);
+      const sides=['px','nx','py','ny','pz','nz'],mats=sides.map(f=>f===S.side&&innM?innM:wallM);
+      const m=new THREE.Mesh(g,mats);m.position.set((S.x0+S.x1)/2,S.y0+h/2,(S.z0+S.z1)/2);m.name='SEAM_FILL';m.castShadow=true;m.receiveShadow=true;scene.add(m);m.updateMatrixWorld(true);
+      STY.boxUV(m,2.6,2.6,false)}}
   (function optimizeEnv(){
     // shading: mặt phẳng giữ phẳng (crease 45°), organic giữ smooth
     {const ORG=/Plant|Pouf|Sofa|Armchair|Pillow|Cushion|Blanket|Duvet|Mattress|Lamp|Toilet|Pendant|Stool|Rug|Curtain|Fairy|Bulb|Globe|Knob|Hook|Sphere/i;
@@ -1226,6 +1245,7 @@ ${FRAG_COLOR}
     // texture: anisotropy cao để cảnh ngoài cửa sổ không bị sạn/nhấp nháy
     const tex=new Set();env.traverse(o=>{if(!o.isMesh)return;(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{if(!m)return;['map','normalMap','emissiveMap','roughnessMap','metalnessMap','aoMap'].forEach(k=>{if(m[k])tex.add(m[k])})})});
     tex.forEach(t=>{t.anisotropy=maxAniso;t.generateMipmaps=true;t.minFilter=THREE.LinearMipmapLinearFilter;t.needsUpdate=true});
+    console.log('[sty] map: '+api.stylize(env));
     // chống z-fighting: tấm mỏng nằm áp lên mặt khác (thảm, tranh, bảng ghim, khung, tấm lót…) → vật liệu riêng có polygonOffset
     // (kéo về phía camera trong bộ đệm sâu, không dời hình). Tấm chồng lên tấm khác (thảm trong trên thảm ngoài) được đẩy mạnh thêm 1 bậc.
     {const T=[],bb=new THREE.Box3(),sz=new THREE.Vector3();

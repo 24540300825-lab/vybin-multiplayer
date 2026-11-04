@@ -115,6 +115,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     const s = def.scale || 1.9; inner.scale.setScalar(s);
     const b = new THREE.Box3().setFromObject(inner), c = b.getCenter(new THREE.Vector3());
     inner.position.set(-c.x, -b.min.y, -c.z);          // tâm đáy món đồ = gốc nhóm → đặt / xoay quanh tâm
+    if (!ghost && api.stylize) { inner.updateMatrixWorld(true); api.stylize(inner); }   // vân concrete / gỗ như đồ trong nhà
     const g = new THREE.Group(); g.add(inner); g.userData.def = def; g.userData.inner = inner;
     const sz = b.getSize(new THREE.Vector3()); g.userData.H = sz.y; g.userData.W = sz.x; g.userData.D = sz.z;
     if (!ghost && def.use === 'light') {
