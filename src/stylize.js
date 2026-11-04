@@ -8,7 +8,7 @@
 // UV: tính lại theo MÉT thật (box mapping theo pháp tuyến mặt, có tính scale của vật) → mật độ vân như nhau trên vật to/nhỏ, không méo.
 // Gỗ: trục thớ = cạnh DÀI nhất của vật (chân bàn: thớ dọc; mặt bàn/thanh dầm: thớ theo chiều dài).
 // Vân "detail" lưu dạng log quanh 0.5 (trung tính) → shader: màu *= exp((s-0.5)*k) — sáng/tối quanh màu gốc, vùng tối hơi đậm sắc hơn (giữ mood màu).
-export const STY_VER = 2;
+export const STY_VER = 3;
 const SKIP = /glass|mirror|screen|display|frost|bulb|lampshade|lamp_glow|glow|steel|gold|metal|chrome|silver|brass|soil|interior|leaf|leaves|plant|foliage|grass|flower|fern|poly|aero|water/i;   // KHÔNG lọc 'light' (oak_light, wood_light là gỗ sáng màu)
 const WOOD = /wood|oak|cane|cork|plank|timber|walnut|teak|bamboo|rattan|trim|^ch_floor$|_floor$|^floor$/i;   // trim = khung/nẹp cửa sổ & viền vỏ nhà
 
@@ -18,7 +18,7 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
   const T = {concD: tex('concrete_d.jpg'), woodD: tex('wood_d.jpg'), concC: tex('concrete_c.jpg', true), roofC: tex('roof_c.jpg', true), roofH: tex('roof_h.jpg'),
     woodC: tex('wood_c.jpg', true), woodDkC: tex('wooddk_c.jpg', true), brickC: tex('brick_c.jpg', true), brickH: tex('brick_h.jpg'), rockC: tex('rock_c.jpg', true)};
   // độ sáng trung bình (tuyến tính) của texture màu gỗ → giữ độ sáng tương đối của gỗ gốc (gỗ sáng / gỗ vừa)
-  const REF = {wood: 0.234, wooddk: 0.147};
+  const REF = {wood: 0.47, wooddk: 0.29};
   // độ mạnh vân (đã chia cho hệ số mã hoá log lúc tạo file: concrete 1.6, wood 0.35)
   const roofPH = {value: 0.075};   // độ sâu parallax mái ngói (theo đơn vị UV)
   const DK = {conc: 2.0 / 1.6, wood: 0.75 / 0.35, wall: 2.5 / 1.6};
@@ -62,7 +62,7 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
   const kindOf = (m, o) => {
     if (!m || !m.isMeshStandardMaterial || m.userData.vySty) return m && m.userData.vySty;
     const n = m.name || '';
-    if (/^Stylized\s+Concrete/i.test(n) || wallNames.has(n)) return 'wall';
+    if (/^(Stylized\s+Concrete|M_Wall_Cream)/i.test(n) || wallNames.has(n)) return 'wall';
     if (/^Stylized Brick Wall/i.test(n)) return 'roof';
     if (/^Stylized Stone Tiles/i.test(n)) return 'brick';   // thân tường rào quanh nhà → Stylized Dark Brick
     if (/^M_Fence_stoneDk/i.test(n)) return 'wall';        // khối đỉnh tường rào / đỉnh trụ cổng → concrete trắng như vỏ nhà
@@ -71,6 +71,9 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
     if (m.userData.fol2 || m.userData.grass || m.userData.leaf || m.userData.ground || m.userData.keepEmi) return null;
     if (m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0.02 && m.emissiveIntensity > 0) return null;
     if (SKIP.test(n)) return null;
+    { // vật trắng / sáng gần như không có sắc (tủ lạnh, toilet, gốm sứ, giấy…) → TRẮNG TRƠN (không vân)
+      const c = m.color, r = Math.pow(c.r, 0.4545), g = Math.pow(c.g, 0.4545), b = Math.pow(c.b, 0.4545), mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      if (mx > 0.9 && (mx - mn) / mx < 0.055 && !WOOD.test(n)) return 'white'; }
     if (!WOOD.test(n)) return 'conc';
     const c = m.color, l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
     return /dark|dk/i.test(n) || l < 0.12 ? 'wooddk' : 'wood';     // gỗ tối → Stylized Wood Darker
@@ -80,19 +83,20 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
     if (done.has(m)) return; done.add(m); m.userData.vySty = k;
     if (k === 'conc') { m.map = T.concD; m.userData.vyDK = DK.conc; }
     else if (k === 'wood' || k === 'wooddk') { m.map = k === 'wood' ? T.woodC : T.woodDkC; m.userData.vyRef = REF[k]; m.normalMap = null; m.roughnessMap = null; m.metalnessMap = null; m.aoMap = null; }
+    else if (k === 'white') { m.color.setRGB(0.97, 0.97, 0.97); m.userData.desat = 1; }
     else if (k === 'brick') { m.map = T.brickC; m.userData.vyHM = T.brickH; m.normalMap = null; m.roughnessMap = null; m.metalnessMap = null; m.aoMap = null; m.color.setRGB(1, 1, 1); }
     else if (k === 'rock') { m.map = T.rockC; m.normalMap = null; m.roughnessMap = null; }
     // tường nhà: trắng ngà sáng (không xám đục) + vân concrete rõ hơn đồ nội thất (mảng tường lớn, nhìn từ xa)
-    else if (k === 'wall') { m.map = T.concD; m.userData.vyDK = DK.wall; m.normalMap = null; m.roughnessMap = null; m.metalnessMap = null; m.aoMap = null; m.color.setRGB(0.97, 0.95, 0.91); m.userData.desat = 1; }
+    else if (k === 'wall') { m.map = T.concD; m.userData.vyDK = DK.wall; m.normalMap = null; m.roughnessMap = null; m.metalnessMap = null; m.aoMap = null; m.color.setRGB(1, 1, 1); m.userData.desat = 1; }   // tường / vỏ nhà: TRẮNG THUẦN
     else if (k === 'roof') { m.map = T.roofC; m.userData.vyHM = T.roofH; m.normalMap = null; m.roughnessMap = null; m.metalnessMap = null; }
-    m.metalness = 0; m.needsUpdate = true;
+    if (k !== 'white') m.metalness = 0; m.needsUpdate = true;
   }
   // gắn chất liệu cho cả cây đối tượng (map, ngoại cảnh, nội thất mua ở shop…)
   function apply(root) {
     let n = 0;
     root.traverse(o => {
       if (!o.isMesh || o.isSkinnedMesh || !o.geometry) return;
-      const ms = [].concat(o.material); if (ms.length !== 1) { ms.forEach(m => { const k = kindOf(m, o); if (k === 'conc' || k === 'wood' || k === 'wooddk') setMat(m, k); }); }
+      const ms = [].concat(o.material); if (ms.length !== 1) { ms.forEach(m => { const k = kindOf(m, o); if (k === 'conc' || k === 'wood' || k === 'wooddk' || k === 'white') setMat(m, k); }); }
       const m = ms[0], k = kindOf(m, o); if (!k) return;
       if (k === 'wood' || k === 'wooddk') boxUV(o, 1.0, 1.8, true);   // 1 ô texture = 1 m ngang × 1.8 m dọc thớ
       else if (k === 'brick') boxUV(o, 1.5, 1.5, false);                  // ~10 hàng gạch / 1.5 m (mặt đứng: hàng gạch nằm ngang)
@@ -112,15 +116,15 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
       {// STYLIZED WOOD: màu lấy từ texture gỗ; độ sáng đi theo gỗ gốc (gỗ sáng vẫn sáng hơn gỗ vừa), bớt bão hoà nhẹ cho hợp tông toon
        vec3 b0=diffuseColor.rgb;float l0=dot(b0,vec3(0.2126,0.7152,0.0722));
        vec3 t=texture2D(map,vMapUv).rgb;float lt=dot(t,vec3(0.2126,0.7152,0.0722));
-       float f=mix(1.0,clamp(l0/uRef,0.85,1.9),0.5);
-       diffuseColor.rgb=mix(vec3(lt),t,0.45)*f*1.22;}   // bớt bão hoà mạnh + sáng lên (đỡ đậm, đỡ gắt)
+       float f=mix(1.0,clamp(l0/uRef,0.9,1.3),0.4);
+       diffuseColor.rgb=mix(vec3(lt),t,0.88)*f*1.06;}   // texture đã chỉnh sáng/ít bão hoà; chỉ nhích theo độ sáng gỗ gốc
       #endif`);
     } else if (k === 'brick') {
       sh.uniforms.uHM = {value: m.userData.vyHM};
       sh.fragmentShader = 'uniform sampler2D uHM;\n' + sh.fragmentShader.replace('#include <map_fragment>', `
       #ifdef USE_MAP
       {vec3 t=texture2D(map,vMapUv).rgb;float h=texture2D(uHM,vMapUv).r;
-       float lt=dot(t,vec3(0.2126,0.7152,0.0722));diffuseColor.rgb*=mix(vec3(lt),t,0.4)*mix(0.78,1.0,smoothstep(0.55,0.95,h))*1.12;}   // bớt bão hoà mạnh, sáng hơn; mạch vữa tối nhẹ theo height
+       float lt=dot(t,vec3(0.2126,0.7152,0.0722));diffuseColor.rgb*=mix(vec3(lt),t,0.8)*mix(0.82,1.0,smoothstep(0.55,0.95,h));}   // mạch vữa tối nhẹ theo height
       #endif`);
     } else if (k === 'rock') {
       sh.vertexShader = 'varying vec3 vRkP,vRkN;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -139,7 +143,7 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
       #endif`);
     } else if (k === 'conc' || k === 'wall') {
       sh.uniforms.uDK = {value: m.userData.vyDK || 1};
-      sh.fragmentShader = (k === 'wood' ? '#define VY_WOOD\n' : '') + 'uniform float uDK;\n' + sh.fragmentShader.replace('#include <map_fragment>', `
+      sh.fragmentShader = (k === 'wood' ? '#define VY_WOOD\n' : '') + (k === 'wall' ? '#define VY_WALL\n' : '') + 'uniform float uDK;\n' + sh.fragmentShader.replace('#include <map_fragment>', `
       #ifdef USE_MAP
       {vec3 b0=diffuseColor.rgb;
        #ifdef VY_WOOD
@@ -150,6 +154,9 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
        // vân tối KHÔNG ngả xám (nhìn như bẩn): nhuộm theo sắc của chính vật; vật trắng/xám → vân ngả ấm nhẹ
        vec3 hue=b0/max(max(b0.r,max(b0.g,b0.b)),1e-3);float sat=1.0-min(hue.r,min(hue.g,hue.b));
        vec3 tint=mix(vec3(1.0,0.84,0.72),hue,smoothstep(0.08,0.35,sat));float dk=clamp(1.0-f,0.0,1.0);
+       #ifdef VY_WALL
+       f=min(mix(1.0,f,0.7),1.0);tint=vec3(1.0);dk=0.0;   // tường trắng thuần: vân chỉ làm tối nhẹ, trung tính (không ngả vàng/bẩn)
+       #endif
        vec3 c=b0*f*mix(vec3(1.0),tint*1.15,dk*0.9);
        diffuseColor.rgb=max(c,vec3(0.0));}
       #endif`);
