@@ -37,14 +37,15 @@ export function createYTMusic({toast = () => {}, onChange: onChange0 = () => {},
     const st = host && host.style; if (!st) return;
     const park = () => { st.left = '-10000px'; st.top = '0'; st.width = '320px'; st.height = '180px'; st.opacity = '0'; st.pointerEvents = 'none'; };
     if (!el) { park(); return; }
-    let last = '';
+    let last = '', stable = 0;
     const step = () => {
       if (dockEl !== el) return;
       if (!el.isConnected) { dock(null); return; }
       const r = el.getBoundingClientRect(), vis = r.width > 4 && r.height > 4 && el.offsetParent !== null;
       const k = vis ? r.left + ',' + r.top + ',' + r.width + ',' + r.height : 'h';
-      if (k !== last) { last = k; if (vis) { st.left = r.left + 'px'; st.top = r.top + 'px'; st.width = r.width + 'px'; st.height = r.height + 'px'; st.opacity = '1'; st.pointerEvents = 'auto'; } else park(); }
-      dockRaf = vis ? requestAnimationFrame(step) : setTimeout(step, 250);     // panel đóng: kiểm tra thưa (đỡ ép trang game tính layout mỗi khung)
+      if (k !== last) { stable = 0; last = k; if (vis) { st.left = r.left + 'px'; st.top = r.top + 'px'; st.width = r.width + 'px'; st.height = r.height + 'px'; st.opacity = '1'; st.pointerEvents = 'auto'; } else park(); }
+      // panel đóng: kiểm tra thưa; panel mở nhưng đứng yên (>20 khung): kiểm tra 10 lần/giây thay vì mỗi khung — mỗi lần đo là 1 lần ép trang game tính layout, cộng dồn với video đang chạy thì rất nặng
+      stable++; dockRaf = !vis ? setTimeout(step, 250) : stable > 20 ? setTimeout(step, 100) : requestAnimationFrame(step);
     };
     step();
   }

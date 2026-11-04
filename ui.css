@@ -916,3 +916,8 @@ html.vy-arrange #hMusic,html.vy-arrange #hBR{opacity:.35;pointer-events:none}
 #hTop #iLamp.lampOff{opacity:.55}#hTop #iLamp.lampOff .ic{filter:grayscale(1) drop-shadow(var(--sh))}
 #kSide .ks{padding:0 .5rem 0 .875rem}
 #hTop .tbg .mlb{display:none}
+
+/* ---- ĐA PHƯƠNG TIỆN: có video chạy cùng game (nhạc YouTube mở, gọi video, khung phim nhỏ) → bỏ làm mờ nền kính + hiệu ứng chuyển cảnh (blur sau video/canvas đang đổi hình mỗi khung là thứ nặng nhất) ---- */
+html.media{--cap:linear-gradient(to right,rgba(24,18,12,.62),rgba(24,18,12,.5));--panel:rgba(26,25,23,.9)}
+html.media .cap,html.media .panel,html.media .mbox,html.media #toast,html.media #fcPill,html.media #kSide .ks,html.media .tbMenu,html.media #hCall,html.media #hRes{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+html.media .hud,html.media .panel{transition:none!important}

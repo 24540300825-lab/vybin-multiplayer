@@ -1703,7 +1703,7 @@ ${FRAG_COLOR}
   function setPR(p){curPR=p;try{localStorage.setItem(PRKEY,String(p))}catch(e){}renderer.setPixelRatio(p);renderer.setSize(innerWidth,innerHeight);const pr=Math.min(p,1.25);composer.setPixelRatio(pr);composer.setSize(innerWidth,innerHeight);fxaaP.material.uniforms['resolution'].value.set(1/(innerWidth*pr),1/(innerHeight*pr))}
   // Tự co độ phân giải render để giữ ≥30 fps. 'Tự động': mục tiêu ~45fps; các preset cố định (Điện ảnh/Đẹp…): giữ trần độ phân giải của preset nhưng vẫn tự hạ khi máy tụt dưới ~30fps (rồi nâng lại khi thoải mái).
   function adaptRes(dtr){if(TEST||throttled)return;ftEma+=(Math.min(dtr,0.1)-ftEma)*0.08;if(--adaptCool>0)return;
-    const q=TP.quality,auto=q==='auto',cap=auto?Math.min(maxPR,1.25):Math.min(maxPR,{low:0.75,medium:1,high:maxPR}[q]||maxPR),bad=auto?0.0235:0.033,good=auto?0.0185:0.026,floor=auto?0.6:0.7;
+    const q=TP.quality,auto=q==='auto',cap0=auto?Math.min(maxPR,1.25):Math.min(maxPR,{low:0.75,medium:1,high:maxPR}[q]||maxPR),cap=media?Math.min(cap0,0.85):cap0,bad=auto?0.0235:0.033,good=auto?0.0185:0.026,floor=auto?0.6:0.7;
     if(ftEma>bad){badWin++;goodWin=0}else if(ftEma<good){goodWin++;badWin=0}else{badWin=0;goodWin=0}
     if(curPR>cap+0.01){pendPR=cap;adaptCool=60;return}
     if(badWin>=20&&curPR>floor){pendPR=Math.max(floor,+(curPR-0.15).toFixed(2));badWin=0;adaptCool=90}
@@ -1786,12 +1786,15 @@ ${FRAG_COLOR}
   document.addEventListener('visibilitychange',()=>{if(document.hidden)return;R.getDelta();resumeN=6;adaptCool=Math.max(adaptCool,240);badWin=0;goodWin=0;ftEma=0.0167;renderer.shadowMap.needsUpdate=true});
   // GIỚI HẠN KHUNG HÌNH: màn 120/144 Hz → vẽ ½ tần số (60/72 fps, vẫn chia đều nhịp màn hình nên không giật) thay vì 144 fps;
   // cửa sổ game không được chọn (đang dùng app/cửa sổ khác bên cạnh) → 30 fps. Tab ẩn thì trình duyệt tự dừng.
-  let rIv=16.7,lastRaf=0,lastDraw=0,focusN=0,hasFoc=true,throttled=false;
+  let media=false,mediaN=0,rIv=16.7,lastRaf=0,lastDraw=0,focusN=0,hasFoc=true,throttled=false;
   const topFocus=()=>{try{return (window.top||window).document.hasFocus()}catch(e){return document.hasFocus()}};
   function loop(t){requestAnimationFrame(loop);t=t||performance.now();
     if(lastRaf){const iv=t-lastRaf;if(iv>3&&iv<40)rIv+=(iv-rIv)*0.04}lastRaf=t;
     if((focusN++&15)===0)hasFoc=topFocus()||!!document.fullscreenElement;
-    const hz=1000/rIv,minDt=!hasFoc?1000/30:hz>100?2000/hz:0;throttled=!hasFoc;
+    // CHẾ ĐỘ ĐA PHƯƠNG TIỆN: đang mở nhạc YouTube (có hình) / gọi video / khung phim thu nhỏ → video chiếm GPU & bộ giải mã cùng game.
+    // Giảm tải 3D (trần độ phân giải thấp hơn, màn tần số quét cao thì vẽ 1/3 thay vì 1/2) + CSS bỏ làm mờ nền kính (xem html.media trong ui.css).
+    if((mediaN++&15)===0){const m=!!document.querySelector('#hYt.on,#hCall.on,#cine.mini');if(m!==media){media=m;document.documentElement.classList.toggle('media',m);adaptCool=Math.min(adaptCool,10)}}
+    const hz=1000/rIv,minDt=!hasFoc?1000/30:hz>100?(media?3000/hz:2000/hz):0;throttled=!hasFoc;
     if(minDt&&t-lastDraw<minDt-2)return;lastDraw=t;
     rawDt=R.getDelta();if(resumeN>0){resumeN--;rawDt=Math.min(rawDt,1/60)}Perf.frame(rawDt*1000);
     // BẮT KỊP THỜI GIAN THẬT: máy yếu/khung hình tụt <20fps trước đây bị ép dt<=0.05s => thế giới chạy CHẬM so với đồng hồ thật, trong khi máy kia vẫn chạy đúng tốc độ
