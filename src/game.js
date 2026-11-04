@@ -1216,7 +1216,7 @@ ${FRAG_COLOR}
   buildGlass();
   // MC.seam: mép tường phòng giáp nhà chính bị hở (vỏ ngoài phía trước của chính phòng bị ẩn để nhìn vào) → khối tường lấp kín,
   // mặt trong cùng chất liệu tường phòng, các mặt ngoài cùng chất liệu tường nhà chính → nhìn như một mảng tường liền
-  if(MC.seam&&extG){const S=MC.seam;let wallM=null,innM=null;
+  if(MC.seam&&extG)for(const S of [].concat(MC.seam)){let wallM=null,innM=null;
     extG.traverse(o=>{if(!wallM&&o.isMesh&&o.material&&/^Stylized\s+Concrete/i.test(o.material.name||''))wallM=o.material});
     env.traverse(o=>{if(!innM&&o.isMesh&&o.material&&o.material.name===S.inner)innM=o.material});
     if(wallM){const w=S.x1-S.x0,h=S.y1-S.y0,d=S.z1-S.z0,g=new THREE.BoxGeometry(w,h,d);
