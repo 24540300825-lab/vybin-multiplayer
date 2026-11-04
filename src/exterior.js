@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import {FILES} from './manifest.js';
 import {makeDepthMat} from './foliage.js';
+import {makeFoliageDecals} from './decals.js';
 
 // ---- mức chất lượng: mật độ, tầm nhìn, bóng, số lớp sương, hạt mưa -----------------------------------------
 export const LEVELS = {
@@ -18,18 +19,18 @@ export const LEVELS = {
 // "Đẹp chỗ cần đẹp": khoảng cách tính từ NHÂN VẬT (chỗ mắt người chơi nhìn). Quanh nhân vật đủ dày + đủ chi tiết;
 // ra xa nhanh chóng thưa dần và đổi sang hình giảm tam giác (lod: từ khoảng này trở ra dùng bản ~12–16% tam giác).
 const CLASS_OUT = {
-  grass:  {maxD: 32,  d0: 10, d1: 27,  min: 0.04, shadow: true,  cell: 9,  lod: 12},
-  flower: {maxD: 34,  d0: 10, d1: 30,  min: 0.03, shadow: false, cell: 10, lod: 12},
-  bush:   {maxD: 90,  d0: 18, d1: 80,  min: 0.10, shadow: true,  cell: 12, lod: 18},
-  tree:   {maxD: 200, d0: 30, d1: 180, min: 0.30, shadow: true,  cell: 14, lod: 18},
-  rock:   {maxD: 110, d0: 25, d1: 100, min: 0.20, shadow: true,  cell: 12, lod: 25},
+  // KHÔNG còn mesh LOD giảm tam giác ở xa: cỏ/hoa/bụi thật chỉ trong ~15 m, cây/đá thật trong ~30 m; xa hơn là decal (src/decals.js)
+  grass:  {maxD: 15,  d0: 8,  d1: 15,  min: 0.25, shadow: true,  cell: 9,  lod: 0},
+  flower: {maxD: 15,  d0: 8,  d1: 15,  min: 0.25, shadow: false, cell: 10, lod: 0},
+  bush:   {maxD: 18,  d0: 12, d1: 18,  min: 0.40, shadow: true,  cell: 12, lod: 0},
+  tree:   {maxD: 32,  d0: 32, d1: 40,  min: 1.00, shadow: true,  cell: 14, lod: 0},
+  rock:   {maxD: 34,  d0: 20, d1: 34,  min: 0.40, shadow: true,  cell: 12, lod: 0},
 };
-// 3 phòng trong nhà: chỉ giữ cây cỏ GẦN nhà, đủ chi tiết (không dùng bản giảm tam giác — nhìn từ camera trên cao thấy rõ, rất xấu);
-// cây/bụi/đá ở xa bị BỎ HẲN (sương + nền cỏ lo phần xa). Ô to → ít lượt vẽ.
+// 3 phòng trong nhà: chỉ giữ cây cỏ GẦN nhà, đủ chi tiết; xa hơn cũng là decal (thưa hơn)
 const CLASS_IN = {
-  grass:  {maxD: 22,  d0: 8,  d1: 20,  min: 0.05, shadow: false, cell: 16, lod: 0},
-  flower: {maxD: 22,  d0: 8,  d1: 20,  min: 0.05, shadow: false, cell: 16, lod: 0},
-  bush:   {maxD: 22,  d0: 14, d1: 22,  min: 0.60, shadow: false, cell: 16, lod: 0},
+  grass:  {maxD: 15,  d0: 8,  d1: 15,  min: 0.25, shadow: false, cell: 16, lod: 0},
+  flower: {maxD: 15,  d0: 8,  d1: 15,  min: 0.25, shadow: false, cell: 16, lod: 0},
+  bush:   {maxD: 18,  d0: 12, d1: 18,  min: 0.60, shadow: false, cell: 16, lod: 0},
   tree:   {maxD: 26,  d0: 18, d1: 26,  min: 0.85, shadow: false, cell: 16, lod: 0},
   rock:   {maxD: 20,  d0: 12, d1: 20,  min: 0.50, shadow: false, cell: 16, lod: 0},
 };
@@ -250,6 +251,8 @@ export function setupExterior(c) {
     const sets = grouped ? [ms] : ms.map(m => [m]);
     sets.forEach(set => { const cls = classOf(set[0], set); items.push({set, cls}); });
   }
+  const treeSpots = [];
+  const treeH = set => { let h = 0; set.forEach(m => { const g = m.geometry; if (!g.boundingBox) g.computeBoundingBox(); h = Math.max(h, g.boundingBox.max.y); }); return Math.max(2, h); };
   const tmpM = new THREE.Matrix4();
   for (const {set, cls} of items) {
     const CL = CLASS[cls];
@@ -262,6 +265,7 @@ export function setupExterior(c) {
     if (!mats.length) { set.forEach(m => m.removeFromParent()); continue; }
     nIn += mats.length;
     templates[cls].push({set, mats});
+    if (cls === 'tree') { const hl = treeH(set); mats.forEach(mm => { V3.setFromMatrixPosition(mm); treeSpots.push({x: V3.x, y: V3.y, z: V3.z, h: hl * Math.hypot(mm.elements[4], mm.elements[5], mm.elements[6])}); }); }
     // vật cản: thân cây / đá
     if (cls === 'tree' || cls === 'rock') addColliders(cls, set, mats);
     const buckets = new Map();
@@ -339,6 +343,8 @@ export function setupExterior(c) {
     out.forEach(([x, z]) => {
       const t = T[(rnd() * T.length) | 0], src = t.mats[(rnd() * t.mats.length) | 0];
       src.decompose(V3, Q, S3);
+      // cây ngoài hàng rào: luôn có bản decal; chỉ cây sát hàng rào (người chơi có thể lại gần) mới có thêm cây 3D
+      if (cls === 'tree') { treeSpots.push({x, y: V3.y, z, h: treeH(t.set) * S3.y, far: true}); if (distFence(x, z) > 30) return; }
       const m = new THREE.Matrix4().compose(new THREE.Vector3(x, V3.y, z), Q, S3);
       const CL = CLASS[cls], FC = CL.cell * 3, k = (T.indexOf(t)) + '|' + Math.floor(x / FC) + ',' + Math.floor(z / FC);   // rải ngoài hàng rào: ô to gấp 3 (thưa, ở xa → ít lượt vẽ)
       let b = per.get(k); if (!b) { b = {t, arr: []}; per.set(k, b); } b.arr.push(m);
@@ -349,10 +355,27 @@ export function setupExterior(c) {
   const farN = {};
   const F = MC.farDensity || 1;
   farN.tree = scatter('tree', Math.round(1100 * F), 2.2, 150, d => rnd() < 0.95 - d / 260);
-  farN.bush = scatter('bush', Math.round(260 * F), 1.8, 90, d => rnd() < 0.95 - d / 120);
-  farN.rock = scatter('rock', Math.round(70 * F), 3, 140, () => true);
-  farN.grass = scatter('grass', Math.round(5200 * F), 0.9, 44, d => rnd() < 1.0 - d / 50);
-  farN.flower = scatter('flower', Math.round(900 * F), 0.9, 36, d => rnd() < 1.0 - d / 42);
+  // cỏ/hoa/bụi/đá 3D ngoài hàng rào: chỉ dải sát hàng rào (xa hơn là thảm + decal cỏ)
+  farN.bush = scatter('bush', Math.round(110 * F), 1.8, 18, () => true);
+  farN.rock = scatter('rock', Math.round(24 * F), 3, 30, () => true);
+  farN.grass = scatter('grass', Math.round(1700 * F), 0.9, 15, d => rnd() < 1.0 - d / 22);
+  farN.flower = scatter('flower', Math.round(300 * F), 0.9, 14, d => rnd() < 1.0 - d / 20);
+  // ---- 4c) DECAL: dải cỏ um tùm phủ khắp vườn + ra xa (hiện từ ~15 m), cây xa = tấm cây (hiện từ ~30 m) ----
+  const decGrass = [];
+  { const step0 = INDOOR ? 2.4 : 1.6, step1 = INDOOR ? 4.2 : 2.7, ext = INDOOR ? 70 : 95, y = MC.floorY || 0, np = MC.noPlant || [];
+    for (let z = R0[2] - ext; z < R0[3] + ext; z += 1) {
+      const inZ = z > R0[2] && z < R0[3];
+      for (let x = R0[0] - ext; x < R0[1] + ext; x += 1) {
+        const inn = inZ && x > R0[0] && x < R0[1], st = inn ? step0 : step1;
+        if (rnd() > 1 / (st * st)) continue;                 // mật độ ~ 1 tấm / st² m²
+        const jx = x + rnd(), jz = z + rnd();
+        if (np.some(b => jx > b[0] - 1.2 && jx < b[1] + 1.2 && jz > b[2] - 1.2 && jz < b[3] + 1.2)) continue;
+        const w = 1.6 + rnd() * 1.5;
+        decGrass.push({x: jx, y: y - 0.04, z: jz, s: w / 8, hue: (rnd() - 0.5) * 0.04, val: (rnd() - 0.5) * 0.12});
+      }
+    }
+  }
+  const DEC = makeFoliageDecals({scene, toonMat, trees: treeSpots, grass: decGrass, indoor: INDOOR});
 
   // ---- 4b) lớp CÂY NGƯỜI CHƠI RẢI (src/build/furniture.js): đi CHUNG đường ống với cây vườn — styleMat (gió, tâm tán, bụi, cúi khi đi qua,
   //      mờ khi chắn camera, giảm rực), bóng lá riêng, chia ô + frustum cull, LOD giảm tam giác, chỉ ô gần đổ bóng. Không bao giờ bị thưa theo khoảng cách.
@@ -397,9 +420,12 @@ export function setupExterior(c) {
 
   // ---- 6) cập nhật mỗi vài khung: LOD theo khoảng cách tới tâm nhìn + chất lượng ----
   let level = 'medium', lv = LEVELS.medium;
-  function setLevel(q) { if (!LEVELS[q]) return; level = q; lv = LEVELS[q]; hazes.forEach((h, i) => h.visible = i < lv.haze); }
+  function setLevel(q) { if (!LEVELS[q]) return; level = q; lv = LEVELS[q]; hazes.forEach((h, i) => h.visible = i < lv.haze);
+    // decal bắt đầu đúng chỗ cây cỏ 3D hết (theo chất lượng)
+    const tr = CLASS.tree.maxD * lv.dist, gr = CLASS.grass.maxD * lv.dist; DEC.U.tree.uR0.value = tr - 7; DEC.U.tree.uR1.value = tr - 1.5; DEC.U.grass.uR0.value = gr - 4.5; DEC.U.grass.uR1.value = gr - 0.5; }
   setLevel('medium');
   function update(target, camPos, fogColor, wcFog) {
+    DEC.update(target);
     for (const ce of cells) {
       const CL = CLASS[ce.cls], d = Math.hypot(ce.cx - target.x, ce.cz - target.z);
       const dist = CL.maxD * lv.dist, vis = d < dist;
@@ -419,7 +445,7 @@ export function setupExterior(c) {
     }
     for (const h of hazes) { h.position.x = target.x; h.position.z = target.z; if (fogColor) h.material.uniforms.uCol.value.copy(fogColor);  }
   }
-  return {tintMats, colliders, update, setLevel, getLevel: () => level, cells, hazes, group, depthMat, walkHeight: buildWalkHeight(scene, MC), setUser, removeUser, userKeys, userMeshes, indoor: INDOOR};
+  return {decals: DEC, tintMats, colliders, update, setLevel, getLevel: () => level, cells, hazes, group, depthMat, walkHeight: buildWalkHeight(scene, MC), setUser, removeUser, userKeys, userMeshes, indoor: INDOOR};
 }
 
 // ---- độ cao mặt đi được (hiên / bục thềm / bậc) -------------------------------------------------------------

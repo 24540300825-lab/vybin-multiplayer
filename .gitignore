@@ -2,3 +2,5 @@ node_modules
 .vercel
 *.pyc
 .tmpcmp/
+tools/bake/out/
+tools/bake/*.glb

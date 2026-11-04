@@ -16,6 +16,7 @@ import {Perf} from './perf.js';
 import {FU,vertFol2,FRAG_PARS,FRAG_COLOR,OCC_GLSL,makeDepthMat,bindTU} from './foliage.js';
 import {setupExterior,LEVELS} from './exterior.js';
 import {makeStylizer} from './stylize.js';
+import {patchDecal} from './decals.js';
 import './hud.js';
 import {SFX} from './sfx.js';
 import {initPins} from './ui/pins.js';
@@ -165,8 +166,8 @@ ${FRAG_COLOR}
           col*=1.0-0.3*uLOff*inH;
           col+=diffuseColor.rgb*vec3(1.0,0.8,0.52)*lp*uLK*0.85;}
          outgoingLight=col+totalEmissiveRadiance;}
-        #include <opaque_fragment>`);if(STY)STY.patch(sh,m)};
-      m.customProgramCacheKey=()=>'vytoon9'+(STY?STY.key(m):'')+(m.userData.occW?'W':'')+(m.userData.fol2?'F':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
+        #include <opaque_fragment>`);if(STY)STY.patch(sh,m);if(m.userData.vyDec)patchDecal(sh,m)};
+      m.customProgramCacheKey=()=>'vytoon9'+(STY?STY.key(m):'')+(m.userData.vyDec?'D'+m.userData.vyDec:'')+(m.userData.occW?'W':'')+(m.userData.fol2?'F':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
 
   // mái ngói cánh Vy/Bin: GLB ngoại cảnh chỉ có mái cánh phòng khách (Roof_Living) → nhân bản sang 2 cánh kia
   // (khớp kích thước mái gốc Roof_Vy/Roof_Bin trong LIVING_ROOM.glb: rộng 10.85, lệch tâm ±0.425, cao 6.4). skipX = x tâm cánh đang ở (giữ hở để nhìn vào)
