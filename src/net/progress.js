@@ -75,6 +75,13 @@ export class Progress {
     const r = await this._rpc('game_transfer', {p_item: item, p_n: n, p_to_house: !!toHouse, p_idem: Date.now().toString(36) + Math.random().toString(36).slice(2, 8)});
     this._poke(); return r;
   }
+  // ---- cửa hàng, bán, chế tạo (hạng mục 06) ----
+  _id() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 10); }
+  async shop() { return this._rpc('game_shop'); }
+  async recipes() { const r = await this._rpc('game_recipes'); if (r) setItems(r.items); return r; }
+  async buy(item, n, toHouse) { const r = await this._rpc('game_buy', {p_item: item, p_n: n, p_to_house: !!toHouse, p_idem: this._id()}); this._poke(); this.refresh(); return r; }
+  async sell(item, n) { const r = await this._rpc('game_sell', {p_item: item, p_n: n, p_idem: this._id()}); this.refresh(); return r; }
+  async craft(recipe, n, toHouse) { const r = await this._rpc('game_craft', {p_recipe: recipe, p_n: n, p_to_house: !!toHouse, p_idem: this._id()}); if (toHouse) this._poke(); this.refresh(); return r; }
   async save({settings = null, tasks = null, title = null, flags = null} = {}) {
     await this._rpc('game_save', {p_settings: settings, p_tasks: tasks, p_title: title, p_flags: flags});
   }

@@ -4,13 +4,15 @@
 import {ic} from './icons.js';
 import {ITEMS, curName, fmtItems} from '../net/progress.js';
 import {Notify} from './notify.js';
+import {createShop} from './shop-ui.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const nf = n => Number(n || 0).toLocaleString('vi-VN');
 const ERR = {
   bag_full: 'Túi đầy — cất bớt đồ vào kho nhà nhé.', house_full: 'Kho nhà đã đầy.', insufficient: 'Không đủ số lượng.',
-  quest_expired: 'Nhiệm vụ này đã hết hạn.', not_done: 'Chưa hoàn thành.', bad_item: 'Vật phẩm không hợp lệ.', bad_amount: 'Số lượng không hợp lệ.',
+  quest_expired: 'Nhiệm vụ này đã hết hạn.', not_for_sale: 'Món này hiện không bán.', level_locked: 'Chưa đủ cấp để mở món này.',
+  week_limit: 'Đã đạt giới hạn mua trong tuần.', not_sellable: 'Món này không bán được.', bad_recipe: 'Công thức không hợp lệ.', missing: 'Thiếu nguyên liệu.', not_done: 'Chưa hoàn thành.', bad_item: 'Vật phẩm không hợp lệ.', bad_amount: 'Số lượng không hợp lệ.',
 };
 const errText = e => { const m = String(e && e.message || e); const k = Object.keys(ERR).find(k => m.includes(k)); return k ? ERR[k] : 'Có lỗi, thử lại sau. (' + m + ')'; };
 const RAR = {common: 'Thường', uncommon: 'Khá', rare: 'Hiếm', epic: 'Quý', legend: 'Huyền thoại'};
@@ -125,13 +127,16 @@ export function mountQuestsUi({prog, toast, api, mapId}) {
   }
 
   // ======================= TÚI ĐỒ & KHO NHÀ =======================
-  let bag = null, bTab = 'mine', bGroup = 'all', bQuery = '', bSel = null;
+  let bag = null, bTab = 'mine', bGroup = 'all', bQuery = '', bSel = null, sellAsk = 0;
+  const shopUi = createShop({prog, toast, rerender: () => BM.isOn() && renderBag(), errText});
   async function loadBag() { try { bag = await prog.bag(); } catch (e) { toast(errText(e)); } if (BM.isOn()) renderBag(); }
-  const openBag = async t => { if (t) bTab = t; BM.m.classList.add('on'); renderBag(); rep('open_bag', 'ob:' + day()); await loadBag(); };
+  const openBag = async t => { if (t) bTab = t; BM.m.classList.add('on'); renderBag(); rep('open_bag', 'ob:' + day()); if (bTab === 'shop' || bTab === 'craft') shopUi.load(); await loadBag(); };
   function renderBag() {
-    BM.tabs.innerHTML = [['mine', 'Túi của tôi'], ['house', 'Kho nhà (chung)']].map(([k, l]) => `<div class="chip${k === bTab ? ' on' : ''}" role="tab" data-t="${k}">${l}</div>`).join('');
-    BM.tabs.onclick = e => { const c = e.target.closest('.chip'); if (c) { bTab = c.dataset.t; bSel = null; bGroup = 'all'; renderBag(); } };
+    BM.tabs.innerHTML = [['mine', 'Túi của tôi'], ['house', 'Kho nhà (chung)'], ['shop', 'Cửa hàng'], ['craft', 'Chế tạo']].map(([k, l]) => `<div class="chip${k === bTab ? ' on' : ''}" role="tab" data-t="${k}">${l}</div>`).join('');
+    BM.tabs.onclick = e => { const c = e.target.closest('.chip'); if (c) { const was = bTab; bTab = c.dataset.t; bSel = null; bGroup = 'all'; shopUi.reset(); renderBag(); if ((bTab === 'shop' || bTab === 'craft') && was !== bTab) shopUi.load(); else if (bTab === 'mine' || bTab === 'house') loadBag(); } };
     const B = BM.body;
+    if (bTab === 'shop') return shopUi.renderShop(B, BM.sub);
+    if (bTab === 'craft') return shopUi.renderCraft(B, BM.sub);
     if (!bag) { B.innerHTML = '<p class="pg-empty">Đang tải…</p>'; BM.sub.textContent = ''; return; }
     const own = bTab === 'mine' ? bag.mine : bag.house, cap = bTab === 'mine' ? bag.slots : bag.house_slots;
     BM.sub.textContent = own.length + ' / ' + cap + ' ô';
@@ -145,13 +150,21 @@ export function mountQuestsUi({prog, toast, api, mapId}) {
         <label class="bg-search"><span class="ic">${ic('search')}</span><input id="bgQ" placeholder="Tìm đồ…" value="${esc(bQuery)}" autocomplete="off"></label></div>
       <div class="bg-wrap"><div class="bg-grid" id="bgGrid">${shown.map(o => { const d = ITEMS[o.id] || {}; return `<button class="bg-cell r-${esc(d.rarity || 'common')}${o.id === bSel ? ' on' : ''}" data-i="${esc(o.id)}" title="${esc(d.name || o.id)}"><span>${esc(d.icon || '📦')}</span><em>${nf(o.n)}</em></button>`; }).join('')}${(bGroup === 'all' && !q) ? '<i class="bg-cell empty"></i>'.repeat(Math.max(0, Math.min(cap, 40) - shown.length)) : ''}</div>
       <div class="bg-det">${sel ? `<div class="bg-big r-${esc(it.rarity || 'common')}">${esc(it.icon || '📦')}</div><b>${esc(it.name)}</b><small>${esc(grp(it.group))} · ${esc(RAR[it.rarity] || 'Thường')} · có ${nf(sel.n)}${it.stack ? ' / tối đa ' + it.stack : ''}</small><p>${esc(it.desc || '')}</p>
-          ${it.sell ? `<small class="bg-sell">Giá bán gợi ý: ${nf(it.sell)} Xu / món · Cửa hàng sắp có</small>` : ''}
-          <div class="bg-mv"><input type="number" id="bgN" min="1" max="${sel.n}" value="${sel.n}" aria-label="Số lượng"><button class="pb" id="bgMv">${bTab === 'mine' ? 'Cất vào kho nhà' : 'Lấy về túi'}</button></div>`
+          <div class="bg-mv"><input type="number" id="bgN" min="1" max="${sel.n}" value="${sel.n}" aria-label="Số lượng"><button class="pb" id="bgMv">${bTab === 'mine' ? 'Cất vào kho nhà' : 'Lấy về túi'}</button></div>
+          ${bTab === 'mine' && it.sell && !it.nosell && it.group !== 'quest' ? (sellAsk ? `<div class="sh-cf"><b>Bán ${nf(sellAsk)} ${esc(it.name)}?</b><span>Nhận <b>${nf(it.sell * sellAsk)} Xu</b> (${nf(it.sell)} Xu / món)</span><div class="bg-mv"><button class="pl" id="bgSN">Huỷ</button><button class="pb" id="bgSY">Bán</button></div></div>`
+            : `<button class="pl bg-sellb" id="bgSell">Bán · ${nf(it.sell)} Xu / món</button>`) : bTab === 'mine' ? '<small>Món này không bán được.</small>' : ''}`
         : `<p class="pg-empty">${own.length ? 'Chọn một món để xem chi tiết.' : bTab === 'mine' ? 'Túi đang trống. Làm nhiệm vụ để nhận nguyên liệu nhé.' : 'Kho nhà trống. Cất đồ từ túi vào để cả hai cùng dùng.'}</p>`}
         <p class="pg-help bg-note">${bTab === 'mine' ? 'Túi riêng của bạn, mang theo mọi nơi.' : 'Kho chung của Bin và Vy — ai cũng cất / lấy được. Lịch sử xem ở Hồ sơ → Lịch sử → Quỹ nhà.'}</p></div></div>`;
     $('bgGrp').onclick = e => { const c = e.target.closest('.chip'); if (c) { bGroup = c.dataset.g; renderBag(); } };
     const qi = $('bgQ'); qi.oninput = () => { bQuery = qi.value; const pos = qi.selectionStart; renderBag(); const n = $('bgQ'); n.focus(); n.setSelectionRange(pos, pos); };
-    $('bgGrid').onclick = e => { const c = e.target.closest('[data-i]'); if (c) { bSel = c.dataset.i === bSel ? null : c.dataset.i; renderBag(); } };
+    $('bgGrid').onclick = e => { const c = e.target.closest('[data-i]'); if (c) { bSel = c.dataset.i === bSel ? null : c.dataset.i; sellAsk = 0; renderBag(); } };
+    $('bgSell') && ($('bgSell').onclick = () => { sellAsk = Math.max(1, Math.min(sel.n, parseInt($('bgN').value, 10) || 1)); renderBag(); });
+    $('bgSN') && ($('bgSN').onclick = () => { sellAsk = 0; renderBag(); });
+    $('bgSY') && ($('bgSY').onclick = async e => {
+      e.currentTarget.disabled = true; const n = sellAsk;
+      try { const r = await prog.sell(sel.id, n); if (r && r.ok) toast(`Đã bán ${n} ${it.name} (+${nf(r.gain)} Xu)`); } catch (er) { toast(errText(er)); }
+      sellAsk = 0; loadBag();
+    });
     $('bgMv') && ($('bgMv').onclick = async e => {
       const n = Math.max(1, Math.min(sel.n, parseInt($('bgN').value, 10) || 0)); e.currentTarget.disabled = true;
       try { await prog.transfer(sel.id, n, bTab === 'mine'); toast((bTab === 'mine' ? 'Đã cất ' : 'Đã lấy ') + n + ' ' + it.name + (bTab === 'mine' ? ' vào kho nhà' : ' về túi')); } catch (er) { toast(errText(er)); }
@@ -184,10 +197,10 @@ export function mountQuestsUi({prog, toast, api, mapId}) {
     paintDot();
     if (lastReady != null && d.quests_ready !== lastReady) loadQuests();   // người kia vừa góp xong nhiệm vụ chung…
     lastReady = d.quests_ready;
-    if (BM.isOn()) loadBag();
+    if (BM.isOn() && (bTab === 'mine' || bTab === 'house')) loadBag();
   });
   // giờ đổi ngày/tuần → tải lại bộ nhiệm vụ mới
   setInterval(() => { if (Q && new Date(Q.day_ends).getTime() - skew <= Date.now()) loadQuests(); else if (QM.isOn()) renderQuests(); }, 60000);
   paintDot(); loadQuests();
-  return {openQuests, openBag};
+  return {openQuests, openBag, openShop: () => openBag('shop')};
 }

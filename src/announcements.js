@@ -1,6 +1,12 @@
 // Thông báo "cập nhật game" hiện trong trung tâm thông báo (chuông). Thêm bản mới: chèn 1 mục ĐẦU danh sách — id phải duy nhất.
 // Mỗi mục: {id, date, title, items:[các dòng ngắn]}. Trạng thái "đã đọc" lưu trên máy từng người (localStorage).
 export const NEWS = [
+  {id: 'shop-craft', date: '04/11/2026', title: 'Cửa hàng, Bán đồ & Chế tạo', items: [
+    'Túi đồ (phím B) có thêm 2 tab: Cửa hàng và Chế tạo',
+    'Cửa hàng: Nội thất và Nguyên liệu, xem giá + số dư sau mua trước khi xác nhận; chọn nhận vào túi hoặc cất thẳng vào kho nhà',
+    'Bán đồ: chọn món trong túi → Bán, thấy trước số Xu nhận được',
+    'Chế tạo: 6 công thức đầu (Chậu cây gỗ, Giỏ đan, Khung ảnh, Ghế đẩu, Đèn bàn, Kệ sách) — mỗi món +điểm Chế tạo và XP',
+    'Nội thất mua/chế tạo được cất trước; đặt vào nhà sẽ mở cùng chế độ Xây nhà']},
   {id: 'quests-bag', date: '03/11/2026', title: 'Nhiệm vụ, Túi đồ & Kho nhà', items: [
     'Nhiệm vụ (lá cờ, phím J): 3 mục tiêu mỗi ngày, 3 mục tiêu mỗi tuần, và 1 nhiệm vụ chung Bin + Vy góp Điểm Kiến Tạo cho nhà. Bỏ lỡ không bị phạt',
     'Túi đồ (phím B): lưới đồ có lọc & tìm, xem chi tiết từng món; Kho nhà chung để cất / lấy đồ cho cả hai',

@@ -129,7 +129,7 @@ async function boot() {
         $('sAcc') && ($('sAcc').textContent = (sess.user && sess.user.email) || '');
         const day = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
         // vào map => sự kiện (máy chủ tự áp giới hạn: về nhà lần đầu, dạo vườn 1 lần/ngày…)
-        const mapEv = {house: 'enter_house', exterior: 'visit_garden', studio: 'enter_studio'}[mapId];
+        const mapEv = {living: 'enter_house', house: 'enter_house', exterior: 'visit_garden', vy: 'enter_studio', bin: 'enter_studio', studio: 'enter_studio'}[mapId];
         if (mapEv) prog.report(mapEv, {map: mapId}, mapEv + ':' + day());
         // ngủ: game phát lệnh 'sleep' qua api.emit (cùng lệnh đồng bộ cho người kia)
         const emit0 = api.emit;
@@ -148,8 +148,9 @@ async function boot() {
         let inCall = false;
         voice.on && voice.on('state', st => { const on = !!(st && st.active && st.peerVoice && (st.phase === 'connected' || st.phase === 'weak')); if (on && !inCall) prog.report('call_together', {}, 'call:' + Math.floor(Date.now() / 1800000)); inCall = on; });
         // ở cạnh nhau: cùng online + cùng map, cộng dồn mỗi 10 phút
-        let together = 0;
-        setInterval(() => { if (document.hidden || !sess.peer || peerMap !== mapId) return; if (++together % 10 === 0) prog.report('together_10min', {map: mapId}, 'tg:' + Math.floor(Date.now() / 600000)); }, 60000);
+        // (có trang vỏ: bộ đếm sống ở vỏ nên đổi phòng không làm mất số phút đã cộng; vẫn chỉ tính khi ở CÙNG một map)
+        const TG = SH ? (SH.together ||= {n: 0}) : {n: 0};
+        setInterval(() => { if (document.hidden || !sess.peer || peerMap !== mapId) return; if (++TG.n % 10 === 0) prog.report('together_10min', {map: mapId}, 'tg:' + Math.floor(Date.now() / 600000)); }, 60000);
         // "Việc hôm nay" đồng bộ giữa các máy
         const T = window.__vyTasks;
         if (T && prog.me) {
