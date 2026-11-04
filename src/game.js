@@ -1073,10 +1073,13 @@ ${FRAG_COLOR}
   const SKY={top:'#86b3ea',mid:'#c9d6f2',pink:'#f5c6c6',hor:'#ffe3c4'};
   const skyU={cTop:{value:new THREE.Color(SKY.top)},cMid:{value:new THREE.Color(SKY.mid)},cPink:{value:new THREE.Color(SKY.pink)},cHor:{value:new THREE.Color(SKY.hor)},
     cCl:{value:new THREE.Color('#ffffff')},cClSh:{value:new THREE.Color('#e8d8e8')},cth:{value:0.58},uStar:{value:0},uSunV:{value:1},uOut:{value:OUTD?1:0},
-    sunDir:{value:new THREE.Vector3(0.55,0.5,0.65).normalize()},moonDir:{value:new THREE.Vector3(-0.5,0.4,-0.3).normalize()},uT:{value:0}};
+    sunDir:{value:new THREE.Vector3(0.55,0.5,0.65).normalize()},moonDir:{value:new THREE.Vector3(-0.5,0.4,-0.3).normalize()},uT:{value:0},
+    tA:{value:null},tB:{value:null},tC:{value:null},uMix:{value:0},uW:{value:0},uRA:{value:0},uRB:{value:0},uRC:{value:0},uTexK:{value:0},uGK:{value:0.62},
+    rH:{value:new THREE.Vector3(.5,.5,.5)},rM:{value:new THREE.Vector3(.5,.5,.5)},rZ:{value:new THREE.Vector3(.5,.5,.5)},uSkyDim:{value:1}};
   const sky=new THREE.Mesh(new THREE.SphereGeometry(1,32,16),new THREE.ShaderMaterial({uniforms:skyU,side:THREE.BackSide,depthWrite:false,depthTest:false,fog:false,toneMapped:false,
     vertexShader:'varying vec3 vD;void main(){vD=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
     fragmentShader:`varying vec3 vD;uniform vec3 cTop,cMid,cPink,cHor,cCl,cClSh,sunDir,moonDir;uniform float uT,cth,uStar,uSunV,uOut;
+    uniform sampler2D tA,tB,tC;uniform float uMix,uW,uRA,uRB,uRC,uTexK,uGK,uSkyDim;uniform vec3 rH,rM,rZ;
     float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
     float h31(vec3 p){p=fract(p*0.3183099+vec3(.1,.2,.3));p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
     float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
@@ -1085,6 +1088,16 @@ ${FRAG_COLOR}
       vec3 c=cHor;c=mix(c,cPink,smoothstep(0.02,0.06,t));c=mix(c,cMid,smoothstep(0.1,0.16,t));c=mix(c,cTop,smoothstep(0.3,0.38,t));
       if(h<0.0)c=cHor;
       float up=step(0.0,h);
+      // ẢNH BẦU TRỜI stylized (bán cầu trên, equirect): 2 ảnh theo giờ (chuyển mượt) + 1 ảnh thời tiết (mây u ám).
+      // Xoay ngang để vầng mặt trời vẽ sẵn trùng hướng mặt trời thật; rồi kéo màu một phần về dải màu grading hiện tại (giữ mood theo giờ/thời tiết)
+      if(uTexK>0.001){float hh=max(h,0.0015);float vv=asin(clamp(hh,0.0,1.0))*0.63662;float uu=atan(d.z,d.x)*0.159155+0.5;
+        vec3 ta=texture2D(tA,vec2(fract(uu+uRA),vv)).rgb,tb=texture2D(tB,vec2(fract(uu+uRB),vv)).rgb,tc=texture2D(tC,vec2(fract(uu+uRC),vv)).rgb;
+        vec3 tx=mix(mix(ta,tb,uMix),tc,uW);
+        vec3 ref=mix(mix(rH,rM,smoothstep(0.03,0.22,hh)),rZ,smoothstep(0.3,0.65,hh));
+        vec3 rat=clamp(c/max(ref,vec3(0.02)),vec3(0.35),vec3(2.6));
+        vec3 g=tx*pow(rat,vec3(uGK))*uSkyDim;
+        g=mix(g,c,smoothstep(0.0,-0.03,h));          // dưới chân trời: về màu chân trời (khớp sương / mặt đất)
+        c=mix(c,g,uTexK);}
       // sao
       vec3 sp=d*150.0;float st=step(0.9968,h31(floor(sp)));st*=0.55+0.45*sin(uT*2.5+h31(floor(sp)+7.0)*40.0);
       c+=vec3(st)*uStar*smoothstep(0.03,0.3,h)*up;
@@ -1127,16 +1140,16 @@ ${FRAG_COLOR}
         vec3 cc=mix(mix(cClSh,cdark,thick),cCl*sunC,lt*(1.0-0.55*thick));
         cc+=vec3(1.0,0.86,0.66)*0.30*pow(max(sd,0.0),4.0)*uSunV*edge;
         cc=mix(cc,cc*vec3(0.78,0.84,1.0),smoothstep(0.0,0.5,0.5-sunDir.y)*0.5);
-        c=mix(c,cc,body*0.96);
+        c=mix(c,cc,body*0.96*(1.0-uTexK));
         // mây ti mỏng kéo sợi + tia sáng toả từ mặt trời (god rays) xuyên qua mây
         float ci=vn(vec2(d.x/(h+0.35)*0.45+uT*0.0016,d.z/(h+0.35)*3.2))*vn(vec2(d.z/(h+0.35)*0.9+5.0,d.x/(h+0.35)*2.1));
-        c=mix(c,mix(cHor,vec3(1.0),0.55)*sunC,smoothstep(0.2,0.42,ci)*0.4*smoothstep(0.12,0.4,h)*(1.0-body));
+        c=mix(c,mix(cHor,vec3(1.0),0.55)*sunC,smoothstep(0.2,0.42,ci)*0.4*smoothstep(0.12,0.4,h)*(1.0-body)*(1.0-uTexK));
         vec3 sdn=normalize(sunDir),sax=normalize(cross(vec3(0.0,1.0,0.0),sdn)),say=cross(sdn,sax);
         float ra=atan(dot(d,say),dot(d,sax));
         float rays=(0.5+0.5*sin(ra*13.0+vn(vec2(ra*5.0,uT*0.03))*5.0))*(0.6+0.4*vn(vec2(ra*21.0,3.0)));
         c+=vec3(1.0,0.8,0.55)*rays*pow(max(sd,0.0),3.0)*0.2*uSunV*up*smoothstep(-0.05,0.08,sunDir.y)*(1.0-body*0.7);
         float hz=smoothstep(0.0,0.05,h)*(1.0-smoothstep(0.05,0.3,h));
-        c=mix(c,cHor,hz*body*0.25);
+        c=mix(c,cHor,hz*body*0.25*(1.0-uTexK));
       }
       vec2 cp=d.xz/(max(h,0.0)+0.25)*1.4+vec2(uT*0.004,0.0);
       float n=vn(cp*vec2(1.2,2.4))*0.6+vn(cp*vec2(2.4,4.8))*0.4;
@@ -1146,8 +1159,8 @@ ${FRAG_COLOR}
       float cl2=step(cth+0.09,n2)*smoothstep(0.04,0.2,h)*0.85;
       float lit=step(cth,vn(cp*vec2(1.2,2.4)+vec2(0.05,0.18))*0.6+vn(cp*vec2(2.4,4.8)+vec2(0.1,0.3))*0.4);
       float rimL=pow(max(sd,0.0),5.0)*uSunV;
-      if(uOut<0.5){c=mix(c,cClSh*1.05,cl2);
-      c=mix(c,mix(cClSh,cCl,lit)+vec3(1.0,0.75,0.45)*0.22*rimL*lit,cl*0.92);}
+      if(uOut<0.5){c=mix(c,cClSh*1.05,cl2*(1.0-uTexK));
+      c=mix(c,mix(cClSh,cCl,lit)+vec3(1.0,0.75,0.45)*0.22*rimL*lit,cl*0.92*(1.0-uTexK));}
       // sao băng
       float kk=fract(uT*0.045);if(kk<0.05&&uStar>0.2){float u=kk/0.05;vec2 pos=vec2(-0.5+u*0.7,0.78-u*0.33);vec2 dr=normalize(vec2(0.7,-0.33));vec2 r=d.xy-pos;float a=dot(r,dr),bb=abs(dot(r,vec2(-dr.y,dr.x)));
         c+=vec3(1.0,0.95,0.85)*exp(min(a,0.0)*28.0)*(1.0-smoothstep(0.0,0.004,bb))*step(a,0.004)*(1.0-u)*uStar*up*smoothstep(0.1,0.3,h);}
@@ -1155,6 +1168,31 @@ ${FRAG_COLOR}
       #include <colorspace_fragment>
     }`}));
   sky.renderOrder=-1000;sky.frustumCulled=false;sky.scale.setScalar(700);scene.add(sky);scene.background=null;
+  // ===== ẢNH BẦU TRỜI theo giờ =====  (assets/sky/sky_XX.jpg: bán cầu trên 2048×512; meta: màu trung bình chân trời/giữa/đỉnh + vị trí ngang vầng mặt trời)
+  const SKYM={"03":{"h":[0.4955,0.4618,0.1879],"m":[0.2928,0.2589,0.1925],"z":[0.2902,0.1597,0.1125],"su":0.1763},"123":{"h":[0.3463,0.4113,0.4655],"m":[0.2492,0.3238,0.5314],"z":[0.5633,0.4214,0.4679],"su":0.9985},"12":{"h":[0.9388,0.2768,0.1153],"m":[0.4093,0.0732,0.1977],"z":[0.1983,0.0457,0.0968],"su":0.7979},"130":{"h":[0.4675,0.6068,0.6715],"m":[0.2695,0.3754,0.5819],"z":[0.4767,0.2421,0.2662],"su":0.106},"131":{"h":[0.4985,0.3439,0.2385],"m":[0.4028,0.4515,0.4337],"z":[0.3494,0.253,0.2971],"su":0.4136},"133":{"h":[0.5477,0.5139,0.3814],"m":[0.4084,0.421,0.4121],"z":[0.3747,0.2661,0.3266],"su":0.314},"23":{"h":[0.3211,0.3616,0.409],"m":[0.3683,0.3717,0.3879],"z":[0.3541,0.3298,0.3552],"su":null},"29":{"h":[0.3082,0.4848,0.3462],"m":[0.3211,0.333,0.3004],"z":[0.295,0.2252,0.223],"su":null},"40":{"h":[0.4917,0.4615,0.3537],"m":[0.4497,0.4374,0.3672],"z":[0.381,0.3294,0.3182],"su":0.1958},"66":{"h":[0.7473,0.4682,0.3404],"m":[0.4326,0.4377,0.4254],"z":[0.2386,0.1843,0.2343],"su":0.605},"87":{"h":[0.0948,0.1561,0.3007],"m":[0.0779,0.1406,0.3083],"z":[0.1347,0.1068,0.1803],"su":0.0708},"97":{"h":[0.7035,0.4221,0.3102],"m":[0.6985,0.4779,0.4071],"z":[0.3526,0.2353,0.3386],"su":0.0513}};
+  // lịch trong ngày (giờ game) → ảnh trời; giữa 2 mốc chuyển mượt
+  const SKYS=[[0,'87'],[4.7,'87'],[5.6,'97'],[6.5,'130'],[7.6,'40'],[9.4,'123'],[15.2,'123'],[16.3,'40'],[17.2,'29'],[17.9,'03'],[18.6,'131'],[19.25,'12'],[19.9,'66'],[20.7,'87'],[24,'87']];
+  const skyTex=new Map(),skyLd=new THREE.TextureLoader();
+  const getSky=k=>{let t=skyTex.get(k);if(t)return t.ok?t.tex:null;t={ok:false,tex:skyLd.load('assets/sky/sky_'+k+'.jpg?v=1',()=>{t.ok=true})};
+    t.tex.colorSpace=THREE.SRGBColorSpace;t.tex.wrapS=THREE.RepeatWrapping;t.tex.wrapT=THREE.ClampToEdgeWrapping;t.tex.generateMipmaps=false;t.tex.minFilter=THREE.LinearFilter;t.tex.magFilter=THREE.LinearFilter;   // không mipmap: tránh đường nối ở mép ảnh
+    skyTex.set(k,t);return null};
+  const sunU=v=>Math.atan2(v.z,v.x)/(2*Math.PI)+0.5,rotOf=(k,su)=>SKYM[k].su==null?0:(SKYM[k].su-su);
+  const _ra=new THREE.Vector3(),_rb=new THREE.Vector3();
+  function skyStep(t,sunV,moonV,isDay,dt){
+    t=((t%24)+24)%24;let i=0;while(i<SKYS.length-2&&SKYS[i+1][0]<=t)i++;
+    const [t0,a]=SKYS[i],[t1,b]=SKYS[i+1];let m=t1>t0?(t-t0)/(t1-t0):0;m=m*m*(3-2*m);
+    const wK=Math.min(1,Math.max(0,(WC.cov-0.55)/0.3)),cK=isDay?'23':'66';
+    const A=getSky(a),B=getSky(b),C=wK>0.01?getSky(cK):null;
+    // ảnh kế tiếp nạp trước
+    getSky(SKYS[Math.min(SKYS.length-1,i+2)][1]);
+    const ok=A&&B&&(wK<=0.01||C);const U=skyU;
+    U.uTexK.value+=((ok?1:0)-U.uTexK.value)*Math.min(1,(dt||0.016)*2);if(!ok)return;
+    U.tA.value=A;U.tB.value=B;U.tC.value=C||A;U.uMix.value=m;U.uW.value=wK;
+    const su=sunU(isDay?sunV:moonV);U.uRA.value=rotOf(a,su);U.uRB.value=rotOf(b,su);U.uRC.value=rotOf(cK,su);
+    const bl=(f)=>{_ra.fromArray(SKYM[a][f]).lerp(_rb.fromArray(SKYM[b][f]),m);if(wK>0.01)_ra.lerp(_rb.fromArray(SKYM[cK][f]),wK);return _ra};
+    U.rH.value.copy(bl('h'));U.rM.value.copy(bl('m'));U.rZ.value.copy(bl('z'));
+    U.uSkyDim.value=1-0.35*WC.rain;}
+  window.__sky={U:skyU,SKYS,getSky};
   scene.fog=new THREE.Fog(SKY.hor,70,300);
   
   let grassCol=null;const grassTex=(()=>{let t=null;const gn=MC.gtex||'Plane001';(extG||env).traverse(o=>{if(o.isMesh&&o.name===gn&&o.material.map){t=o.material.map;grassCol=o.material.color.clone()}});return t})();
@@ -1681,7 +1719,7 @@ ${FRAG_COLOR}
     skyU.cClSh.value.copy(des(k.mid).lerp(k.pink,0.5)).multiplyScalar(dayB*0.95*(1-0.25*WC.des));
     skyU.cth.value=WC.cov;skyU.uStar.value=(1-k.day)*(1-Math.min(1,WC.cov>0.5?0:(0.6-WC.cov)*3));
     skyU.uSunV.value=(isDay?fade:0)*(1-Math.min(1,(0.6-WC.cov)*3.5));
-    skyU.sunDir.value.copy(S.v);skyU.moonDir.value.copy(M.v);
+    skyU.sunDir.value.copy(S.v);skyU.moonDir.value.copy(M.v);skyStep(t,S.v,M.v,isDay,dt);
     // sương
     scene.fog.color.copy(des(k.fog));scene.fog.near=WC.fn*(OUTD?0.8:1);scene.fog.far=WC.ff*(OUTD?0.55:1);
     // grade
