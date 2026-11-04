@@ -128,9 +128,9 @@ export function mountQuestsUi({prog, toast, api, mapId}) {
 
   // ======================= TÚI ĐỒ & KHO NHÀ =======================
   let bag = null, bTab = 'mine', bGroup = 'all', bQuery = '', bSel = null, sellAsk = 0;
-  const shopUi = createShop({prog, toast, rerender: () => BM.isOn() && renderBag(), errText});
+  const shopUi = createShop({prog, toast, rerender: () => BM.isOn() && renderBag(), errText, onClose: () => BM.close()});
   async function loadBag() { try { bag = await prog.bag(); } catch (e) { toast(errText(e)); } if (BM.isOn()) renderBag(); }
-  const openBag = async t => { if (t) bTab = t; BM.m.classList.add('on'); renderBag(); rep('open_bag', 'ob:' + day()); if (bTab === 'shop' || bTab === 'craft') shopUi.load(); await loadBag(); };
+  const openBag = async (t, grp) => { if (t) bTab = t; if (grp) { bGroup = grp; bSel = null; } BM.m.classList.add('on'); renderBag(); rep('open_bag', 'ob:' + day()); if (bTab === 'shop' || bTab === 'craft') shopUi.load(); await loadBag(); };
   function renderBag() {
     BM.tabs.innerHTML = [['mine', 'Túi của tôi'], ['house', 'Kho nhà (chung)'], ['shop', 'Cửa hàng'], ['craft', 'Chế tạo']].map(([k, l]) => `<div class="chip${k === bTab ? ' on' : ''}" role="tab" data-t="${k}">${l}</div>`).join('');
     BM.tabs.onclick = e => { const c = e.target.closest('.chip'); if (c) { const was = bTab; bTab = c.dataset.t; bSel = null; bGroup = 'all'; shopUi.reset(); renderBag(); if ((bTab === 'shop' || bTab === 'craft') && was !== bTab) shopUi.load(); else if (bTab === 'mine' || bTab === 'house') loadBag(); } };
@@ -150,10 +150,12 @@ export function mountQuestsUi({prog, toast, api, mapId}) {
         <label class="bg-search"><span class="ic">${ic('search')}</span><input id="bgQ" placeholder="Tìm đồ…" value="${esc(bQuery)}" autocomplete="off"></label></div>
       <div class="bg-wrap"><div class="bg-grid" id="bgGrid">${shown.map(o => { const d = ITEMS[o.id] || {}; return `<button class="bg-cell r-${esc(d.rarity || 'common')}${o.id === bSel ? ' on' : ''}" data-i="${esc(o.id)}" title="${esc(d.name || o.id)}"><span>${esc(d.icon || '📦')}</span><em>${nf(o.n)}</em></button>`; }).join('')}${(bGroup === 'all' && !q) ? '<i class="bg-cell empty"></i>'.repeat(Math.max(0, Math.min(cap, 40) - shown.length)) : ''}</div>
       <div class="bg-det">${sel ? `<div class="bg-big r-${esc(it.rarity || 'common')}">${esc(it.icon || '📦')}</div><b>${esc(it.name)}</b><small>${esc(grp(it.group))} · ${esc(RAR[it.rarity] || 'Thường')} · có ${nf(sel.n)}${it.stack ? ' / tối đa ' + it.stack : ''}</small><p>${esc(it.desc || '')}</p>
-          <div class="bg-mv"><input type="number" id="bgN" min="1" max="${sel.n}" value="${sel.n}" aria-label="Số lượng"><button class="pb" id="bgMv">${bTab === 'mine' ? 'Cất vào kho nhà' : 'Lấy về túi'}</button></div>
+          ${(() => { const F = window.__vyFurn; if (!F || !F.placeable(sel.id)) return ''; return F.canHere() ? `<button class="pb bg-place" id="bgPlace">Đặt vào ${esc(F.mapName)}</button>` : `<small class="sh-why">${esc(F.mapName)} là phòng riêng của người kia — sang phòng khách, vườn hoặc phòng mình để đặt.</small>`; })()}
+          <div class="bg-mv"><input type="number" id="bgN" min="1" max="${sel.n}" value="${sel.n}" aria-label="Số lượng"><button class="pl" id="bgMv">${bTab === 'mine' ? 'Cất vào kho nhà' : 'Lấy về túi'}</button></div>
           ${bTab === 'mine' && it.sell && !it.nosell && it.group !== 'quest' ? (sellAsk ? `<div class="sh-cf"><b>Bán ${nf(sellAsk)} ${esc(it.name)}?</b><span>Nhận <b>${nf(it.sell * sellAsk)} Xu</b> (${nf(it.sell)} Xu / món)</span><div class="bg-mv"><button class="pl" id="bgSN">Huỷ</button><button class="pb" id="bgSY">Bán</button></div></div>`
             : `<button class="pl bg-sellb" id="bgSell">Bán · ${nf(it.sell)} Xu / món</button>`) : bTab === 'mine' ? '<small>Món này không bán được.</small>' : ''}`
         : `<p class="pg-empty">${own.length ? 'Chọn một món để xem chi tiết.' : bTab === 'mine' ? 'Túi đang trống. Làm nhiệm vụ để nhận nguyên liệu nhé.' : 'Kho nhà trống. Cất đồ từ túi vào để cả hai cùng dùng.'}</p>`}
+        ${window.__vyFurn ? `<button class="pl bg-arr" id="bgArr"><i class="ic">${ic('home')}</i>Sắp xếp ${esc(window.__vyFurn.mapName)}</button>` : ''}
         <p class="pg-help bg-note">${bTab === 'mine' ? 'Túi riêng của bạn, mang theo mọi nơi.' : 'Kho chung của Bin và Vy — ai cũng cất / lấy được. Lịch sử xem ở Hồ sơ → Lịch sử → Quỹ nhà.'}</p></div></div>`;
     $('bgGrp').onclick = e => { const c = e.target.closest('.chip'); if (c) { bGroup = c.dataset.g; renderBag(); } };
     const qi = $('bgQ'); qi.oninput = () => { bQuery = qi.value; const pos = qi.selectionStart; renderBag(); const n = $('bgQ'); n.focus(); n.setSelectionRange(pos, pos); };
@@ -165,6 +167,8 @@ export function mountQuestsUi({prog, toast, api, mapId}) {
       try { const r = await prog.sell(sel.id, n); if (r && r.ok) toast(`Đã bán ${n} ${it.name} (+${nf(r.gain)} Xu)`); } catch (er) { toast(errText(er)); }
       sellAsk = 0; loadBag();
     });
+    $('bgPlace') && ($('bgPlace').onclick = () => { BM.close(); window.__vyFurn.place(sel.id); });
+    $('bgArr') && ($('bgArr').onclick = () => { BM.close(); window.__vyFurn.arrange(); });
     $('bgMv') && ($('bgMv').onclick = async e => {
       const n = Math.max(1, Math.min(sel.n, parseInt($('bgN').value, 10) || 0)); e.currentTarget.disabled = true;
       try { await prog.transfer(sel.id, n, bTab === 'mine'); toast((bTab === 'mine' ? 'Đã cất ' : 'Đã lấy ') + n + ' ' + it.name + (bTab === 'mine' ? ' vào kho nhà' : ' về túi')); } catch (er) { toast(errText(er)); }

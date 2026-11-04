@@ -1,6 +1,11 @@
 // Thông báo "cập nhật game" hiện trong trung tâm thông báo (chuông). Thêm bản mới: chèn 1 mục ĐẦU danh sách — id phải duy nhất.
 // Mỗi mục: {id, date, title, items:[các dòng ngắn]}. Trạng thái "đã đọc" lưu trên máy từng người (localStorage).
 export const NEWS = [
+  {id: 'furniture-place', date: '04/11/2026', title: 'Đặt nội thất vào nhà', items: [
+    '22 món nội thất 3D (bộ Kenney Furniture Kit, miễn phí CC0): sofa, ghế, đèn, kệ sách, cây cảnh, thảm…',
+    'Túi đồ → chọn món → "Đặt vào phòng": rê chuột lên sàn, R để xoay, bấm để đặt (điện thoại: chạm chỗ rồi bấm Đặt). Mua ở cửa hàng có thêm "Mua & đặt luôn"',
+    'Dùng được thật: ghế / ghế thư giãn / sofa → Ngồi; đèn → Bật / Tắt (người kia cũng thấy); radio → bật nhạc',
+    'Túi đồ → "Sắp xếp phòng" để dời, xoay hoặc cất đồ lại vào túi. Phòng Vy chỉ Vy sắp xếp, phòng Bin chỉ Bin; phòng khách & vườn cả hai']},
   {id: 'shop-craft', date: '04/11/2026', title: 'Cửa hàng, Bán đồ & Chế tạo', items: [
     'Túi đồ (phím B) có thêm 2 tab: Cửa hàng và Chế tạo',
     'Cửa hàng: Nội thất và Nguyên liệu, xem giá + số dư sau mua trước khi xác nhận; chọn nhận vào túi hoặc cất thẳng vào kho nhà',

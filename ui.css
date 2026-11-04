@@ -861,3 +861,18 @@ html[data-fx="lite"] #cine .cLib{transition:none}
 .cr-in{display:flex;flex-wrap:wrap;gap:.375rem;margin-top:.375rem}.cr-in span{font-size:.8125rem;border-radius:999px;padding:.125rem .5rem;background:rgba(0,0,0,.35)}.cr-in .ok{color:var(--green)}.cr-in .no{color:#ff9b9b}
 .cr-go{align-items:center;flex-wrap:wrap}.cr-go .sh-dst{margin:0}
 @media(max-width:640px){.sh-list{max-height:30vh}#hBag .pg-tabs .chip{padding:.375rem .75rem;font-size:.875rem}}
+
+/* ---------- đặt nội thất: thanh điều khiển nổi ---------- */
+#fnBar{position:fixed;z-index:7;left:50%;bottom:1.25rem;transform:translateX(-50%);display:flex;align-items:center;gap:.5rem;padding:.625rem .75rem .625rem 1.25rem;border-radius:999px;box-shadow:0 0 0 2px rgba(255,213,129,.55);max-width:calc(100vw - 2rem);box-sizing:border-box;flex-wrap:wrap;justify-content:center}
+#fnBar[hidden]{display:none}
+#fnBar .fn-t{display:flex;flex-direction:column;margin-right:.5rem;min-width:0}#fnBar .fn-t b{font:400 1.25rem/1.2 var(--f-d)}#fnBar .fn-t small{color:var(--ink2);font-weight:600;font-size:.8125rem}
+#fnBar .rb{font-size:1.25rem}#fnBar .pl .ic,#fnBar .pb .ic{font-size:1.125rem}
+#fnBar.busy{opacity:.7}
+.bg-place{margin-top:.25rem}.bg-arr{margin-top:.75rem;width:100%}.bg-arr .ic{font-size:1.125rem}
+@media(max-width:640px){#fnBar{bottom:5.5rem;border-radius:1.5rem;padding:.75rem}#fnBar .fn-t{flex-basis:100%;margin:0 0 .25rem;text-align:center}}
+html.vy-arrange #hMusic,html.vy-arrange #hBR{opacity:.35;pointer-events:none}
+/* nút dùng đồ nội thất (Ngồi / Bật đèn / Nhạc) nổi trên món đồ khi đứng gần */
+#fPins{position:fixed;inset:0;pointer-events:none;z-index:5}
+.fpin{position:absolute;left:0;top:0;margin:-1.25rem 0 0 0;translate:-50% 0;pointer-events:auto;display:flex;align-items:center;gap:.375rem;padding:.375rem .75rem .375rem .5rem;border:0;border-radius:999px;background:rgba(255,231,198,.95);color:#914a14;font:800 .875rem/1 var(--f-b);cursor:pointer;box-shadow:0 .25rem .75rem rgba(0,0,0,.25)}
+.fpin[hidden]{display:none}.fpin .ic{font-size:1rem}.fpin.on{background:#ffd581;color:#5a2c08}
+.fpin:hover{filter:brightness(1.05)}

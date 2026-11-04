@@ -141,6 +141,8 @@ async function boot() {
         // nhiệm vụ, túi đồ & kho nhà, hướng dẫn người mới (hạng mục 04 + 05)
         try { const {mountQuestsUi} = await import('./ui/quests-ui.js'); window.__vyQuests = mountQuestsUi({prog, toast, api, mapId}); }
         catch (e) { console.warn('[quests]', e); }
+        // nội thất đặt thêm trong nhà (model Kenney CC0, assets/furniture/) — lỗi ở đây không ảnh hưởng game
+        import('./build/furniture.js').then(m => m.mountFurniture({prog, sess, api, mapId, slot, toast})).then(f => { if (f) window.__vyFurn = f; }).catch(e => console.warn('[furn]', e));
         // chat
         if (SH) chat.on('sent', () => prog.report('chat_sent', {}, 'chat:' + Date.now()));
         else { const send0 = chat.send.bind(chat); chat.send = async (...args) => { const r = await send0(...args); if (r && r.ok !== false) prog.report('chat_sent', {}, 'chat:' + Date.now()); return r; }; }

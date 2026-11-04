@@ -122,3 +122,14 @@ Toàn bộ hiệu ứng âm thanh nằm trong `src/sfx.js`, tổng hợp bằng 
 - Game: chế độ nhân vật `watch` (clip `WATCH`, `WATCH_IDLE`, `OFFWATCH` trong bảng `K`), đệm `Sofa_Seat*` + `TV_Screen` trong map; khi màn rạp mở `api.theater=true` → gần như ngừng vẽ 3D.
 - Bắp rang: object `POPCORN_IN` / `POPCORN_IDLE` / `POPCORN_OUT` trong file nhân vật (đã bake theo tay); clip nào target object nào thì chạy theo đó.
 - Miệng LazyRig (`src/lazyrig.js`): biểu cảm tự động theo tư thế + nhép theo tiếng nói cuộc gọi (`api.meTalk / api.peerTalk`).
+
+## 9. Nội thất đặt thêm (`src/build/furniture.js`) — model Kenney Furniture Kit (CC0)
+- Model nằm ở `assets/furniture/<model>.glb` (nguồn: Kenney Furniture Kit 2.1, giấy phép CC0 — `assets/furniture/LICENSE-Kenney-Furniture-Kit.txt`). Kit đầy đủ 140 món; mới lấy 22.
+- Món nào dùng model nào: `game_config.items` → `model`, `scale`, `solid`, `use`, `seat`, `light`.
+  - **scale**: model Kenney không cùng tỉ lệ với nhau → mỗi món một hệ số, chỉnh theo kích thước thật trong world (ghế bàn làm việc có sẵn: mặt ngồi 0.42 m; nhân vật ~1.6 m). Ví dụ ghế đệm 1.9 (mặt ngồi ~0.46 m), sofa 1.8 (cao 0.72, dài 2 m), đèn cây 1.86 (1.6 m).
+  - **origin**: model Kenney có gốc ở góc → code dời về tâm đáy. Mặt trước = +Z cục bộ (= yaw nhân vật khi ngồi).
+  - **solid**: chặn lưới đi bộ (thảm, gối, sách = false).
+  - **use**: `sit` (ngồi bằng clip ngồi lùi của sofa — `seat:{n, y:% chiều cao mặt đệm, z:% lệch sâu, x:% lệch ngang cho 2 chỗ}`), `light` (PointLight + chao sáng; `light:{y,r,i}`), `music` (bật/tắt nhạc HUD).
+- Thêm món mới: copy glb vào `assets/furniture/`, thêm 1 dòng vào `items` (+ `shop`/`recipes` nếu bán/chế tạo). Đo kích thước: `python3 tools/…` hoặc mở model, tính scale = cỡ thật / cỡ model.
+- Máy chủ: `game_placed` (vị trí), RPC `game_placed / game_place / game_place_move / game_place_pickup / game_place_use`. Quyền: `game_config.place.maps` (phòng Vy chỉ Vy, phòng Bin chỉ Bin, phòng khách + vườn cả hai).
+- Game: `api.seatSet/seatDel/seatFree` (chỗ ngồi thêm, id chuỗi 'f<id>:<k>'), `api.pickHook` (giành cú bấm khi đang đặt đồ), `api.toonMat`.

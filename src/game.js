@@ -325,7 +325,7 @@ ${FRAG_COLOR}
     for(const S of stairs){if(x>S.x0-0.02&&x<S.x1+0.02&&z>S.z0&&z<S.z1+0.02)blocked[lv][j*G.W+i]=1;
       else if(x>S.x0-0.16&&x<S.x1+0.16&&z>S.z0&&z<S.z1-0.03)blocked[lv][j*G.W+i]=1;}}      // vành đệm bán kính nhân vật dọc hông cầu thang: đường đi không sượt/cắt góc hông
   console.log('colliders',cols[0].length,cols[1].length);
-  window.__G={G,blocked,A,cols,envMeshes,isUnder,CHAIR};
+  window.__G={G,blocked,A,cols,envMeshes,isUnder,CHAIR,stairs};
   const colGroup=new THREE.Group();colGroup.visible=false;scene.add(colGroup);
   cols.forEach((arr,lv)=>arr.forEach(b=>colGroup.add(new THREE.Box3Helper(b,lv?0x44ff88:0xff5555))));
   $('cCol').onchange=e=>colGroup.visible=e.target.checked;
@@ -667,9 +667,13 @@ ${FRAG_COLOR}
         if(!(x>cb.min.x&&x<cb.max.x&&z>cb.min.z&&z<cb.max.z)&&mk.stands.some(v=>Math.hypot(v.x-x,v.z-z)<0.22)){if(mk.mine.has(k)){blocked[lv][k]=0;mk.mine.delete(k)}continue}
         if(!blocked[lv][k]){blocked[lv][k]=1;mk.mine.add(k)}}}}
   // ghế sofa xem TV: gốc đứng sao cho hông cuối clip WATCHING rơi đúng tâm đệm (clip lùi ~0.5 m rồi ngồi xuống)
-  function watchPose(i){const se=SOFA.seats[i],an=HIP.WATCH?HIP.WATCH.e:new THREE.Vector3(0,0.5,-0.52),y=SOFA.yaw,c=Math.cos(y),s=Math.sin(y);
-    return new THREE.Vector3(se.c.x-(an.x*c+an.z*s),A.L0,se.c.z-(-an.x*s+an.z*c))}
-  const watchDY=i=>{const an=HIP.WATCH?HIP.WATCH.e:null;if(!an)return 0;return clamp(SOFA.seats[i].top+0.06-(A.L0+an.y),-0.15,0.15)};
+  // chỗ ngồi THÊM từ nội thất đặt trong nhà (src/build/furniture.js): id dạng chuỗi 'f…' → {c, top, yaw, lv, fy}; dùng chung clip ngồi lùi WATCH của sofa
+  const XSEAT={};api.seatSet=(id,o)=>{XSEAT[id]={c:new THREE.Vector3(o.x,o.y,o.z),top:o.y,yaw:o.yaw,lv:o.lv|0,fy:o.fy}};api.seatDel=id=>{delete XSEAT[id]};api.seatFree=id=>!occ['sofa'+id];
+  const isX=i=>typeof i==='string';
+  const seatOf=i=>isX(i)?XSEAT[i]:SOFA.seats[i],seatYaw=i=>isX(i)?XSEAT[i].yaw:SOFA.yaw,seatFY=i=>isX(i)?XSEAT[i].fy:A.L0,seatLv=i=>isX(i)?XSEAT[i].lv:0;
+  function watchPose(i){const se=seatOf(i),an=HIP.WATCH?HIP.WATCH.e:new THREE.Vector3(0,0.5,-0.52),y=seatYaw(i),c=Math.cos(y),s=Math.sin(y);
+    return new THREE.Vector3(se.c.x-(an.x*c+an.z*s),seatFY(i),se.c.z-(-an.x*s+an.z*c))}
+  const watchDY=i=>{const an=HIP.WATCH?HIP.WATCH.e:null;if(!an)return 0;return clamp(seatOf(i).top+0.06-(seatFY(i)+an.y),-0.15,0.15)};
   const bedPose=side=>new THREE.Vector3(side==='L'?A.bedBox.min.x-CFG.bedSide:A.bedBox.max.x+CFG.bedSide,A.L1,A.bedBox.min.z+CFG.bedHeadZ);
   const bedRootY=()=>A.mattress.max.y-CFG.bedHipH;
 
@@ -701,7 +705,10 @@ ${FRAG_COLOR}
     plan=[...leave(),...route(s.x,s.z,A.chairL,false,true),{t:'face',yaw:A.chairYaw},{t:'climbChair',side}];if(type==='type')plan.push({t:'type'});}
   const cmdWake=()=>{em('wake');if(P.mode==='bed'||(busy&&busy.kind==='climbBed'))plan=[{t:'offBed'}];else if(plan.some(s=>s.t==='climbBed')){plan=[];['bedL','bedR'].forEach(k=>{if(occ[k]===DEF.id)occ[k]=null})}};
   // xem TV: đi tới trước đệm sofa còn trống gần nhất → quay mặt về TV → ngồi lùi lên sofa (WATCHING) → WATCHING_IDLE
-  function cmdWatch(seat){if(!SOFA)return false;
+  function cmdWatch(seat){
+    if(isX(seat)){if(!XSEAT[seat])return false;if(P.mode==='watch'&&P.seat===seat)return true;if(occ['sofa'+seat]&&occ['sofa'+seat]!==DEF.id){toast('Chỗ đó có người rồi');return false}
+      em('watch',seat);occ['sofa'+seat]=DEF.id;const s=watchPose(seat);plan=[...leave(),...route(s.x,s.z,seatLv(seat),false,true),{t:'face',yaw:seatYaw(seat)},{t:'climbWatch',seat}];return true}
+    if(!SOFA)return false;
     if(P.mode==='watch'||(busy&&busy.kind==='climbWatch')||plan.some(x=>x.t==='climbWatch'))return true;
     const p0=startPos(),free=[0,1].filter(i=>i<SOFA.seats.length&&(!occ['sofa'+i]||occ['sofa'+i]===DEF.id));
     if(seat!=null&&free.includes(seat|0))seat=seat|0;else{if(!free.length){toast('Sofa đã kín chỗ');return false}
@@ -734,8 +741,8 @@ ${FRAG_COLOR}
       if(b.kind==='climbBed'){P.mode='bed';if(plan[0]&&plan[0].t==='offBed'){}else{play('SLEEP_'+P.side,{fade:0.05});eyeClose();sfxAt('sleep',{range:12});}}
       else if(b.kind==='climbChair'){if(plan[0]&&plan[0].t==='offChair'){P.mode='sit'}else if(!K.SIT){P.mode='sit';}else if(plan[0]&&plan[0].t==='type'){plan.shift();P.mode='type';play('TYPE',{fade:0.05});}else{P.mode='sit';play('SIT',{fade:0.1});}}
       else if(b.kind==='offBed'){sfxAt('wake',{range:12});occ['bed'+P.side]=null;const dr=endDrift('OFFBED_'+P.side);P.mode='free';P.level=1;P.stand=null;anchor=null;toRest(dr);}
-      else if(b.kind==='climbWatch'){P.mode='watch';if(!(plan[0]&&plan[0].t==='offWatch'))play('WATCH_IDLE',{fade:0.15});if(!DEF.remote&&api.onWatchSeated)api.onWatchSeated()}
-      else if(b.kind==='offWatch'){for(const k of ['sofa0','sofa1'])if(occ[k]===DEF.id)occ[k]=null;const dr=endDrift('OFFWATCH');P.mode='free';P.level=0;P.stand=null;P.seat=undefined;anchor=null;toRest(dr);if(!DEF.remote&&api.onWatchLeft)api.onWatchLeft()}
+      else if(b.kind==='climbWatch'){P.mode='watch';if(!(plan[0]&&plan[0].t==='offWatch'))play('WATCH_IDLE',{fade:0.15});if(!DEF.remote&&api.onWatchSeated&&!isX(P.seat))api.onWatchSeated()}
+      else if(b.kind==='offWatch'){const wasX=isX(P.seat),lv=wasX&&XSEAT[P.seat]?XSEAT[P.seat].lv:0;for(const k in occ)if(/^sofa/.test(k)&&occ[k]===DEF.id)occ[k]=null;const dr=endDrift('OFFWATCH');P.mode='free';P.level=lv;P.stand=null;P.seat=undefined;anchor=null;toRest(dr);if(!DEF.remote&&api.onWatchLeft&&!wasX)api.onWatchLeft()}
       else if(b.kind==='offChair'){occ.chair=null;const dr=endDrift('OFFCHAIR_'+P.side);P.mode='free';P.level=A.chairL;P.stand=null;anchor=null;toRest(dr);}
     }
   }
@@ -768,10 +775,10 @@ ${FRAG_COLOR}
         anchor=HIP['CLIMBCHAIR_'+it.side].e.clone();startBusy('climbChair','CLIMBCHAIR_'+it.side,'CLIMBUP',A.CY,A.CY+CFG.sitYAdj);break;}
       case 'offBed':{plan.shift();eyeOpen();startBusy('offBed','OFFBED_'+P.side,null,bedRootY(),A.L1);break;}
       case 'offChair':{plan.shift();startBusy('offChair','OFFCHAIR_'+P.side,'OFF',A.CY+CFG.sitYAdj,A.CY);break;}
-      case 'climbWatch':{plan.shift();const i=it.seat|0;if(occ['sofa'+i]&&occ['sofa'+i]!==DEF.id){plan=[];toast('Chỗ đó có người rồi');break}occ['sofa'+i]=DEF.id;
-        P.yaw=SOFA.yaw;P.seat=i;const s=watchPose(i);P.stand=s.clone();P.pos.x=s.x;P.pos.z=s.z;P.level=0;
-        startBusy('climbWatch','WATCH',null,A.L0,A.L0+watchDY(i));popIn();break;}
-      case 'offWatch':{plan.shift();startBusy('offWatch','OFFWATCH',null,P.pos.y,A.L0);popOut();break;}
+      case 'climbWatch':{plan.shift();const i=isX(it.seat)?it.seat:it.seat|0;if(isX(i)&&!XSEAT[i]){plan=[];break}if(occ['sofa'+i]&&occ['sofa'+i]!==DEF.id){plan=[];toast('Chỗ đó có người rồi');break}occ['sofa'+i]=DEF.id;
+        P.yaw=seatYaw(i);P.seat=i;const s=watchPose(i),fy=seatFY(i);P.stand=s.clone();P.pos.x=s.x;P.pos.z=s.z;P.level=seatLv(i);
+        startBusy('climbWatch','WATCH',null,fy,fy+watchDY(i));if(!isX(i))popIn();break;}
+      case 'offWatch':{plan.shift();startBusy('offWatch','OFFWATCH',null,P.pos.y,isX(P.seat)&&XSEAT[P.seat]?XSEAT[P.seat].fy:A.L0);popOut();break;}
       case 'type':{plan.shift();if(P.mode==='sit'&&K.TYPE){P.mode='type';play('TYPE',{fade:0.06});}break;}
       case 'sitidle':{plan.shift();if(P.mode==='type'){P.mode='sit';play('SIT',{fade:0.2});}break;}
     }
@@ -983,6 +990,7 @@ ${FRAG_COLOR}
   let down=null;
   renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,b:e.button}});
   function pick(e,run){
+    if(api.pickHook&&api.pickHook(e,run))return;   // chế độ sắp xếp nội thất (src/build/furniture.js) giành cú bấm
     mv.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(mv,camera);
     const hits=ray.intersectObjects(envMeshes,false);
     for(const h of hits){
@@ -1792,5 +1800,6 @@ ${FRAG_COLOR}
     let p;try{p=renderer.compileAsync?renderer.compileAsync(scene,camera):Promise.resolve(renderer.compile(scene,camera))}catch(e){p=Promise.resolve()}
     return p.then(done,done)};
   api.dispose=()=>{try{remote&&remote.dispose();local.dispose()}catch(e){}renderer.dispose()};
+  api.toonMat=toonMat;   // để nội thất đặt thêm (src/build/furniture.js) cùng kiểu đổ bóng toon với nhà
   window.__FU=FU;window.VY={EXT,Perf,local,get remote(){return remote},api,A,scene,camera,renderer,controls,tick,THREE,doorList,toggleDoor,occ,TP,envApply,rain,ripples,garden,WC};
 }

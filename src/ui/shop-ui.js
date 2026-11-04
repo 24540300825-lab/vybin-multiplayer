@@ -10,7 +10,7 @@ const nf = n => Number(n || 0).toLocaleString('vi-VN');
 const nm = id => (ITEMS[id] || {}).name || id;
 const icon = id => (ITEMS[id] || {}).icon || '📦';
 
-export function createShop({prog, toast, rerender, errText, onOpenBag}) {
+export function createShop({prog, toast, rerender, errText, onClose}) {
   let shop = null, rec = null, cat = null, query = '', sel = null, confirm = false, busy = false, rSel = null;
   async function load() {
     try { [shop, rec] = await Promise.all([prog.shop(), prog.recipes()]); if (shop) setItems(shop.items); } catch (e) { toast(errText(e)); }
@@ -32,17 +32,19 @@ export function createShop({prog, toast, rerender, errText, onOpenBag}) {
     if (L) {
       const maxW = L.week_limit ? Math.max(0, L.week_limit - (L.bought_week || 0)) : 99;
       const nIn = Math.max(1, Math.min(99, maxW || 1, parseInt(($('shN') || {}).value, 10) || 1));
-      const cost = L.price * nIn, after = shop.xu - cost, toHouse = !!($('shDst') && $('shDst').dataset.h === '1');
+      const F = window.__vyFurn, canPlace = !!(F && F.placeable(L.item) && F.canHere());
+      let dstH = ($('shDst') && $('shDst').dataset.h) || '0'; if (dstH === '2' && !canPlace) dstH = '0';
+      const cost = L.price * nIn, after = shop.xu - cost, toHouse = dstH === '1';
       const why = L.locked ? `Mở khi đạt cấp ${L.lv}` : L.week_limit && maxW <= 0 ? 'Đã mua đủ giới hạn tuần này' : after < 0 ? `Còn thiếu ${nf(-after)} Xu` : '';
       det = `<div class="bg-big r-${esc(it.rarity || 'common')}">${esc(icon(L.item))}</div><b>${esc(nm(L.item))}</b>
         <small>${esc(C.name || '')} · đang có ${nf(L.mine)} trong túi${L.house ? ', ' + nf(L.house) + ' trong kho nhà' : ''}</small><p>${esc(it.desc || '')}</p>
-        ${it.group === 'furniture' ? '<small class="sh-soon">Đặt vào nhà: mở cùng chế độ Xây nhà. Mua bây giờ để cất trước.</small>' : ''}
+        ${it.group === 'furniture' ? '<small class="sh-soon">Mua xong: tab Túi của tôi → chọn món → Đặt vào phòng.</small>' : ''}
         ${L.week_limit ? `<small>Giới hạn ${L.week_limit} / tuần · đã mua ${nf(L.bought_week || 0)}</small>` : ''}
         ${confirm && !why ? `<div class="sh-cf"><b>Xác nhận mua?</b><span>${nIn} × ${esc(nm(L.item))} → ${toHouse ? 'Kho nhà' : 'Túi của tôi'}</span>
             <span>Giá: <b>${nf(cost)} Xu</b> · Số dư sau mua: <b>${nf(after)} Xu</b></span>
             <div class="bg-mv"><button class="pl" id="shNo">Huỷ</button><button class="pb" id="shYes"${busy ? ' disabled' : ''}>${busy ? 'Đang mua…' : 'Xác nhận'}</button></div></div>`
           : `<div class="sh-row"><span>Số lượng</span><input type="number" id="shN" min="1" max="${Math.min(99, maxW)}" value="${nIn}" aria-label="Số lượng"${why ? ' disabled' : ''}></div>
-            <div class="chips sh-dst" id="shDst" data-h="${toHouse ? 1 : 0}"><div class="chip${toHouse ? '' : ' on'}" data-h="0">Vào túi</div><div class="chip${toHouse ? ' on' : ''}" data-h="1">Cất vào kho nhà</div></div>
+            <div class="chips sh-dst" id="shDst" data-h="${dstH}"><div class="chip${dstH === '0' ? ' on' : ''}" data-h="0">Vào túi</div><div class="chip${dstH === '1' ? ' on' : ''}" data-h="1">Cất vào kho nhà</div>${canPlace ? `<div class="chip${dstH === '2' ? ' on' : ''}" data-h="2">Mua & đặt luôn</div>` : ''}</div>
             <div class="sh-tot"><span>Tổng</span><b id="shTot">${nf(cost)} Xu</b></div>
             ${why ? `<p class="sh-why">${esc(why)}</p>` : ''}
             <div class="bg-mv"><button class="pb" id="shBuy"${why ? ' disabled' : ''}>Mua</button></div>`}`;
@@ -68,14 +70,16 @@ export function createShop({prog, toast, rerender, errText, onOpenBag}) {
       const n = Math.max(1, parseInt(confirm.n, 10) || 1), toHouse = confirm.h === '1';
       // vẽ lại phần xác nhận với đúng số lượng đã chọn
       const cf = B.querySelector('.sh-cf');
-      if (cf) cf.querySelector('span').textContent = n + ' × ' + nm(L.item) + ' → ' + (toHouse ? 'Kho nhà' : 'Túi của tôi');
+      const placeNow = confirm.h === '2';
+      if (cf) cf.querySelector('span').textContent = n + ' × ' + nm(L.item) + ' → ' + (toHouse ? 'Kho nhà' : placeNow ? 'đặt ngay vào ' + window.__vyFurn.mapName : 'Túi của tôi');
       if (cf) cf.querySelectorAll('span')[1].innerHTML = `Giá: <b>${nf(L.price * n)} Xu</b> · Số dư sau mua: <b>${nf(shop.xu - L.price * n)} Xu</b>`;
       $('shNo').onclick = () => { confirm = false; rerender(); };
       $('shYes').onclick = async () => {
         if (busy) return; busy = true; rerender();
         try {
           const r = await prog.buy(L.item, n, toHouse);
-          if (r && r.ok) { toast(`Đã mua ${n} ${nm(L.item)} (−${nf(r.spent)} Xu)${toHouse ? ' · cất vào kho nhà' : ''}`); window.SFX && window.SFX.play && window.SFX.play('success'); }
+          if (r && r.ok) { toast(`Đã mua ${n} ${nm(L.item)} (−${nf(r.spent)} Xu)${toHouse ? ' · cất vào kho nhà' : ''}`); window.SFX && window.SFX.play && window.SFX.play('success');
+            if (placeNow && window.__vyFurn) { onClose && onClose(); window.__vyFurn.place(L.item); } }
           confirm = false;
         } catch (e) { toast(errText(e)); }
         busy = false; await load();
