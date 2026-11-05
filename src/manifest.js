@@ -2,8 +2,8 @@
 export const FILES = {
  "char-bin": {
   "file": "char-bin.glb",
-  "v": "3caa3223",
-  "size": 7394548
+  "v": "837ef05a",
+  "size": 7535752
  },
  "char-vy": {
   "file": "char-vy.glb",

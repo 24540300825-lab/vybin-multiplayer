@@ -910,10 +910,10 @@ ${FRAG_COLOR}
   // ===== NHẢY / NHẢY ĐÔI / LAO (DIVE) — nhân vật có clip JUMP, DOUBLEJUMP, DIVE (Bin) =====
   // Clip tự mang chuyển động đứng (hông lên/xuống) nên KHÔNG cộng thêm độ cao; code chỉ lo chuyển động ngang + chuyển cảnh:
   //  • JUMP: khung đầu & cuối = khung 10 của RUN → từ đang chạy chỉ cần blend ngắn; xong thì trả về RUN đúng khung 10 (không giật pha chân)
-  //  • DOUBLEJUMP: khung đầu = khung 15 của JUMP (đỉnh nhảy) → bấm Space lần 2 trước đỉnh thì chờ tới đỉnh rồi nối liền, sau đỉnh thì blend rất ngắn
+  //  • DOUBLEJUMP: khung đầu = khung 11 của JUMP mới (đỉnh nhảy, khớp tư thế đầu DOUBLEJUMP) → bấm Space lần 2 trước đỉnh thì chờ tới đỉnh rồi nối liền, sau đỉnh thì blend rất ngắn
   //  • DIVE: clip chỉ lăn về phía trước → xoay nhân vật về hướng phím (90° trái/phải, 180° lùi, 45° khi giữ 2 phím) rồi lăn; lao ~2.6 m theo đường cong sin
   let air=null;
-  const AF=30,J_APEX=15/AF,J_LAND=24/AF,DJ_LAND=18/AF,DV_T0=3/AF,DV_T1=25/AF,DV_END=28/AF,DIVE_D=2.6,DIVE_V=DIVE_D*Math.PI/(2*(DV_T1-DV_T0));
+  const AF=30,J_APEX=11/AF,J_LAND=16/AF,DJ_LAND=18/AF,DV_T0=3/AF,DV_T1=25/AF,DV_END=28/AF,DIVE_D=2.6,DIVE_V=DIVE_D*Math.PI/(2*(DV_T1-DV_T0));
   const clipDur=k=>acts[K[k]].getClip().duration;
   const landSfx=()=>{const S=stairAt(P.pos.x,P.pos.z);sfxAt('step',{f:{s:S?'stair':'wood',run:true},range:13})};
   function startJump(){play('JUMP',{once:true,restart:true,fade:0.08});air={k:'jump',t:0,dur:clipDur('JUMP'),dj:false,landed:false};stopT=0;idleHeld=false}
