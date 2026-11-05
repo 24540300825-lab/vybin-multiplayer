@@ -1684,6 +1684,22 @@ ${FRAG_COLOR}
     blizzard:{cov:.2,dim:.35,des:.6,fn:14,ff:90,rain:0,snow:1.8,wind:2.4,wet:.2,cs:.1},
     fog:{cov:.35,dim:.5,des:.3,fn:12,ff:75,rain:0,snow:0,wind:.15,wet:.3,cs:.1},
     windy:{cov:.5,dim:.9,des:.1,fn:70,ff:300,rain:0,snow:0,wind:2.2,wet:0,cs:.7}};
+  // "look" điện ảnh theo thời tiết (chỉ đổi uniform của pass grade sẵn có + màu sương → không tốn thêm pass/hiệu năng)
+  // gT: lệch nhiệt màu · gC: hệ số tương phản · gV: + vignette · gL: nâng vùng tối (r,g,b — mây/mù = đen bệt thành xám xanh như phim) · gG: hạt phim · fT/fA: ám màu sương + lượng
+  const WLOOK={
+    clear:{gT:0,gC:1,gV:0,gL:[0,0,0],gG:0.006,fT:'#ffffff',fA:0},
+    cloudy:{gT:-.02,gC:.97,gV:.03,gL:[.010,.012,.018],gG:0.007,fT:'#c4ccd8',fA:.18},
+    overcast:{gT:-.045,gC:.94,gV:.06,gL:[.016,.019,.026],gG:0.008,fT:'#aab4c2',fA:.32},
+    drizzle:{gT:-.04,gC:1,gV:.06,gL:[.010,.017,.024],gG:0.009,fT:'#a6b4c4',fA:.3},
+    'light rain':{gT:-.06,gC:1.02,gV:.09,gL:[.008,.017,.026],gG:0.010,fT:'#97a8bc',fA:.4},
+    rain:{gT:-.08,gC:1.05,gV:.12,gL:[.006,.016,.027],gG:0.011,fT:'#8798ae',fA:.48},
+    'heavy rain':{gT:-.1,gC:1.08,gV:.16,gL:[.004,.013,.027],gG:0.013,fT:'#71839a',fA:.56},
+    storm:{gT:-.12,gC:1.1,gV:.2,gL:[.003,.010,.026],gG:0.015,fT:'#5f6f88',fA:.6},
+    snow:{gT:-.06,gC:.95,gV:.04,gL:[.010,.012,.017],gG:0.007,fT:'#e2e8f2',fA:.3},
+    blizzard:{gT:-.09,gC:.9,gV:.08,gL:[.018,.021,.028],gG:0.010,fT:'#d4dce8',fA:.62},
+    fog:{gT:-.01,gC:.9,gV:.1,gL:[.030,.031,.034],gG:0.008,fT:'#d6d2cc',fA:.12},
+    windy:{gT:.01,gC:1.03,gV:.03,gL:[0,0,0],gG:0.007,fT:'#ffffff',fA:0}};
+  const WL={gT:0,gC:1,gV:0,gL:new THREE.Vector3(),gG:.012,fT:new THREE.Color('#ffffff'),fA:0},_wlL=new THREE.Vector3(),_wlC=new THREE.Color();
   const WC=Object.assign({int:0},WEATHER.clear);   // giá trị hiện tại (mượt dần)
   const grayOf=c=>{const l=c.r*.299+c.g*.587+c.b*.114;return new THREE.Color(l,l,l)};
   const sunPos=new THREE.Vector3(),moonPos=new THREE.Vector3();
@@ -1691,12 +1707,12 @@ ${FRAG_COLOR}
     return {u,v:new THREE.Vector3(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)),el}}
 
   // post-fx
-  const GradeShader={uniforms:{tDiffuse:{value:null},uExpo:{value:1},uCon:{value:1},uSat:{value:1},uTemp:{value:0},uVig:{value:.3},uTime:{value:0},uTintAmt:{value:.3},uFlash:{value:0},uTintSh:{value:new THREE.Vector3(.4,.35,.6)},uTintHi:{value:new THREE.Vector3(1,.7,.45)}},
+  const GradeShader={uniforms:{tDiffuse:{value:null},uExpo:{value:1},uCon:{value:1},uSat:{value:1},uTemp:{value:0},uVig:{value:.3},uTime:{value:0},uTintAmt:{value:.3},uFlash:{value:0},uLift:{value:new THREE.Vector3()},uGrain:{value:0},uTintSh:{value:new THREE.Vector3(.4,.35,.6)},uTintHi:{value:new THREE.Vector3(1,.7,.45)}},
     vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-    fragmentShader:`uniform sampler2D tDiffuse;uniform float uExpo,uCon,uSat,uTemp,uVig,uTime,uTintAmt,uFlash;uniform vec3 uTintSh,uTintHi;varying vec2 vUv;
+    fragmentShader:`uniform sampler2D tDiffuse;uniform float uExpo,uCon,uSat,uTemp,uVig,uTime,uTintAmt,uFlash,uGrain;uniform vec3 uTintSh,uTintHi,uLift;varying vec2 vUv;
     float hs(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
     void main(){vec3 c=texture2D(tDiffuse,vUv).rgb;
-      c*=uExpo*(1.0+uFlash);
+      c*=uExpo*(1.0+uFlash*vec3(0.8,0.92,1.3));   // chớp: ánh xanh lạnh
       c*=vec3(1.0+uTemp,1.0+uTemp*0.25,1.0-uTemp);
       float l=dot(c,vec3(.2126,.7152,.0722));
       c=mix(vec3(l),c,uSat);
@@ -1706,6 +1722,8 @@ ${FRAG_COLOR}
       c*=mix(vec3(1.0),uTintSh*1.8,uTintAmt*sw);
       c*=mix(vec3(1.0),uTintHi*1.4,uTintAmt*hw);
       vec2 q=vUv-0.5;c*=1.0-uVig*smoothstep(0.25,0.78,length(q*vec2(1.25,1.0)));
+      l=dot(c,vec3(.2126,.7152,.0722));c+=uLift*(1.0-smoothstep(0.0,0.55,l));   // nâng vùng tối theo thời tiết (mây/mưa/tuyết/sương)
+      c+=(hs(gl_FragCoord.xy+fract(uTime*7.13)*517.0)-0.5)*uGrain*(1.0-0.6*l);   // hạt phim nhẹ (đổi theo khung), bớt ở vùng sáng
       gl_FragColor=vec4(max(c,0.0),1.0);}`};
   const SANITIZE={uniforms:{tDiffuse:{value:null}},vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
     fragmentShader:'uniform sampler2D tDiffuse;varying vec2 vUv;void main(){vec3 r=texture2D(tDiffuse,vUv).rgb;gl_FragColor=vec4(r.r>=0.0?min(r.r,16.0):0.0,r.g>=0.0?min(r.g,16.0):0.0,r.b>=0.0?min(r.b,16.0):0.0,1.0);}'};
@@ -1777,8 +1795,9 @@ ${FRAG_COLOR}
       p+=aEnd*vec3(uWindDir.x*uWind*0.05,0.55+0.25*uInt,uWindDir.y*uWind*0.05);
       p.y+=uFloor+0.1;
       float keep=(aRnd<uAmt?1.0:0.0);if(inHouse(p))keep=0.0;
-      vA=keep*(1.0-0.7*aEnd);
-      gl_Position=keep>0.5?projectionMatrix*viewMatrix*vec4(p,1.0):vec4(2.0,2.0,2.0,1.0);}`,
+      vec4 mv=viewMatrix*vec4(p,1.0);float dz=-mv.z;
+      vA=keep*(1.0-0.7*aEnd)*smoothstep(0.6,2.2,dz)*(1.0-0.55*smoothstep(9.0,16.0,dz));   // giọt sát ống kính mờ đi (không thành vệt thô), xa nhạt dần → có chiều sâu
+      gl_Position=keep>0.5?projectionMatrix*mv:vec4(2.0,2.0,2.0,1.0);}`,
     fragmentShader:'uniform vec3 uCol;varying float vA;void main(){if(vA<0.01)discard;gl_FragColor=vec4(uCol,vA*0.62);}'});
   const rain=new THREE.LineSegments(rainG,rainM);rain.frustumCulled=false;rain.raycast=()=>{};rain.visible=false;rain.renderOrder=7;scene.add(rain);
   const setRainCount=n=>rainG.setDrawRange(0,Math.min(RN,n)*2);setRainCount(4200);
@@ -1817,7 +1836,7 @@ ${FRAG_COLOR}
   function thunder(){if(!RA.ctx)return;const ctx=RA.ctx,s=ctx.createBufferSource();s.buffer=RA.buf;const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=180;const g=ctx.createGain();
     const t0=ctx.currentTime+0.25+Math.random()*0.9;g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(0.9,t0+0.08);g.gain.exponentialRampToValueAtTime(0.001,t0+2.6);s.connect(lp);lp.connect(g);g.connect(ctx.destination);s.start(t0);s.stop(t0+2.8)}
 
-  let flash=0,flashT=5,tgtW=WEATHER.clear;
+  let flash=0,flash2=-1,flashT=5,tgtW=WEATHER.clear;
   const sunLight=window.__L.sun,hemiL=window.__L.hemi,ambL=window.__L.amb;
   const _tc=new THREE.Vector3(5,1.5,-4);
   let sfxW=null,sfxAmbT=0;
@@ -1826,6 +1845,8 @@ ${FRAG_COLOR}
     tgtW=WEATHER[TP.weather]||WEATHER.clear;
     const f=dt>0?1-Math.exp(-dt*1.2):1;
     for(const q of ['cov','dim','des','fn','ff','rain','snow','wind','wet','cs','int'])WC[q]+=((tgtW[q]||0)-WC[q])*(dt>0?f:1);
+    {const L=WLOOK[TP.weather]||WLOOK.clear,ff=dt>0?f:1;WL.gT+=(L.gT-WL.gT)*ff;WL.gC+=(L.gC-WL.gC)*ff;WL.gV+=(L.gV-WL.gV)*ff;WL.gG+=(L.gG-WL.gG)*ff;WL.fA+=(L.fA-WL.fA)*ff;
+     WL.gL.lerp(_wlL.set(L.gL[0],L.gL[1],L.gL[2]),ff);WL.fT.lerp(_wlC.set(L.fT),ff)}
     // mặt trời / mặt trăng
     const S=sunPath(t,5.5,19.5,62),M=sunPath(t-19.5+5.5,5.5,15.5,52);   // trăng: 19.5→5.5
     const isDay=((t-5.5+24)%24)<14;const act=isDay?S:M;
@@ -1851,9 +1872,10 @@ ${FRAG_COLOR}
     skyU.uSunV.value=(isDay?fade:0)*(1-Math.min(1,(0.6-WC.cov)*3.5));
     skyU.sunDir.value.copy(S.v);skyU.moonDir.value.copy(M.v);skyStep(t,S.v,M.v,isDay,dt);
     // sương
-    scene.fog.color.copy(des(k.fog));scene.fog.near=WC.fn*(OUTD?0.8:1);scene.fog.far=WC.ff*(OUTD?0.55:1);
+    scene.fog.color.copy(des(k.fog));
+    if(WL.fA>0.001){const fl=scene.fog.color.r*.299+scene.fog.color.g*.587+scene.fog.color.b*.114,tl=WL.fT.r*.299+WL.fT.g*.587+WL.fT.b*.114;_wlC.copy(WL.fT).multiplyScalar(fl/Math.max(tl,1e-3));scene.fog.color.lerp(_wlC,WL.fA)}   // ám màu sương theo thời tiết, giữ độ sáng theo giờscene.fog.near=WC.fn*(OUTD?0.8:1);scene.fog.far=WC.ff*(OUTD?0.55:1);
     // grade
-    GU.uExpo.value=TP.expo*(1-(1-WC.dim)*0.3);GU.uCon.value=TP.con*(OUTD?0.97:1);GU.uSat.value=TP.sat*(1-WC.des*0.35)*(OUTD?0.9:1);GU.uTemp.value=TP.temp+k.gt;GU.uVig.value=TP.vig;GU.uTintAmt.value=TP.tintAmt;GU.uFlash.value=flash*0.6;
+    GU.uExpo.value=TP.expo*(1-(1-WC.dim)*0.3);GU.uCon.value=TP.con*(OUTD?0.97:1);GU.uSat.value=TP.sat*(1-WC.des*0.35)*(OUTD?0.9:1);GU.uCon.value*=WL.gC;GU.uTemp.value=TP.temp+k.gt+WL.gT;GU.uVig.value=TP.vig+WL.gV;GU.uLift.value.copy(WL.gL).multiplyScalar(0.5+0.5*k.day);GU.uGrain.value=WL.gG;GU.uTintAmt.value=TP.tintAmt;GU.uFlash.value=flash*0.6;
     const hs=h=>{const v=hexV(h);return new THREE.Vector3(v.x,v.y,v.z)};GU.uTintSh.value.copy(hexV(TP.tintSh));GU.uTintHi.value.copy(hexV(TP.tintHi));
     bloomP.strength=TP.bloom*(1+0.8*(1-k.day));bloomP.threshold=TP.bloomTh;bloomP.radius=0.55;
     // light shafts
@@ -1861,7 +1883,7 @@ ${FRAG_COLOR}
     let any=0;for(const b of beams){const fct=Math.max(0,b.nrm.dot(dirL)-0.12);const I=TP.rays*fct*0.42*k.sunI*WC.dim*fade*(1-WC.des*0.4);b.mat.uniforms.uI.value=I;b.m.visible=I>0.01;any=Math.max(any,I)}
     motesM.uniforms.uA.value=OUTD?0:Math.min(1,any*1.2)*0.9*TP.motes;motes.visible=motesM.uniforms.uA.value>0.01;
     // thời tiết hạt
-    rainU.uAmt.value=Math.min(1,WC.rain);rainU.uInt.value=Math.max(0.4,WC.int);ripM.uniforms.uAmt.value=Math.min(1,WC.rain);rain.visible=WC.rain>0.03;ripples.visible=rain.visible;rainU.uCol.value.setRGB(0.55+0.4*k.day,0.62+0.35*k.day,0.78+0.2*k.day);snowU.uAmt.value=Math.min(1,WC.snow);snow.visible=WC.snow>0.03;
+    rainU.uAmt.value=Math.min(1,WC.rain);rainU.uInt.value=Math.max(0.4,WC.int);ripM.uniforms.uAmt.value=Math.min(1,WC.rain);rain.visible=WC.rain>0.03;ripples.visible=rain.visible;rainU.uCol.value.setRGB(0.55+0.4*k.day+0.5*flash,0.62+0.35*k.day+0.55*flash,0.78+0.2*k.day+0.6*flash);snowU.uAmt.value=Math.min(1,WC.snow);snow.visible=WC.snow>0.03;
     garden.visible=!!TP.garden;if(gardenAnim.lamp)gardenAnim.lamp.emissiveIntensity=0.25+2.4*Math.max(k.lamp,WC.dim<0.5?0.3:0);TU.uWindA.value=WC.wind;TU.uWet.value=WC.wet;TU.uCloudSh.value=WC.cs*(0.2+0.8*k.day);rainU.uWind.value=WC.wind;updGlass(k.day,WC.dim,WC.des);
     if(RA.g)RA.g.gain.value=Math.min(1,WC.rain)*0.1*(0.4+0.35*WC.int);
     // âm môi trường (gió, chim ban ngày, dế ban đêm) + tiếng báo khi thời tiết đổi
@@ -1871,7 +1893,8 @@ ${FRAG_COLOR}
   window.__envApply=envApply;
   function envStep(dt){
     if(TP.auto){TP.time=(TP.time+dt*TP.speed)%24;if(window.__syncTime)window.__syncTime()}
-    if(WEATHER[TP.weather]&&WEATHER[TP.weather].flash){flashT-=dt;if(flashT<=0){flash=1;flashT=4+Math.random()*7;thunder()}}
+    if(WEATHER[TP.weather]&&WEATHER[TP.weather].flash){flashT-=dt;if(flashT<=0){flash=1;flash2=Math.random()<0.7?0.09+Math.random()*0.12:-1;flashT=4+Math.random()*7;thunder()}}
+    if(flash2>0){flash2-=dt;if(flash2<=0){flash=Math.max(flash,0.6+Math.random()*0.5);flash2=-1}}   // chớp đôi (nháy 2 lần như sét thật)
     flash=Math.max(0,flash-dt*3.2);
     beamU.uT.value+=dt;skyU.uT.value=beamU.uT.value;GU.uTime.value=beamU.uT.value;
     rainU.uC.value.copy(controls.target);snowU.uPx.value=innerHeight/700;rainU.uPx.value=curPR;renderer.getDrawingBufferSize(rainU.uRes.value);
