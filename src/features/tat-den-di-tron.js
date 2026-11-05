@@ -27,6 +27,12 @@ export default {
     const show = h => { box.innerHTML = h; box.hidden = false; }, hide = () => { box.hidden = true; };
     let hsel = 30, G = null, pend = null, raf = 0, peerOn = !ctx.solo, lampsWas = null;
     ctx.onPeer(({present}) => { peerOn = !!present; if (!present && G && !G.done) finish(null, oN + ' đã rời đi — huỷ ván'); });
+    // Đổi map = tải lại iframe nên tính năng khởi tạo lại → ván bị mất. Lưu ván ra localStorage và khôi phục ngay sau khi đổi map (đồng hồ theo giờ thật).
+    const RK = 'vyf:hs:resume:' + me; let peerMap = null;
+    if (ctx.sess) ctx.sess.on('msg', m => { if (m.k === 's' && m.mp) peerMap = m.mp; });
+    const sameMap = () => !ctx.sess || !peerMap || peerMap === ctx.mapId;
+    const saveG = () => { try { if (G && !G.done) localStorage.setItem(RK, JSON.stringify({ts: Date.now(), slot: me, mode: G.mode, bet: G.bet, hide: G.hide, seeker: G.seeker, start: Date.now() - G.t * 1000, sneezeAt: G.sneezeAt, sneezed: G.sneezed, lamps: lampsWas})); else localStorage.removeItem(RK); } catch (e) {} };
+    addEventListener('pagehide', saveG); setInterval(saveG, 1000);
     const okMap = () => !(VY() && VY().EXT && ctx.mapId === 'exterior');
     const modeTxt = (m, b) => m === 'bet' ? `Thách đấu · cược ${b} điểm` : 'Giao hữu';
 
@@ -54,9 +60,10 @@ export default {
     ctx.on('no', () => { if (pend) { clearTimeout(pend.tm); pend = null; show(`<div class="m">😏 ${oN} từ chối — sợ ma à?</div>`); setTimeout(hide, 2200); } });
     ctx.on('busy', () => { if (pend) { pend = null; hide(); ctx.toast(oN + ' đang bận chơi'); } });
 
-    function begin(d, delay) {
-      G = {mode: d.mode, bet: d.bet, hide: d.hide || 15, seeker: d.seeker, t: -delay / 1000 - (d.hide || 15), last: performance.now(), lit: 0, done: false, sneezed: false, sneezeAt: 6 + Math.random() * 18};   // hắt xì TỰ ĐỘNG ở giây ngẫu nhiên 6–24 của lượt tìm
-      const api = VY().api; if (api && api.lamps) { lampsWas = {a: api.lampGroup('a'), b: api.lampGroup('b')}; api.lamps(false); }   // tắt hết đèn
+    function begin(d, delay, resume) {
+      G = {mode: d.mode, bet: d.bet, hide: d.hide || 15, seeker: d.seeker, t: -delay / 1000 - (d.hide || 15), last: performance.now(), lit: 0, start: Date.now() - (-delay / 1000 - (d.hide || 15)) * 1000, done: false, sneezed: false, sneezeAt: 6 + Math.random() * 18};   // hắt xì TỰ ĐỘNG ở giây ngẫu nhiên 6–24 của lượt tìm
+      const api = VY().api; if (api && api.lamps) { lampsWas = resume ? resume.lamps : {a: api.lampGroup('a'), b: api.lampGroup('b')}; api.lamps(false); }   // tắt hết đèn
+      if (resume) { G.t = (Date.now() - resume.start) / 1000; G.sneezeAt = resume.sneezeAt; G.sneezed = resume.sneezed; }
       dark.hidden = false; box.onclick = null; snz.hidden = true; cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
     }
     // t < 0: giai đoạn trốn (từ -HIDE-đếm ngược tới 0) · 0..SEEK: đi tìm
@@ -77,11 +84,11 @@ export default {
         else { mask(L, 2.6, 0); show(`<div class="m">🏃 Đi trốn nhanh! ${Math.ceil(-G.t)}</div><div class="s">Trốn phòng nào cũng được, lên gác cũng được. Hết giờ là mất đèn pin!</div>`); }
         return;
       }
-      if (R && R.char) { const same = Math.abs(R.P.pos.y - L.P.pos.y) < 1.5, d = Math.hypot(R.P.pos.x - L.P.pos.x, R.P.pos.z - L.P.pos.z); R.char.visible = same && (seeker ? d < RANGE + 0.5 : d < 9); }   // khác tầng: không thấy nhau
+      if (R && R.char && sameMap()) { const same = Math.abs(R.P.pos.y - L.P.pos.y) < 1.5, d = Math.hypot(R.P.pos.x - L.P.pos.x, R.P.pos.z - L.P.pos.z); R.char.visible = same && (seeker ? d < RANGE + 0.5 : d < 9); }   // khác tầng: không thấy nhau
       if (seeker) {
         mask(L, 2.6, 2.0);
         let inCone = false;
-        if (R) { const dx = R.P.pos.x - L.P.pos.x, dz = R.P.pos.z - L.P.pos.z, d = Math.hypot(dx, dz);
+        if (R && sameMap()) { const dx = R.P.pos.x - L.P.pos.x, dz = R.P.pos.z - L.P.pos.z, d = Math.hypot(dx, dz);
           const a = Math.abs(Math.atan2(Math.sin(Math.atan2(dx, dz) - L.P.yaw), Math.cos(Math.atan2(dx, dz) - L.P.yaw)));
           const same = Math.abs(R.P.pos.y - L.P.pos.y) < 1.5;   // khác tầng thì KHÔNG tính (kể cả đứng chồng lên nhau trên màn hình)
           inCone = same && (d < RANGE && a < CONE || d < 0.8); }
@@ -97,7 +104,7 @@ export default {
     }
     function sneeze() { if (!G || G.sneezed) return; G.sneezed = true; ctx.send('sneeze', {}); ctx.toast('🤧 Hắt xììì!'); try { VY().local.mouthSay([[0, 0.5]]); } catch (e) {} }
         let pingTm = 0;
-    ctx.on('sneeze', () => { if (!G || G.done) return; const V = VY(); ctx.toast('🤧 Có tiếng hắt xì!'); if (!(V && V.remote && V.local)) return;
+    ctx.on('sneeze', () => { if (!G || G.done) return; const V = VY(); ctx.toast('🤧 Có tiếng hắt xì!'); if (!(V && V.remote && V.local)) return; if (!sameMap()) { ctx.toast('🤧 Tiếng hắt xì vọng từ PHÒNG KHÁC!'); return; }
       const TH = V.THREE, cam = V.camera, q = V.remote.P.pos, v = new TH.Vector3(q.x, q.y + 1, q.z).project(cam);   // chiếu vị trí phát tiếng lên màn hình; ngoài màn hình thì kẹp vào mép
       let x = (v.x * 0.5 + 0.5) * innerWidth, y = (-v.y * 0.5 + 0.5) * innerHeight; if (v.z > 1) { x = innerWidth - x; y = innerHeight - y; }
       const m = 70; ping.style.left = Math.max(m, Math.min(innerWidth - m, x)) + 'px'; ping.style.top = Math.max(m, Math.min(innerHeight - m, y)) + 'px';
@@ -106,7 +113,7 @@ export default {
     ctx.on('timeout', () => end(false, `${oN} trốn kỹ quá!`));
     function end(win, msg) { if (!G || G.done) return; finish(win, msg); }
     function finish(win, msg) {
-      const g0 = G; if (G) G.done = true; G = null; cancelAnimationFrame(raf); dark.hidden = true; snz.hidden = true; ping.hidden = true; try { const R = VY().remote; if (R && R.char) R.char.visible = true; } catch (e) {}
+      const g0 = G; if (G) G.done = true; G = null; try { localStorage.removeItem(RK); } catch (e) {} cancelAnimationFrame(raf); dark.hidden = true; snz.hidden = true; ping.hidden = true; try { const R = VY().remote; if (R && R.char) R.char.visible = true; } catch (e) {}
       const api = VY() && VY().api; if (api && api.lampGroup && lampsWas) { api.lampGroup('a', lampsWas.a); api.lampGroup('b', lampsWas.b); lampsWas = null; }   // bật lại đèn như trước
       const L = led(), bet = g0 ? g0.bet : 0, bm = g0 && g0.mode === 'bet';
       if (win === true) { L.w++; if (bm) L.pts += bet; } else if (win === false) { L.l++; if (bm) L.pts -= bet; } ledSet(L);
@@ -114,6 +121,8 @@ export default {
       box.onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.x != null) return hide();
         if (b.dataset.re != null && g0) { pend = {mode: g0.mode, bet: g0.bet, hide: g0.hide, seeker: g0.seeker === 'bin' ? 'vy' : 'bin'}; ctx.send('inv', pend); show(`<div class="m">Chờ ${oN} nhận lời…</div>`); box.onclick = null; pend.tm = setTimeout(() => { if (pend) { pend = null; hide(); } }, 20000); } };
     }
+    try { const sv = JSON.parse(localStorage.getItem(RK) || 'null'); localStorage.removeItem(RK);
+      if (sv && sv.slot === me && Date.now() - sv.ts < 25000 && !ctx.solo && Date.now() - sv.start < (sv.hide + SEEK + 3) * 1000) { begin(sv, 0, sv); ctx.toast('🔦 Tiếp tục ván trốn tìm ở phòng mới'); } } catch (e) { console.warn('hs resume', e); }
     const btn = ctx.ui.addButton({icon: '🔦', label: '', title: 'Tắt đèn đi trốn (minigame trong nhà)', onClick: inviteUI});
     if (btn) btn.id = 'iHide';
     window.__hide = {state: () => G && {seeker: G.seeker, t: +G.t.toFixed(2), lit: +G.lit.toFixed(2), done: G.done, sneezed: G.sneezed}, invite: (m = 'fr', b = 0) => sendInv(m, b), accept: () => box.querySelector('[data-a]') && box.querySelector('[data-a]').click()};
