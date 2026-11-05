@@ -6,9 +6,11 @@
 // Chi phí: 2 sợi × 3 hạt, 2 bước con mỗi khung, không allocate; tự ngủ khi nhân vật ẩn / ở xa camera.
 import * as THREE from 'three';
 
-const G = -9.8;                       // trọng lực thật (m/s²)
-const DRAG = 2.4;                     // cản không khí (1/s) — dây vải nhẹ: lắng sau ~1 s
-const SPRING = [4, 2.6, 1.4];         // lò xo giữ dáng theo animation (1/s) theo hạt 1..3 — rất yếu, đầu dây tự do nhất
+const G = -9.8 * 0.6;                 // trọng lực hiệu dụng (vải nhẹ, có lực nâng của không khí)
+const DRAG = 8;                       // cản (1/s) — vải: nhớt, tắt dần êm, không dao động qua lại
+const DRAG_SLOW = 14;                 // cản thêm khi hạt gần như đứng yên → đoạn kết thúc chuyển động rất mượt
+const DEV_MAX = 0.16;                 // lệch tối đa so với dáng animation (m) — kẹp mềm, dây không bay quá xa
+const SPRING = [6, 4, 2.5];         // lò xo giữ dáng (1/s) theo hạt 1..3 — đầu dây tự do nhất
 const SUB = 2;                        // số bước con mỗi khung (ổn định khi hông xoay nhanh)
 const ITER = 3;                       // vòng ràng buộc độ dài + va chạm
 const R_LEG = 0.078;                  // bán kính ống quần đo từ mesh (m) ở vùng đùi
@@ -121,18 +123,22 @@ export function makeBelt(root) {
     for (const s of sim) fillTargets(s);
     if (sim[0].T[0].distanceToSquared(lastRoot) > TELEPORT * TELEPORT) { prime(); return; }
     lastRoot.copy(sim[0].T[0]);
-    const h = dt / SUB, drag = Math.exp(-DRAG * h), g = G * h * h;
+    const h = dt / SUB, g = G * h * h, dragA = Math.exp(-DRAG * h), dragB = Math.exp(-(DRAG + DRAG_SLOW) * h);
     for (let sub = 0; sub < SUB; sub++) {
       for (const s of sim) {
         const {n, P, Q, T, L} = s;
         P[0].copy(T[0]); Q[0].copy(T[0]);                  // gốc dây ghim cứng vào lưng
         for (let i = 1; i <= n; i++) {
           const p = P[i], q = Q[i];
-          tmpV.copy(p).sub(q).multiplyScalar(drag);        // vận tốc (có cản)
+          tmpV.copy(p).sub(q);                               // vận tốc theo bước
+          const sp = tmpV.length() / h;                      // m/s
+          tmpV.multiplyScalar(sp < 0.6 ? dragB + (dragA - dragB) * (sp / 0.6) : dragA);   // chậm → cản mạnh hơn (tắt dần êm)
           q.copy(p);
           p.add(tmpV); p.y += g;
           const k = 1 - Math.exp(-SPRING[Math.min(i, SPRING.length) - 1] * h);   // lò xo yếu giữ dáng
           p.x += (T[i].x - p.x) * k; p.y += (T[i].y - p.y) * k; p.z += (T[i].z - p.z) * k;
+          tmpV.copy(p).sub(T[i]); const dv = tmpV.length();
+          if (dv > DEV_MAX) p.copy(T[i]).addScaledVector(tmpV, DEV_MAX / dv);   // kẹp mềm quanh dáng animation
         }
         for (let it = 0; it < ITER; it++) {
           for (let i = 1; i <= n; i++) {                   // giữ độ dài đoạn
