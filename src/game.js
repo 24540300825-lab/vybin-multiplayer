@@ -192,6 +192,9 @@ ${FRAG_COLOR}
   if(MAP_CONFIGS[MAPID]&&MAP_CONFIGS[MAPID].outdoor)addWingRoofs(envG.scene,null);
   // env
   const env=envG.scene;toonify(env);scene.add(env);env.updateMatrixWorld(true);
+  // mẫu Scatter (SF_BiomeProxy_* / SF_SourceProxy_* / SF_BiomeSurface_*: đá, cỏ Plant_01, hoa, bụi, cây) nằm ở gốc toạ độ GLB = góc trước-trái phòng khách → hiện thành cụm đá + lá phẳng dính tường. Chỉ là mẫu cho instancing → ẩn (mesh thường, không đụng InstancedMesh).
+  {const wp=new THREE.Vector3();let n=0;env.traverse(o=>{if(!o.isMesh||o.isInstancedMesh||!o.visible)return;let tpl=false;for(let q=o;q&&q!==scene;q=q.parent)if(/^\.?SF_(Biome|Source)/.test(q.name||'')){tpl=true;break}
+    if(!tpl)return;o.getWorldPosition(wp);env.worldToLocal(wp);if(Math.abs(wp.x)<0.01&&Math.abs(wp.z)<0.01){o.visible=false;n++}});if(n)console.log('env: ẩn '+n+' mẫu scatter ở gốc toạ độ')}
   const envMeshes=[];const byName={};
   env.traverse(o=>{byName[o.name]=o;if(o.isMesh){envMeshes.push(o);const m=o.material;const tr=m&&(m.transparent||m.opacity<1);o.userData.glass=tr||/glass/i.test(o.name);
     if(!tr){o.castShadow=true;}o.receiveShadow=true;}});

@@ -437,8 +437,9 @@ export function setupExterior(c) {
   { let nT = 0; env.updateMatrixWorld(true); const wp = new THREE.Vector3();
     env.traverse(o => { if (!o.isMesh || o.isInstancedMesh || !o.visible) return;
       let hid = false; for (let q = o.parent; q; q = q.parent) if (!q.visible) { hid = true; break; }
-      o.getWorldPosition(wp);
-      if (hid || (/^SF_Biome(Proxy|Mesh)/.test(o.name) && Math.abs(wp.x) < 0.01 && Math.abs(wp.z) < 0.01)) { o.visible = false; nT++; } });
+      o.getWorldPosition(wp); env.worldToLocal(wp);   // gốc toạ độ của GLB ngoại cảnh (map trong nhà dời env theo dx/dz)
+      let tpl = false; for (let q = o; q && q !== env; q = q.parent) if (/^\.?SF_(Biome|Source)/.test(q.name || '')) { tpl = true; break; }   // mẫu Scatter: SF_BiomeProxy_* / SF_SourceProxy_* / SF_BiomeSurface_* (đá, cỏ Plant_01, hoa, bụi…)
+      if (hid || (tpl && Math.abs(wp.x) < 0.01 && Math.abs(wp.z) < 0.01)) { o.visible = false; nT++; } });
     if (nT) console.log('exterior: ẩn ' + nT + ' mẫu cây/bụi nằm ở gốc toạ độ'); }
   console.log('exterior: instanced in GLB ' + nIn + ' → ' + cells.length + ' ô; rải ngoài ' + JSON.stringify(farN) + '; vật cản tròn ' + colliders.circles.length + ', hộp ' + colliders.boxes.length);
 
