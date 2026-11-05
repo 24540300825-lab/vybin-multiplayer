@@ -8,7 +8,7 @@ const N = 240;
 const ft = new Float32Array(N); let since = 0, fi = 0, fn = 0, rendererRef = null, el = null, on = false, lastDraw = 0, hitch = 0;
 let gl = null, tq = null, qPending = [], qActive = null, gpuMs = 0, cpuMs = 0, t0 = 0, cpuEma = 0, gpuEma = 0;
 let lastProgs = 0, lastTex = 0, lastGeo = 0, lastHeap = 0, frameNo = 0, tStart = performance.now();
-let callsEma = 0, trisEma = 0, ctxFn = () => ({}), curLong = [], lastVis = 0, lastCause = '';
+let dtEma = 0, callsEma = 0, trisEma = 0, ctxFn = () => ({}), curLong = [], lastVis = 0, lastCause = '';
 const hitches = [], timeline = [], longTasks = [];
 let secAcc = {n: 0, sum: 0, max: 0, bad: 0, cpu: 0, gpu: 0, calls: 0, tris: 0}, secT = 0;
 const HITCH_MIN = 40;   // ms
@@ -56,7 +56,7 @@ export const Perf = {
     since++; frameNo++; ft[fi] = dtMs; fi = (fi + 1) % N; if (fn < N) fn++;
     const inf = rendererRef ? rendererRef.info : null, progs = inf ? inf.programs.length : 0, tex = inf ? inf.memory.textures : 0, geo = inf ? inf.memory.geometries : 0, h = heapMB();
     const fc = inf ? inf.render.calls : 0, ftr = inf ? inf.render.triangles : 0; callsEma = callsEma ? callsEma * 0.9 + fc * 0.1 : fc; trisEma = trisEma ? trisEma * 0.9 + ftr * 0.1 : ftr;
-    const base = fn > 30 ? Array.from(ft.subarray(0, fn)).sort((a, b) => a - b)[fn >> 1] : 16.7;
+    const base = fn > 30 ? dtEma : 16.7; if (dtMs < dtEma * 3 || !dtEma) dtEma = dtEma ? dtEma * 0.95 + dtMs * 0.05 : dtMs;   // trung bình trượt bỏ qua frame giật (không cấp phát mỗi frame)
     if (frameNo > 5 && dtMs > Math.max(HITCH_MIN, base * 2.5)) {
       hitch++;
       const info = {dProgs: progs - lastProgs, dTex: tex - lastTex, dGeo: geo - lastGeo, dHeap: h != null && lastHeap ? h - lastHeap : null, cpu: cpuMs, gpu: gpuMs, longTask: curLong.reduce((m, r) => Math.max(m, r.ms), 0)};
