@@ -2,4 +2,5 @@
 // Mỗi mục là hàm import động (chỉ tải khi bật). Xem docs/EXTENDING.md và src/features/_template.js.
 export const FEATURES = [
   // () => import('./vi-du-vay-tay.js'),
+  () => import('./khoai-nong.js'),   // minigame Khoai nóng (🥔) — rượt nhau ngoài vườn
 ];
