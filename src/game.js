@@ -357,7 +357,7 @@ ${FRAG_COLOR}
     for(const S of stairs){if(x>S.x0-0.02&&x<S.x1+0.02&&z>S.z0&&z<S.z1+0.02){blocked[lv][j*G.W+i]=1;hard[lv][j*G.W+i]=1}
       else if(x>S.x0-0.16&&x<S.x1+0.16&&z>S.z0&&z<S.z1-0.03){blocked[lv][j*G.W+i]=1;hard[lv][j*G.W+i]=1}}}      // vành đệm bán kính nhân vật dọc hông cầu thang: đường đi không sượt/cắt góc hông
   console.log('colliders',cols[0].length,cols[1].length);
-  window.__G={G,blocked,A,cols,envMeshes,isUnder,CHAIR,stairs,jh,hard};
+  window.__G={G,blocked,A,cols,envMeshes,isUnder,CHAIR,stairs,jh,hard,findPath};
   const colGroup=new THREE.Group();colGroup.visible=false;scene.add(colGroup);
   cols.forEach((arr,lv)=>arr.forEach(b=>colGroup.add(new THREE.Box3Helper(b,lv?0x44ff88:0xff5555))));
   $('cCol').onchange=e=>colGroup.visible=e.target.checked;
@@ -383,7 +383,9 @@ ${FRAG_COLOR}
         if(free(lv,gi+di,gj+dj)){const d=di*di+dj*dj;if(d<bd){bd=d;best=[gi+di,gj+dj]}}}
       if(best){[gi,gj]=best;gx=G.x0+(gi+.5)*G.c;gz=G.z0+(gj+.5)*G.c}}
     if(los(lv,x0,z0,gx,gz,true,exact))return [{x:gx,z:gz}];
-    const [si,sj]=cell(x0,z0),N=G.W*G.H,g=new Float32Array(N).fill(1e9),par=new Int32Array(N).fill(-1),done=new Uint8Array(N);
+    let [si,sj]=cell(x0,z0);const N=G.W*G.H,g=new Float32Array(N).fill(1e9),par=new Int32Array(N).fill(-1),done=new Uint8Array(N);
+    // đang đứng lấn vào lề vùng chặn (vd. vừa đi đường tắt sát đồ đạc, hay bị ngắt giữa lộ trình): A* từ ô bị chặn không lan ra được → trước đây trả [] → bước sau (ngồi/xem TV) đặt thẳng vị trí = giật vài mét. Bắt đầu từ ô trống gần nhất.
+    if(!free(lv,si,sj)){let best=null,bd=1e9;for(let r=1;r<12&&!best;r++)for(let dj=-r;dj<=r;dj++)for(let di=-r;di<=r;di++){if(Math.max(Math.abs(di),Math.abs(dj))!==r)continue;if(free(lv,si+di,sj+dj)){const d=di*di+dj*dj;if(d<bd){bd=d;best=[si+di,sj+dj]}}}if(best)[si,sj]=best}
     const h=(i,j)=>{const dx=Math.abs(i-gi),dz=Math.abs(j-gj);return (dx+dz)+(1.414-2)*Math.min(dx,dz)};
     const heap=[];const push=(f,k)=>{heap.push([f,k]);let c=heap.length-1;while(c>0){const p=(c-1)>>1;if(heap[p][0]<=heap[c][0])break;[heap[p],heap[c]]=[heap[c],heap[p]];c=p}};
     const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let c=0;for(;;){let l=2*c+1,r=l+1,m=c;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===c)break;[heap[m],heap[c]]=[heap[c],heap[m]];c=m}}return top};
@@ -769,7 +771,10 @@ ${FRAG_COLOR}
       const near=Math.abs(x0-cx)<0.45&&z0>S.topZ+0.02,top0=near?[]:[wp(cx,S.topZ,null,run,1)];
       if(S.front){const F=S.front;it.push(...top0,wp(cx,S.midZ,0,run),wp(cx,F.zF,null,run,1),wp(F.lx,F.zF,null,run,1));x0=F.lx;z0=F.zF}
       else{it.push(...top0,wp(cx,S.midZ,0,run),wp(cx,S.botZ,null,run),wp(cx,approachZ(cx,S.botZ,1,0),null,run,1));x0=cx;z0=approachZ(cx,S.botZ,1,0)}}
-    add(findPath(x0,z0,x,z,lv,exact));return it;}
+    add(findPath(x0,z0,x,z,lv,exact));
+    // tới chỗ ngồi/giường/sofa: điểm đứng thường nằm sát (hoặc lẹm) vùng chặn của đồ → A* chỉ tới được ô trống gần nhất, rồi bước leo/ngồi đặt thẳng vị trí = giật. Nối thêm 1 đoạn đi thẳng tới đúng điểm đứng (ngắn) để nhân vật tự bước vào chỗ.
+    if(exact){const l=it.length?it[it.length-1]:{x:x0,z:z0},d=Math.hypot(l.x-x,l.z-z);if(d>0.02&&d<1.5)it.push(wp(x,z,null,run))}
+    return it;}
   const leave=()=>{const k=busy&&busy.kind;return (P.mode==='bed'||k==='climbBed')?[{t:'offBed'}]:(P.mode==='sit'||P.mode==='type'||k==='climbChair')?[{t:'offChair'}]:(P.mode==='watch'||k==='climbWatch')?[{t:'offWatch'}]:[]};
   function cmdMove(x,z,lv,run){
     em('move',[r3(x),r3(z),lv,run?1:0]);
@@ -811,8 +816,13 @@ ${FRAG_COLOR}
   function endDrift(key){const e=HIP[key]&&HIP[key].e,r=HIP.REST&&HIP.REST.s;if(!e||!r)return false;
     const dx=e.x-r.x,dz=e.z-r.z;if(Math.hypot(dx,dz)<0.02)return false;const c=Math.cos(P.yaw),s=Math.sin(P.yaw);
     P.pos.x+=dx*c+dz*s;P.pos.z+=-dx*s+dz*c;return true;}
+  // bắt đầu leo/ngồi khi chưa đứng đúng điểm đứng (bản sao mạng tới gần ~0.3 m, hay đường đi chỉ tới được ô sát đồ đạc): không đặt thẳng vị trí (giật) mà trượt mượt về đúng chỗ trong ~0.3 s đầu clip
+  function easeIn(fx,fz,fw){if(!busy)return;const d=Math.hypot(P.pos.x-fx,P.pos.z-fz),dw=Math.abs(angDiff(P.yaw,fw));if(d<0.01&&dw<0.02)return;
+    if(d>2.5)return;   // quá xa (kẹt chỗ kín): đành đặt thẳng
+    busy.ez={fx,fz,fw,sx:P.pos.x,sz:P.pos.z,sw:P.yaw,T:clamp(0.18+d*0.5,0.18,0.45)};P.pos.x=fx;P.pos.z=fz;P.yaw=fw}
   function updateBusy(dt){
     const b=busy,p=clamp(b.a.time/b.dur,0,1);
+    if(b.ez){const e=b.ez,w=sstep(0,1,Math.min(1,b.a.time/e.T));P.pos.x=e.fx+(e.sx-e.fx)*w;P.pos.z=e.fz+(e.sz-e.fz)*w;P.yaw=e.fw+angDiff(e.sw,e.fw)*w;if(w>=1)b.ez=null}
     P.pos.y=THREE.MathUtils.lerp(b.y0,b.y1,sstep(0.2,0.8,p));
     if(b.kind==='climbBed'&&p>=CFG.eyeCloseAt)eyeClose();
     if(b.kind==='climbWatch'&&!b.cued&&p>=0.3){b.cued=true;if(!DEF.remote&&api.onWatchSitting)api.onWatchSitting()}     // lúc lấy bắp ra: camera bắt đầu lướt
@@ -859,15 +869,15 @@ ${FRAG_COLOR}
       case 'face':{const diff=angDiff(it.yaw,P.yaw);
         if(Math.abs(diff)<0.04){P.yaw=it.yaw;plan.shift();break}
         P.yaw+=clamp(diff,-9*dt,9*dt);play(DEF.idleBurst?'REST':'IDLE',{fade:0.2});break;}
-      case 'climbBed':{plan.shift();if(occ['bed'+it.side]&&occ['bed'+it.side]!==DEF.id){plan=[];toast('Phía giường này có người');break}occ['bed'+it.side]=DEF.id;P.yaw=0;P.level=1;P.side=it.side;const s=bedPose(it.side);P.stand=s.clone();P.pos.x=s.x;P.pos.z=s.z;
-        anchor=HIP['CLIMBBED_'+it.side].e.clone();startBusy('climbBed','CLIMBBED_'+it.side,null,A.L1,bedRootY());break;}
-      case 'climbChair':{plan.shift();if(occ.chair&&occ.chair!==DEF.id){plan=[];toast('Ghế đang có người');break}occ.chair=DEF.id;P.yaw=A.chairYaw;P.side=it.side;const s=chairStandOf(it.side);P.stand=s.clone();P.pos.x=s.x;P.pos.z=s.z;
-        anchor=HIP['CLIMBCHAIR_'+it.side].e.clone();startBusy('climbChair','CLIMBCHAIR_'+it.side,'CLIMBUP',A.CY,A.CY+CFG.sitYAdj);break;}
+      case 'climbBed':{plan.shift();const fx=P.pos.x,fz=P.pos.z,fw=P.yaw;if(occ['bed'+it.side]&&occ['bed'+it.side]!==DEF.id){plan=[];toast('Phía giường này có người');break}occ['bed'+it.side]=DEF.id;P.yaw=0;P.level=1;P.side=it.side;const s=bedPose(it.side);P.stand=s.clone();P.pos.x=s.x;P.pos.z=s.z;
+        anchor=HIP['CLIMBBED_'+it.side].e.clone();startBusy('climbBed','CLIMBBED_'+it.side,null,A.L1,bedRootY());easeIn(fx,fz,fw);break;}
+      case 'climbChair':{plan.shift();const fx=P.pos.x,fz=P.pos.z,fw=P.yaw;if(occ.chair&&occ.chair!==DEF.id){plan=[];toast('Ghế đang có người');break}occ.chair=DEF.id;P.yaw=A.chairYaw;P.side=it.side;const s=chairStandOf(it.side);P.stand=s.clone();P.pos.x=s.x;P.pos.z=s.z;
+        anchor=HIP['CLIMBCHAIR_'+it.side].e.clone();startBusy('climbChair','CLIMBCHAIR_'+it.side,'CLIMBUP',A.CY,A.CY+CFG.sitYAdj);easeIn(fx,fz,fw);break;}
       case 'offBed':{plan.shift();eyeOpen();startBusy('offBed','OFFBED_'+P.side,null,bedRootY(),A.L1);break;}
       case 'offChair':{plan.shift();startBusy('offChair','OFFCHAIR_'+P.side,'OFF',A.CY+CFG.sitYAdj,A.CY);break;}
-      case 'climbWatch':{plan.shift();const i=isX(it.seat)?it.seat:it.seat|0;if(isX(i)&&!XSEAT[i]){plan=[];break}if(occ['sofa'+i]&&occ['sofa'+i]!==DEF.id){plan=[];toast('Chỗ đó có người rồi');break}occ['sofa'+i]=DEF.id;
+      case 'climbWatch':{plan.shift();const fx=P.pos.x,fz=P.pos.z,fw=P.yaw;const i=isX(it.seat)?it.seat:it.seat|0;if(isX(i)&&!XSEAT[i]){plan=[];break}if(occ['sofa'+i]&&occ['sofa'+i]!==DEF.id){plan=[];toast('Chỗ đó có người rồi');break}occ['sofa'+i]=DEF.id;
         P.yaw=seatYaw(i);P.seat=i;const s=watchPose(i),fy=seatFY(i);P.stand=s.clone();P.pos.x=s.x;P.pos.z=s.z;P.level=seatLv(i);
-        startBusy('climbWatch','WATCH',null,fy,fy+watchDY(i));if(!isX(i))popIn();break;}
+        startBusy('climbWatch','WATCH',null,fy,fy+watchDY(i));easeIn(fx,fz,fw);if(!isX(i))popIn();break;}
       case 'offWatch':{plan.shift();startBusy('offWatch','OFFWATCH',null,P.pos.y,isX(P.seat)&&XSEAT[P.seat]?XSEAT[P.seat].fy:A.L0);popOut();break;}
       case 'type':{plan.shift();if(P.mode==='sit'&&K.TYPE){P.mode='type';play('TYPE',{fade:0.06});}break;}
       case 'sitidle':{plan.shift();if(P.mode==='type'){P.mode='sit';play('SIT',{fade:0.2});}break;}
