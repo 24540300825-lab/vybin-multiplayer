@@ -500,7 +500,9 @@ ${FRAG_COLOR}
   // Giờ khi bản sao ở trạng thái tự do (không leo/ngồi/nằm, không chạy lộ trình click), vị trí–độ cao–tầng–hướng–tốc độ CHỈ lấy từ snapshot của chủ nhân vật,
   // phát lại trễ ~0.1–0.4s (tự chỉnh theo độ rung mạng) và nội suy giữa 2 gói → liên tục, dừng đúng chỗ, không xuyên sàn. Animation chọn theo tốc độ nội suy.
   const NB=[];let nOff=null,nJit=0.02,nSeq=-1;
-  const RUN_SP=(CFG.walk+CFG.run)/2*0.85;
+  // hệ số tốc độ tạm thời (Turbo của minigame Khoai nóng…): mL = bản của mình, mR = bản sao đối phương (nhận qua mạng) — dùng để phân biệt đi/chạy đúng khi đang tăng tốc
+  window.__spd=window.__spd||{mL:1,mR:1};const SPM=()=>DEF.remote?window.__spd.mR:window.__spd.mL,ANM=()=>Math.pow(SPM(),0.85);
+  const RUN_SPf=()=>(CFG.walk+CFG.run)/2*0.85;
   const netI=()=>DEF.remote&&NB.length>0&&P.mode==='free'&&!busy&&!plan[0];
   const netWP=()=>DEF.remote&&NB.length>0&&!busy&&plan[0]&&plan[0].t==='wp';
   let nStill=0;
@@ -527,7 +529,7 @@ ${FRAG_COLOR}
     P.level=nTgt.l;P.sp=nTgt.sp;nStill=P.sp<0.05?nStill+dt:0;
     P.yaw+=angDiff(nTgt.w,P.yaw)*(1-Math.exp(-dt*18));
     if(!anim)return;
-    if(P.sp>0.05){play(P.sp>RUN_SP?'RUN':'WALK',{fade:0.15});idleHeld=false;stopT=0}
+    if(P.sp>0.05){play(P.sp/SPM()>RUN_SPf()?'RUN':'WALK',{fade:0.15});idleHeld=false;stopT=0}
     else{stopT+=dt;if(stopT>0.14||(cur!==acts[K.WALK]&&cur!==acts[K.RUN]))idleTick(dt)}
   }
   const char=chrG.scene;
@@ -853,7 +855,7 @@ ${FRAG_COLOR}
         if(netWP()){            // bản sao đi lộ trình (click-đi / tới giường, ghế, sofa): vị trí theo snapshot, chỉ dùng lộ trình để biết lúc nào tới đích cuối
           let j=0;while(plan[j+1]&&plan[j+1].t==='wp')j++;const fin=plan[j];
           netFree(dt,false);
-          if(P.sp>0.05)play(P.sp>RUN_SP?'RUN':'WALK',{fade:0.2});
+          if(P.sp>0.05)play(P.sp/SPM()>RUN_SPf()?'RUN':'WALK',{fade:0.2});
           const dF=Math.hypot(fin.x-P.pos.x,fin.z-P.pos.z);
           // tới đích: sát điểm cuối, hoặc gần đích mà chủ nhân vật đã bắt đầu hành động kế (leo giường/ghế…) hay đã đứng hẳn (mv=0)
           const ownBusy=net&&net.b,ownStill=net&&!net.mv;
@@ -866,7 +868,7 @@ ${FRAG_COLOR}
         if(d<=arrive){if(last){P.pos.x=it.x;P.pos.z=it.z;}if(it.setLevel!=null)P.level=it.setLevel;plan.shift();break}
         const diff=angDiff(Math.atan2(dx,dz),P.yaw);
         P.yaw+=clamp(diff*(1-Math.exp(-dt*30)),-22*dt,22*dt);
-        P.sp=(it.run?CFG.run:CFG.walk)*(stairAt(P.pos.x,P.pos.z)?0.85:1);
+        P.sp=(it.run?CFG.run:CFG.walk)*SPM()*(stairAt(P.pos.x,P.pos.z)?0.85:1);
         const mx=(last&&d<0.5)?dx/d:Math.sin(P.yaw),mz=(last&&d<0.5)?dz/d:Math.cos(P.yaw);
         const st=Math.min(P.sp*dt,d)*(it.strict?Math.max(0.05,1-Math.abs(diff)/0.5):1);P.pos.x+=mx*st;P.pos.z+=mz*st;      // điểm vào cầu thang: quay mặt về hướng đi rồi mới bước (không vòng ra ngoài trục)
         play(it.run?'RUN':'WALK',{fade:0.2});
@@ -1002,10 +1004,10 @@ ${FRAG_COLOR}
       let v=0;if(A.t>=DV_T0&&A.t<=DV_T1)v=DIVE_V*Math.sin(Math.PI*(A.t-DV_T0)/(DV_T1-DV_T0));
       P.sp=v;if(v>0.05)stepMove(A.dx*v*dt,A.dz*v*dt)}
     else if(inp.mag>0.1){const diff=angDiff(Math.atan2(inp.x,inp.z),P.yaw);P.yaw+=clamp(diff*(1-Math.exp(-dt*30)),-22*dt,22*dt);
-      P.sp=inp.run?CFG.run:CFG.walk;stepMove(Math.sin(P.yaw)*P.sp*dt,Math.cos(P.yaw)*P.sp*dt)}
+      P.sp=(inp.run?CFG.run:CFG.walk)*SPM();stepMove(Math.sin(P.yaw)*P.sp*dt,Math.cos(P.yaw)*P.sp*dt)}
     else P.sp=0;
     if(!A.landed&&A.t>=(A.k==='jump'?J_LAND:A.k==='djump'?DJ_LAND:DV_T1-0.05)){A.landed=true;landSfx()}
-    if(A.t>=A.dur-1e-3||(A.k==='dive'&&A.t>=DV_END&&inp.mag>0.1))endAir(DEF.remote&&netI()?{mag:P.sp>0.05?1:0,run:P.sp>RUN_SP}:inp)}
+    if(A.t>=A.dur-1e-3||(A.k==='dive'&&A.t>=DV_END&&inp.mag>0.1))endAir(DEF.remote&&netI()?{mag:P.sp>0.05?1:0,run:P.sp/SPM()>RUN_SPf()}:inp)}
   // ----- WASD control -----
   function manualUpdate(dt,inp){if(inp.interact){em('int');emitOff++;try{manualUpdate0(dt,inp)}finally{emitOff--}}else manualUpdate0(dt,inp)}
   function manualUpdate0(dt,inp){
@@ -1034,7 +1036,7 @@ ${FRAG_COLOR}
     if(inp.mag>0.1){
       const diff=angDiff(Math.atan2(inp.x,inp.z),P.yaw);
       P.yaw+=clamp(diff*(1-Math.exp(-dt*30)),-22*dt,22*dt);
-      P.sp=(inp.run?CFG.run:CFG.walk)*(stairAt(P.pos.x,P.pos.z)?0.85:1);
+      P.sp=(inp.run?CFG.run:CFG.walk)*SPM()*(stairAt(P.pos.x,P.pos.z)?0.85:1);
       stepMove(Math.sin(P.yaw)*P.sp*dt,Math.cos(P.yaw)*P.sp*dt);
       play(inp.run?'RUN':'WALK',{fade:0.15});idleHeld=false;
       stopT=0;
@@ -1112,7 +1114,7 @@ ${FRAG_COLOR}
     char.rotation.y=P.yaw;
     const c=Math.cos(P.yaw),s=Math.sin(P.yaw);
     char.position.set(P.pos.x+off.x*c+off.z*s,P.pos.y+off.y,P.pos.z-off.x*s+off.z*c);
-    if(cur===acts[K.WALK])cur.timeScale=CFG.walkAnim;else if(cur===acts[K.RUN])cur.timeScale=CFG.runAnim;
+    if(cur===acts[K.WALK])cur.timeScale=CFG.walkAnim*ANM();else if(cur===acts[K.RUN])cur.timeScale=CFG.runAnim*ANM();
     updateLayers(dt);mixer.update(dt);if(afterMix.length){const q=afterMix.splice(0);q.forEach(f=>{try{f()}catch(e){console.error(e)}})}
     if(belt){beltWind.a=OUTD?TU.uWindA.value:0;beltWind.t=TU.uWindT.value;beltWind.x=FU.uWindDir.value.x;beltWind.z=FU.uWindDir.value.y;belt.update(dt,char.visible&&char.position.distanceToSquared(camera.position)<1600,beltWind)}
     updateEyes(dt);blinkTick();sfxTick();mouthTick(dt);

@@ -8,6 +8,7 @@ export const ACTIONS = [
   {id: 'off',   label: 'Rời ghế',             def: 'KeyX'},
   {id: 'sleep', label: 'Ngủ',                 def: 'KeyZ'},
   {id: 'wake',  label: 'Dậy',                 def: 'KeyV'},
+  {id: 'boost', label: 'Turbo (Khoai nóng)',   def: 'KeyG'},
 ];
 // phím cố định của game (không đổi được) — hiển thị để biết, và để không gán trùng
 const FIXED = [

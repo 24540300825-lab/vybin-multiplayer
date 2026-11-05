@@ -3,11 +3,15 @@
 // Chuyền xong có 1.2 s người nhận không chuyền ngược lại được. Chế độ: Giao hữu (không cược) / Thách đấu (cược điểm thách đấu).
 // Đồng bộ: người đang cầm là người xét chạm & xét nổ (1 nguồn quyết định → không cãi nhau), gửi 'pass' / 'boom' cho bên kia.
 const TOUCH = 0.95, NOPASS = 1.2, BETS = [10, 50, 100];
+// tốc độ trong ván: 2 bên GIỐNG HỆT nhau (đi 5, chạy 7 m/s); anim nhanh theo (không tuyến tính hoàn toàn để chân không quay như chong chóng)
+const SPD = {walk: 5, run: 7, walkAnim: 3.4, runAnim: 2.3};
+// Turbo: dùng được mỗi 10 s (tính từ đầu ván / lúc hết turbo trước), kéo dài 5 s, nhân tốc độ ×1.5. Phím G (đổi được trong Cài đặt phím).
+const BOOST_CD = 10, BOOST_T = 5, BOOST_X = 1.5;
 const rngOf = seed => { let s = seed >>> 0 || 1; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
 export default {
   id: 'potato',
   init(ctx) {
-    const VY = () => window.VY, T = () => VY().THREE;
+    const VY = () => window.VY, T = () => VY().THREE, CFG = window.CFG;
     const css = document.createElement('style');
     css.textContent = `#hpBox{position:fixed;left:50%;top:5.5rem;transform:translateX(-50%);z-index:13;width:min(21rem,92vw);padding:1rem 1.25rem;border-radius:1.75rem;color:#fff;text-align:center}
 #hpBox[hidden]{display:none}#hpBox h4{margin:.1rem 0 .6rem;font-size:1.05rem}#hpBox .m{font-size:1.1rem;font-weight:700;min-height:1.4rem}#hpBox .s{font-size:.8rem;opacity:.75;margin-top:.4rem}
@@ -20,7 +24,7 @@ export default {
     const ledTxt = () => { const L = led(); return `Thắng ${L.w} – Thua ${L.l} · Điểm thách đấu: ${L.pts}`; };
     const show = (html, hot) => { box.innerHTML = html; box.hidden = false; box.classList.toggle('hot', !!hot); };
     const hide = () => { box.hidden = true; box.classList.remove('hot'); };
-    let G = null, pend = null, raf = 0, peerOn = !ctx.solo;
+    let G = null, pend = null, raf = 0, peerOn = !ctx.solo, cfg0 = null;
     ctx.onPeer(({present}) => { peerOn = !!present; if (!present && G && !G.done) finish(null, oN + ' đã rời đi — huỷ ván'); });
     const okMap = () => ctx.mapId === 'exterior';
     const modeTxt = (mode, bet) => mode === 'bet' ? `Thách đấu · cược ${bet} điểm` : 'Giao hữu';
@@ -49,11 +53,20 @@ export default {
       c.char.traverse(o => { if (!o.isMesh) return; [].concat(o.material).forEach(m => { if (!m || !m.color) return;
         if (on) { if (m.userData.hpC == null) m.userData.hpC = m.color.getHex(); m.color.setRGB(0.09, 0.08, 0.08); } else if (m.userData.hpC != null) { m.color.setHex(m.userData.hpC); delete m.userData.hpC; } }); });
     }
+    // nạp sẵn (biên dịch shader) quả khoai + quả cầu nổ ngay lúc vào ván → lúc nổ không phải tạo vật liệu/biên dịch shader mới (tránh khựng đứng máy)
+    let boomS = null;
+    function prewarm() {
+      const V = VY(), TH = T(); if (!V || !V.renderer) return;
+      if (!boomS) { boomS = new TH.Mesh(new TH.SphereGeometry(1, 12, 8), new TH.MeshBasicMaterial({color: 0xffa040, transparent: true, opacity: 0.9, depthWrite: false})); boomS.frustumCulled = false; }
+      const pm = potatoMesh(); pm.position.set(0, -50, 0); boomS.position.set(0, -50, 0); boomS.scale.setScalar(0.01);
+      V.scene.add(pm); V.scene.add(boomS);
+      try { V.renderer.compile(V.scene, V.camera); } catch (e) {}
+      V.scene.remove(boomS);
+    }
     function boomFx(slot) {
-      const c = charOf(slot), V = VY(); if (!c || !V) return; const TH = T();
-      const s = new TH.Mesh(new TH.SphereGeometry(1, 16, 12), new TH.MeshBasicMaterial({color: 0xffa040, transparent: true, opacity: 0.9, depthWrite: false}));
+      const c = charOf(slot), V = VY(); if (!c || !V) return; if (!boomS) prewarm(); const s = boomS;
       s.position.copy(c.P.pos); s.position.y += 1.2; V.scene.add(s); const t0 = performance.now();
-      const step = () => { const u = (performance.now() - t0) / 600; if (u >= 1) { V.scene.remove(s); s.geometry.dispose(); s.material.dispose(); return; } s.scale.setScalar(0.2 + u * 2.4); s.material.opacity = 0.9 * (1 - u); s.material.color.setHSL(0.08 - u * 0.08, 1, 0.6 - u * 0.4); requestAnimationFrame(step); };
+      const step = () => { const u = (performance.now() - t0) / 600; if (u >= 1) { V.scene.remove(s); return; } s.scale.setScalar(0.2 + u * 2.4); s.material.opacity = 0.9 * (1 - u); s.material.color.setHSL(0.08 - u * 0.08, 1, 0.6 - u * 0.4); requestAnimationFrame(step); };
       step(); blacken(slot, true); setTimeout(() => blacken(slot, false), 6000);
       try { if (c.mouthSay) c.mouthSay([[0, 1.0]]); } catch (e) {}
     }
@@ -87,18 +100,30 @@ export default {
     // ---- ván chơi ----
     function begin(d, delay) {
       const r = rngOf(d.seed);
-      G = {mode: d.mode, bet: d.bet, holder: r() < 0.5 ? 'bin' : 'vy', fuse: 15 + r() * 20, t: -delay / 1000, last: performance.now(), noPass: 0, passes: 0, done: false, waitBoom: 0};
+      G = {mode: d.mode, bet: d.bet, holder: r() < 0.5 ? 'bin' : 'vy', fuse: 15 + r() * 20, t: -delay / 1000, bNext: 10, bUntil: -1, last: performance.now(), noPass: 0, passes: 0, done: false, waitBoom: 0};
+      cfg0 = {walk: CFG.walk, run: CFG.run, walkAnim: CFG.walkAnim, runAnim: CFG.runAnim}; Object.assign(CFG, SPD); window.__spd.mL = window.__spd.mR = 1;
+      prewarm();
       box.onclick = null; cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
     }
+    function useBoost() {
+      if (!G || G.done || G.t < 0) return; if (G.t < G.bNext || G.bUntil > G.t) return;
+      G.bUntil = G.t + BOOST_T; G.bNext = G.bUntil + BOOST_CD; window.__spd.mL = BOOST_X; ctx.send('boost', {on: 1}); ctx.toast('⚡ TURBO!');
+    }
+    function boostTick() {
+      if (G.bUntil > 0 && G.t >= G.bUntil && window.__spd.mL !== 1) { window.__spd.mL = 1; ctx.send('boost', {on: 0}); }
+    }
+    ctx.on('boost', d => { window.__spd.mR = d.on ? BOOST_X : 1; });
+    addEventListener('vy:act', e => { if (e.detail === 'boost') useBoost(); });
+    function boostTxt() { if (G.t < 0) return ''; if (G.bUntil > G.t) return `⚡ Turbo ${Math.ceil(G.bUntil - G.t)} s`; return G.t >= G.bNext ? '⚡ Turbo sẵn sàng — bấm G' : `Turbo hồi ${Math.ceil(G.bNext - G.t)} s`; }
     function hud() {
       if (G.t < 0) return show(`<h4>🥔 Khoai nóng · ${modeTxt(G.mode, G.bet)}</h4><div class="m">${Math.ceil(-G.t)}…</div><div class="s">${G.holder === me ? 'Bạn cầm khoai trước! Chạm ' + oN + ' để chuyền' : oN + ' cầm khoai trước — chạy đi!'}</div>`);
       const mine = G.holder === me, k = G.t / G.fuse;
-      show(`<div class="m">${mine ? '🔥 KHOAI TRÊN TAY BẠN — chạm ' + oN + '!' : '🏃 Chạy đi! ' + oN + ' đang cầm khoai'}</div><div class="s">${mine && G.noPass > 0 ? 'Vừa nhận — chưa chuyền lại được' : k > 0.66 ? 'Khoai sắp nổ!!' : 'Chuyền ' + G.passes + ' lần'}</div>`, mine && k > 0.66);
+      show(`<div class="m">${mine ? '🔥 KHOAI TRÊN TAY BẠN — chạm ' + oN + '!' : '🏃 Chạy đi! ' + oN + ' đang cầm khoai'}</div><div class="s">${mine && G.noPass > 0 ? 'Vừa nhận — chưa chuyền lại được' : k > 0.66 ? 'Khoai sắp nổ!!' : 'Chuyền ' + G.passes + ' lần'} · ${boostTxt()}</div>`, mine && k > 0.66);
     }
     function loop(now) {
       if (!G) return; raf = requestAnimationFrame(loop);
       const dt = Math.min(0.1, (now - G.last) / 1000); G.last = now; if (G.done) return;
-      G.t += dt; if (G.noPass > 0) G.noPass -= dt;
+      G.t += dt; if (G.noPass > 0) G.noPass -= dt; boostTick();
       placePotato(now);
       if ((now | 0) % 4 === 0 || G.t < 0.2) hud();
       if (G.t < 0) return;
@@ -117,6 +142,7 @@ export default {
     }
     function finish(win, msg) {
       if (G) G.done = true; cancelAnimationFrame(raf); if (potato && potato.parent) potato.parent.remove(potato);
+      if (cfg0) { Object.assign(CFG, cfg0); cfg0 = null; } window.__spd.mL = window.__spd.mR = 1;
       const L = led(), mode = G && G.mode, bet = (G && G.bet) || 0;
       if (win === true) { L.w++; if (mode === 'bet') L.pts += bet; } else if (win === false) { L.l++; if (mode === 'bet') L.pts -= bet; }
       ctx.store.set('led', L);
