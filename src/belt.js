@@ -10,7 +10,7 @@ import * as THREE from 'three';
 const G = -9.8 * 0.45;          // trọng lực nhẹ (đai ngắn, hơi cứng)
 const STIFF = 16;               // lò xo về tư thế animation (1/s) — càng lớn càng cứng
 const DAMP = 7;                 // cản vận tốc (1/s)
-const MAXDEV = 0.6;             // lệch tối đa so với mục tiêu (m) — quá thì đặt lại (teleport/đổi map)
+const MAXDEV = 0.07;            // lệch tối đa so với mục tiêu (m) — quá thì đặt lại (teleport/đổi map)
 
 export function makeBelt(root, opts = {}) {
   let grp = null;
