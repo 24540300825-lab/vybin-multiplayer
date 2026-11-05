@@ -433,6 +433,13 @@ export function setupExterior(c) {
       const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); sp.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); if (sp.radius > 12) return;
       if (MC.noPlant.some(b => rectD(sp.center.x, sp.center.z, b, 0.4) < Math.min(4, sp.radius) + 0.15)) { let t = o; for (let q = o.parent; q && q !== env; q = q.parent) if (/^SF_|tree|bush/i.test(q.name)) t = q; t.visible = false; nRm++; } });   // ẩn cả cây (thân + cành + tán), không chỉ phần lá
     if (nRm) console.log('exterior: bỏ ' + nRm + ' cây/bụi lẻ sát tường nhà'); }
+  // mẫu cây/bụi (SF_Biome*) nằm gốc toạ độ (0,0) — ngay sát tường trước phòng khách: mẫu bị ẩn ở nút cha nhưng mesh con vẫn visible nên bị gộp (MERGED_) và vẽ ra → tán cây/bụi dính vào tường nhà. Ẩn hết mẫu này trước khi gộp mesh.
+  { let nT = 0; env.updateMatrixWorld(true); const wp = new THREE.Vector3();
+    env.traverse(o => { if (!o.isMesh || o.isInstancedMesh || !o.visible) return;
+      let hid = false; for (let q = o.parent; q; q = q.parent) if (!q.visible) { hid = true; break; }
+      o.getWorldPosition(wp);
+      if (hid || (/^SF_Biome(Proxy|Mesh)/.test(o.name) && Math.abs(wp.x) < 0.01 && Math.abs(wp.z) < 0.01)) { o.visible = false; nT++; } });
+    if (nT) console.log('exterior: ẩn ' + nT + ' mẫu cây/bụi nằm ở gốc toạ độ'); }
   console.log('exterior: instanced in GLB ' + nIn + ' → ' + cells.length + ' ô; rải ngoài ' + JSON.stringify(farN) + '; vật cản tròn ' + colliders.circles.length + ', hộp ' + colliders.boxes.length);
 
   // ---- 6) cập nhật mỗi vài khung: LOD theo khoảng cách tới tâm nhìn + chất lượng ----
