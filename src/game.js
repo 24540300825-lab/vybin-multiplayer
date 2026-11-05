@@ -1527,11 +1527,17 @@ ${FRAG_COLOR}
   function updInst(){const t=controls.target;for(const c of OPT.inst){const u=c.userData,d=Math.hypot(u.cx-t.x,u.cz-t.z);
       const f=Math.min(1,Math.max(0.05,1.05-d/26));const vis=d<62,sh=d<13;let n=Math.ceil(u.n*f);
       if(c.visible!==vis)c.visible=vis;if(c.count!==n)c.count=n;if(c.castShadow!==sh)c.castShadow=sh}}
+  // GPU rời (NVIDIA / AMD Radeon RX / Intel Arc / Apple M) → cho phép mức 'ultra' khi đang dư sức (độ phân giải đã lên trần); có trễ để không nhảy qua lại
+  const DISCRETE=(()=>{try{const g=renderer.getContext(),e=g.getExtension('WEBGL_debug_renderer_info');return !!e&&/NVIDIA|GeForce|RTX|GTX|Radeon (RX|Pro)|Arc|Apple M/i.test(g.getParameter(e.UNMASKED_RENDERER_WEBGL))}catch(e){return false}})();
+  function autoLvl(){return curPR<0.8?'low':curPR<1.1?'medium':(DISCRETE&&curPR>=(curLvl==='ultra'?1.05:1.2))?'ultra':'high'}
+  const lvlOf=()=>TP.quality==='auto'?autoLvl():TP.quality;
+  let curIn='';
+  function applyIndoor(){const l=lvlOf(),w=l==='low'?'low':l==='ultra'?'indoorUltra':'indoor';if(w!==curIn){curIn=w;EXTV.setLevel(w)}}
   let curLvl='';
-  function applyLevel(){const q=TP.quality,lvl=q==='auto'?(curPR<0.8?'low':curPR<1.1?'medium':'high'):q;if(lvl===curLvl||!LEVELS[lvl])return;curLvl=lvl;EXT.setLevel(lvl);setRainCount(LEVELS[lvl].rain);
-    const ms={low:1536,medium:2048,high:2560}[lvl],hs={low:13,medium:15,high:17}[lvl],sh=sun.shadow;
+  function applyLevel(){const q=TP.quality,lvl=q==='auto'?autoLvl():q;if(lvl===curLvl||!LEVELS[lvl])return;curLvl=lvl;EXT.setLevel(lvl);setRainCount(LEVELS[lvl].rain);
+    const ms={low:1536,medium:2048,high:2560,ultra:3072}[lvl],hs={low:13,medium:15,high:17,ultra:19}[lvl],sh=sun.shadow;
     if(sh.mapSize.x!==ms){sh.mapSize.set(ms,ms);if(sh.map){sh.map.dispose();sh.map=null}}Object.assign(sh.camera,{left:-hs,right:hs,top:hs*0.9,bottom:-hs*0.9});sh.camera.updateProjectionMatrix()}
-  function updCull(){if(EXT){applyLevel();EXT.update(controls.target,camera.position,scene.fog.color)}else updInst();if(EXTV)EXTV.update(controls.target,camera.position,scene.fog.color);const cx=controls.target;OPT.far.forEach(o=>{if(!o.userData.c){const b=new THREE.Box3().setFromObject(o);o.userData.c=b.getCenter(new THREE.Vector3());o.userData.r=b.getSize(new THREE.Vector3()).length()/2}
+  function updCull(){if(EXT){applyLevel();EXT.update(controls.target,camera.position,scene.fog.color)}else updInst();if(EXTV){if(!EXT)applyIndoor();EXTV.update(controls.target,camera.position,scene.fog.color)}const cx=controls.target;OPT.far.forEach(o=>{if(!o.userData.c){const b=new THREE.Box3().setFromObject(o);o.userData.c=b.getCenter(new THREE.Vector3());o.userData.r=b.getSize(new THREE.Vector3()).length()/2}
       const d=o.userData.c.distanceTo(camera.position)-o.userData.r;o.visible=d<300})}
 
   // ===== MÔI TRƯỜNG: ngày/đêm · thời tiết · light shafts · post-fx =====

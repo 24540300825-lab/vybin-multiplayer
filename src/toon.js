@@ -65,7 +65,7 @@ export function applyToon(save=true){
     ['tintSh','Split-tone shadow','c'],['tintHi','Split-tone highlight','c'],['tintAmt','Split-tone amount','n',0,1,0.01],
     ['vig','Vignette','n',0,1,0.01],['bloom','Bloom','n',0,2,0.01],['bloomTh','Bloom threshold','n',0.3,1.5,0.01],
     ['h','Ngày / đêm · thời tiết'],['time','Giờ (0–24)','n',0,24,0.05],['auto','Tự chạy ngày đêm','b'],['speed','Tốc độ (giờ/giây)','n',0.01,2,0.01],['weather','Thời tiết','s',WEA],
-    ['rays','Tia sáng (light shafts)','n',0,3,0.05],['motes','Bụi sáng','n',0,3,0.05],['h','Hiệu năng / cảnh quan'],['quality','Chất lượng','s',['auto','low','medium','high']],['garden','Cây cối / vườn','b']];
+    ['rays','Tia sáng (light shafts)','n',0,3,0.05],['motes','Bụi sáng','n',0,3,0.05],['h','Hiệu năng / cảnh quan'],['quality','Chất lượng','s',['auto','low','medium','high','ultra']],['garden','Cây cối / vườn','b']];
   const ctr={};
   tp.innerHTML='<b style="font-size:13px">🎨 Look: toon · grade · ngày/đêm</b><div id="tpre"></div>';
   const pre=tp.querySelector('#tpre');

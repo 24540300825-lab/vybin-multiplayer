@@ -9,11 +9,15 @@ import {makeFoliageDecals} from './decals.js';
 
 // ---- mức chất lượng: mật độ, tầm nhìn, bóng, số lớp sương, hạt mưa -----------------------------------------
 export const LEVELS = {
-  low:    {dens: 0.35, dist: 0.62, shadowR: 8,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.40, gNear: 0.45},
-  medium: {dens: 0.55, dist: 0.85, shadowR: 9,  grassShadowR: 4,  haze: 2, rain: 4200, far: 0.60, gNear: 0.85},
-  high:   {dens: 0.72, dist: 1.00, shadowR: 11, grassShadowR: 6,  haze: 2, rain: 6000, far: 0.80, gNear: 1.0},
+  // fl = hệ số số lượng hoa (hoa đã nhân đôi bản sao khi dựng ô nên 0.3 ≈ mật độ cũ)
+  low:    {dens: 0.35, dist: 0.62, shadowR: 8,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.40, gNear: 0.45, fl: 0.3},
+  medium: {dens: 0.55, dist: 0.85, shadowR: 9,  grassShadowR: 4,  haze: 2, rain: 4200, far: 0.60, gNear: 0.85, fl: 0.3},
+  high:   {dens: 0.72, dist: 1.00, shadowR: 11, grassShadowR: 6,  haze: 2, rain: 6000, far: 0.80, gNear: 1.0,  fl: 0.3},
+  // ultra: máy mạnh (GPU rời) — vùng cây cỏ rộng hơn ~40%, hoa dày gấp ~2, bóng cỏ/cây xa hơn, mưa dày
+  ultra:  {dens: 1.00, dist: 1.40, shadowR: 15, grassShadowR: 10, haze: 2, rain: 9000, far: 1.00, gNear: 1.0,  fl: 0.5},
   // map trong nhà (phòng khách / phòng Vy / phòng Bin): vườn chỉ thấy qua khung cửa → thưa hơn, gần hơn, cây cỏ không đổ bóng
-  indoor: {dens: 0.80, dist: 1.00, shadowR: 0,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.45, gNear: 0.9},
+  indoor: {dens: 0.80, dist: 1.00, shadowR: 0,  grassShadowR: 0,  haze: 1, rain: 2400, far: 0.45, gNear: 0.9,  fl: 0.3},
+  indoorUltra: {dens: 1.00, dist: 1.5, shadowR: 0, grassShadowR: 0, haze: 2, rain: 4000, far: 0.80, gNear: 1.0, fl: 0.55},
 };
 // theo loại: tầm nhìn tối đa (m), đường cong mật độ theo khoảng cách (d0 = bắt đầu thưa, d1 = còn tối thiểu), có đổ bóng không
 // "Đẹp chỗ cần đẹp": khoảng cách tính từ NHÂN VẬT (chỗ mắt người chơi nhìn). Quanh nhân vật đủ dày + đủ chi tiết;
@@ -270,8 +274,8 @@ export function setupExterior(c) {
     // vật cản: thân cây / đá
     if (cls === 'tree' || cls === 'rock') addColliders(cls, set, mats);
     // cỏ um tùm: thêm 1 bản sao lệch 0.35–0.9 m / xoay / nhỏ hơn chút cho mỗi cụm cỏ (×2 mật độ; vùng xa vẫn bị thưa bớt theo khoảng cách)
-    if (cls === 'grass') { const add = [], mT = new THREE.Matrix4(), mR = new THREE.Matrix4(), mS = new THREE.Matrix4();
-      for (const mm of mats) { const a = rnd() * 6.283, r = 0.35 + rnd() * 0.55; V3.setFromMatrixPosition(mm); const x = V3.x + Math.cos(a) * r, z = V3.z + Math.sin(a) * r;
+    if (cls === 'grass' || cls === 'flower') { const add = [], mT = new THREE.Matrix4(), mR = new THREE.Matrix4(), mS = new THREE.Matrix4();
+      for (const mm of mats) { const a = rnd() * 6.283, r = (cls === 'flower' ? 0.5 : 0.35) + rnd() * 0.55; V3.setFromMatrixPosition(mm); const x = V3.x + Math.cos(a) * r, z = V3.z + Math.sin(a) * r;
         if (MC.noPlant && MC.noPlant.some(b => x > b[0] && x < b[1] && z > b[2] && z < b[3])) continue;
         const sc = 0.8 + rnd() * 0.25; add.push(mm.clone().multiply(mR.makeRotationY(rnd() * 6.283)).multiply(mS.makeScale(sc, sc * (0.85 + rnd() * 0.3), sc)).premultiply(mT.makeTranslation(x - V3.x, 0, z - V3.z))); }
       mats = mats.concat(add); }
@@ -448,7 +452,7 @@ export function setupExterior(c) {
       const solid = ce.user || (!INDOOR && !ce.far && (ce.cls === 'tree' || ce.cls === 'rock'));
       const t = Math.min(1, Math.max(0, (d - CL.d0) / (CL.d1 - CL.d0)));
       // cỏ: sát nhân vật gần đủ dày (lv.gNear), xa thưa dần về min×dens; các loại khác như cũ
-      const f = solid ? 1 : ce.cls === 'grass' ? lv.gNear + (CL.min * lv.dens - lv.gNear) * t : Math.max(CL.min, 1 - t * (1 - CL.min)) * lv.dens * (ce.cls === 'flower' ? 0.6 : 1);   // hoa: thưa bớt 40%
+      const f = solid ? 1 : ce.cls === 'grass' ? lv.gNear + (CL.min * lv.dens - lv.gNear) * t : Math.max(CL.min, 1 - t * (1 - CL.min)) * lv.dens * (ce.cls === 'flower' ? lv.fl : 1);   // hoa: số lượng theo mức chất lượng
       const dens = ce.cls === 'tree' && ce.far ? Math.max(f, lv.far * 0.4) : f;
       const n = Math.max(1, Math.ceil(ce.n * Math.min(1, dens)));
       if (ce.im.count !== n) { ce.im.count = n; if (ce.im1) ce.im1.count = n; }

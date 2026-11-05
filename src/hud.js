@@ -37,7 +37,7 @@ import {Fx} from './ui/fx.js';
    $('mpList').onmouseover=e=>{const c=e.target.closest('.mapc');if(c&&window.__prefetchMap)window.__prefetchMap(c.dataset.m)}}
   addEventListener('keydown',e=>{if(e.code==='Escape'){$('hMap').classList.remove('on')}if(e.code==='Escape')$('hSet').classList.remove('on')});
   // --- preset đồ họa
-  const GFX={'Tiết kiệm':{quality:'low',post:false,rays:0,motes:0,bloom:0,garden:true,ao:0},'Cân bằng':{quality:'medium',post:true,rays:0.6,motes:0.5,bloom:0.15,ao:0.6},'Đẹp':{quality:'high',post:true,rays:1,motes:1,bloom:0.22,ao:0.75},'Điện ảnh':{quality:'high',post:true,rays:1.7,motes:1.6,bloom:0.4,vig:0.3,ao:0.85},'Tự động':{quality:'auto',post:true,rays:1,motes:1,bloom:0.22,ao:0.7}};
+  const GFX={'Tiết kiệm':{quality:'low',post:false,rays:0,motes:0,bloom:0,garden:true,ao:0},'Cân bằng':{quality:'medium',post:true,rays:0.6,motes:0.5,bloom:0.15,ao:0.6},'Đẹp':{quality:'high',post:true,rays:1,motes:1,bloom:0.22,ao:0.75},'Điện ảnh':{quality:'ultra',post:true,rays:1.7,motes:1.6,bloom:0.4,vig:0.3,ao:0.85},'Tự động':{quality:'auto',post:true,rays:1,motes:1,bloom:0.22,ao:0.7}};
   const gfxCur=load('vyGfx','Tự động');
   function chips(el,items,cur,fn){el.innerHTML='';items.forEach(([k,l])=>{const c=document.createElement('div');c.className='chip'+(k===cur?' on':'');c.textContent=l;c.onclick=()=>{[...el.children].forEach(x=>x.classList.remove('on'));c.classList.add('on');fn(k)};el.appendChild(c)})}
   function syncOld(){try{window.__tpSync&&window.__tpSync()}catch(e){}}
