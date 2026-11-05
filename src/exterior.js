@@ -27,12 +27,12 @@ const CLASS_OUT = {
   rock:   {maxD: 34,  d0: 20, d1: 34,  min: 0.40, shadow: true,  cell: 12, lod: 0},
 };
 // 3 phòng trong nhà: chỉ giữ cây cỏ GẦN nhà, đủ chi tiết; xa hơn cũng là decal (thưa hơn)
-const CLASS_IN = {
-  grass:  {maxD: 15,  d0: 7,  d1: 15,  min: 0.30, shadow: false, cell: 16, lod: 0},
-  flower: {maxD: 9,   d0: 4,  d1: 9,   min: 0.20, shadow: false, cell: 16, lod: 0},
-  bush:   {maxD: 18,  d0: 12, d1: 18,  min: 0.60, shadow: false, cell: 16, lod: 0},
-  tree:   {maxD: 26,  d0: 18, d1: 26,  min: 0.85, shadow: false, cell: 16, lod: 0},
-  rock:   {maxD: 20,  d0: 12, d1: 20,  min: 0.50, shadow: false, cell: 16, lod: 0},
+const CLASS_IN = {   // trong nhà: khoảng cách tính từ HỘP NHÀ (không phải tâm nhìn) → chỉ phần sát cửa kính mới có mesh 3D, xa hơn là decal; ô nhỏ để cull chặt
+  grass:  {maxD: 4.5, d0: 1,  d1: 4.5, min: 0.25, shadow: false, cell: 6,  lod: 0},
+  flower: {maxD: 2.5, d0: 1,  d1: 2.5, min: 0.20, shadow: false, cell: 6,  lod: 0},
+  bush:   {maxD: 8,   d0: 3,  d1: 8,   min: 0.35, shadow: false, cell: 8,  lod: 0},
+  tree:   {maxD: 22,  d0: 8,  d1: 22,  min: 0.55, shadow: false, cell: 14, lod: 0},
+  rock:   {maxD: 6,   d0: 3,  d1: 6,   min: 0.40, shadow: false, cell: 8,  lod: 0},
 };
 let CLASS = CLASS_OUT;
 
@@ -425,6 +425,8 @@ export function setupExterior(c) {
   console.log('exterior: instanced in GLB ' + nIn + ' → ' + cells.length + ' ô; rải ngoài ' + JSON.stringify(farN) + '; vật cản tròn ' + colliders.circles.length + ', hộp ' + colliders.boxes.length);
 
   // ---- 6) cập nhật mỗi vài khung: LOD theo khoảng cách tới tâm nhìn + chất lượng ----
+  const IB = [-0.3, 10.3, -8.3, 0.6];   // hộp nội thất (khung camera chỉ pan trong đây) — ngoại cảnh chỉ cần cho vùng nhìn ra từ hộp này
+  if (INDOOR) DEC.U.tree.uBox.value.set(IB[0], IB[1], IB[2], IB[3]);
   let level = 'medium', lv = LEVELS.medium;
   function setLevel(q) { if (!LEVELS[q]) return; level = q; lv = LEVELS[q]; hazes.forEach((h, i) => h.visible = i < lv.haze);
     // decal bắt đầu đúng chỗ cây cỏ 3D hết (theo chất lượng)
@@ -433,7 +435,8 @@ export function setupExterior(c) {
   function update(target, camPos, fogColor, wcFog) {
     DEC.update(target);
     for (const ce of cells) {
-      const CL = CLASS[ce.cls], d = Math.hypot(ce.cx - target.x, ce.cz - target.z);
+      const CL = CLASS[ce.cls];
+      const d = INDOOR ? Math.max(0, Math.hypot(Math.max(IB[0] - ce.cx, 0, ce.cx - IB[1]), Math.max(IB[2] - ce.cz, 0, ce.cz - IB[3])) - CL.cell * 0.4) : Math.hypot(ce.cx - target.x, ce.cz - target.z);
       const dist = CL.maxD * lv.dist, vis = d < dist;
       const lod0 = !ce.im1 || d < CL.lod * lv.dist;            // gần: hình đủ chi tiết; xa: hình giảm tam giác
       const v0 = vis && lod0, v1 = vis && !lod0;
