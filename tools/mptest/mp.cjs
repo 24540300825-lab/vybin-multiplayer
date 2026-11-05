@@ -11,7 +11,7 @@ const b=await chromium.launch({args:['--use-gl=swiftshader','--enable-unsafe-swi
 const ctx=await b.newContext({viewport:{width:200,height:150}});
 const errs=[];
 const open=async(as)=>{const p=await ctx.newPage();p.on('pageerror',e=>errs.push(as+': '+e.message));p.on('console',m=>{if(m.type()==='error')errs.push(as+' console: '+m.text().slice(0,160))});
-  await p.goto(`${BASE}/?mock=/dev/mock-supabase.js&room=${room}&as=${as}&m=${MAP}&test&q=low${NETQ?'&'+NETQ:''}`,{waitUntil:'load'});return p};
+  await p.goto(`${BASE}/?mock=/dev/mock-supabase.js&room=${room}&as=${as}&m=${MAP}&test${NETQ?'&'+NETQ:''}#map=${MAP}`,{waitUntil:'load'});return p};
 const A=await open('bin');await new Promise(r=>setTimeout(r,1500));const B=await open('vy');
 const frameOf=async(p,id)=>{for(let i=0;i<180;i++){for(const f of p.frames()){if(await f.evaluate(id=>!!(window.VY&&window.VY.local&&window.VY.local.id===id),id).catch(()=>false))return f}await p.waitForTimeout(1000)}throw new Error('no game '+id)};
 const fa=await frameOf(A,'bin'),fb=await frameOf(B,'vy');

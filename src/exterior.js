@@ -258,6 +258,10 @@ export function setupExterior(c) {
   }
   const treeSpots = [];
   const treeH = set => { let h = 0; set.forEach(m => { const g = m.geometry; if (!g.boundingBox) g.computeBoundingBox(); h = Math.max(h, g.boundingBox.max.y); }); return Math.max(2, h); };
+  // bán kính tán (ngang) của mẫu cây/bụi theo hộp bao thật của mọi phần (thân + tán) — dùng để bỏ cây/bụi có tán chạm vào tường nhà (lộ vào phòng, nhìn nhạt/xuyên tường)
+  const canopyR = set => { let r = 0; set.forEach(m => { const g = m.geometry; if (!g.boundingBox) g.computeBoundingBox(); const bb = g.boundingBox; r = Math.max(r, Math.abs(bb.min.x), bb.max.x, Math.abs(bb.min.z), bb.max.z); }); return r; };
+  // khoảng cách ngang từ (x,z) tới khối nhà = hộp lòng nhà nở thêm bề dày tường w
+  const rectD = (x, z, b, w) => Math.hypot(Math.max(b[0] - w - x, 0, x - b[1] - w), Math.max(b[2] - w - z, 0, z - b[3] - w));
   const tmpM = new THREE.Matrix4();
   for (const {set, cls} of items) {
     const CL = CLASS[cls];
@@ -265,12 +269,14 @@ export function setupExterior(c) {
     const ref = set[0]; ref.updateWorldMatrix(true, false);
     const W = ref.matrixWorld; let mats = [];
     const dt = MC.dropTrees;
-    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (dt && cls === 'tree') { V3.setFromMatrixPosition(mm); if (dt.some(q => Math.hypot(V3.x - q[0], V3.z - q[1]) < 1.6)) continue; } if (MC.noPlant) { V3.setFromMatrixPosition(mm); const pd = cls === 'tree' ? 2.6 : cls === 'bush' ? 0.5 : 0; if (MC.noPlant.some(b => V3.x > b[0] - pd && V3.x < b[1] + pd && V3.z > b[2] - pd && V3.z < b[3] + pd)) continue; }   // cây to: chừa thêm 2.6 m quanh tường để tán không đâm xuyên vào phòng   // không mọc cây/cỏ trong lòng nhà (lộ ra ở các phòng mặt cắt) 
+    for (let i = 0; i < ref.count; i++) { ref.getMatrixAt(i, tmpM); const mm = tmpM.clone().premultiply(W); if (dt && cls === 'tree') { V3.setFromMatrixPosition(mm); if (dt.some(q => Math.hypot(V3.x - q[0], V3.z - q[1]) < 1.6)) continue; } if (MC.noPlant) { V3.setFromMatrixPosition(mm); if (cls === 'tree' || cls === 'bush') { const r = canopyR(set) * Math.hypot(mm.elements[0], mm.elements[1], mm.elements[2]); if (MC.noPlant.some(b => rectD(V3.x, V3.z, b, 0.4) < r + 0.15)) continue; } else if (MC.noPlant.some(b => V3.x > b[0] && V3.x < b[1] && V3.z > b[2] && V3.z < b[3])) continue; }   // cây to: chừa thêm 2.6 m quanh tường để tán không đâm xuyên vào phòng   // không mọc cây/cỏ trong lòng nhà (lộ ra ở các phòng mặt cắt) 
       mats.push(mm); }
     if (!mats.length) { set.forEach(m => m.removeFromParent()); continue; }
     nIn += mats.length;
     templates[cls].push({set, mats});
-    if (cls === 'tree') { const hl = treeH(set); mats.forEach(mm => { V3.setFromMatrixPosition(mm); treeSpots.push({x: V3.x, y: V3.y, z: V3.z, h: hl * Math.hypot(mm.elements[4], mm.elements[5], mm.elements[6])}); }); }
+    if (cls === 'tree') { const hl = treeH(set); mats.forEach(mm => { V3.setFromMatrixPosition(mm); const h = hl * Math.hypot(mm.elements[4], mm.elements[5], mm.elements[6]);
+      if (MC.noPlant && MC.noPlant.some(b => rectD(V3.x, V3.z, b, 0.4) < h * 0.45)) return;     // tấm decal (phẳng, quay theo camera) của cây sát nhà sẽ cắm xuyên tường → không làm decal cho cây này
+      treeSpots.push({x: V3.x, y: V3.y, z: V3.z, h}); }); }
     // vật cản: thân cây / đá
     if (cls === 'tree' || cls === 'rock') addColliders(cls, set, mats);
     // cỏ um tùm: thêm 1 bản sao lệch 0.35–0.9 m / xoay / nhỏ hơn chút cho mỗi cụm cỏ (×2 mật độ; vùng xa vẫn bị thưa bớt theo khoảng cách)
@@ -425,7 +431,7 @@ export function setupExterior(c) {
   if (MC.noPlant) { const sp = new THREE.Sphere(); let nRm = 0; env.updateMatrixWorld(true);
     env.traverse(o => { if (!o.isMesh || o.isInstancedMesh || !o.visible) return; if (![].concat(o.material).some(m => m && /^Poly(Foliage|Shader)/i.test(m.name || ''))) return;
       const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); sp.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); if (sp.radius > 12) return;
-      const pd = Math.min(3, sp.radius); if (MC.noPlant.some(b => sp.center.x > b[0] - pd && sp.center.x < b[1] + pd && sp.center.z > b[2] - pd && sp.center.z < b[3] + pd)) { let t = o; for (let q = o.parent; q && q !== env; q = q.parent) if (/^SF_|tree|bush/i.test(q.name)) t = q; t.visible = false; nRm++; } });   // ẩn cả cây (thân + cành + tán), không chỉ phần lá
+      if (MC.noPlant.some(b => rectD(sp.center.x, sp.center.z, b, 0.4) < Math.min(4, sp.radius) + 0.15)) { let t = o; for (let q = o.parent; q && q !== env; q = q.parent) if (/^SF_|tree|bush/i.test(q.name)) t = q; t.visible = false; nRm++; } });   // ẩn cả cây (thân + cành + tán), không chỉ phần lá
     if (nRm) console.log('exterior: bỏ ' + nRm + ' cây/bụi lẻ sát tường nhà'); }
   console.log('exterior: instanced in GLB ' + nIn + ' → ' + cells.length + ' ô; rải ngoài ' + JSON.stringify(farN) + '; vật cản tròn ' + colliders.circles.length + ', hộp ' + colliders.boxes.length);
 
