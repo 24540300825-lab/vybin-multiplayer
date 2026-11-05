@@ -1,4 +1,5 @@
 // Điểm khởi động: cấu hình → (multiplayer) giữ slot BIN/VY → nạp asset của map + nhân vật của mình → dựng game → gắn mạng/chat/voice.
+import {APP_VERSION} from './version.js';
 import {CONFIG} from './config.js';
 import * as Assets from './assets.js';
 import {MAP_LIST, DEFAULT_MAP, isMap, goToMap, prefetchMap} from './maps.js';
@@ -183,6 +184,24 @@ async function boot() {
     window.VYFEATURES = host;
     FEATURES.forEach(load => load().then(m => host.register(m.default)).catch(e => console.warn('[features] không nạp được', e)));
   } catch (e) { console.warn('[features]', e); }
+  // ---------- 5b) "hộp đen": ghi lại tình trạng mỗi giây để biết vì sao lâu lâu web bị đứng ----------
+  try {
+    const BK = 'vyf:blackbox', prev = JSON.parse(localStorage.getItem(BK) || 'null');
+    if (prev && prev.run && Date.now() - prev.ts < 3600e3) {   // lần trước kết thúc mà không qua 'pagehide' → bị đứng/chết tab
+      window.__lastCrash = prev; console.warn('[blackbox] lần trước có thể bị đứng', prev);
+      import('./ui/mp-ui.js').then(m => setTimeout(() => m.toast('⚠️ Lần trước web bị đứng — đã ghi lại thông tin để chẩn đoán (' + (prev.map || '') + ', khung hình dài nhất ' + prev.maxFrameMs + ' ms)'), 2500)).catch(() => {});
+    }
+    let maxFrame = 0, lastT = performance.now(), frames = 0;
+    const raf = now => { const d = now - lastT; lastT = now; frames++; if (d > maxFrame) maxFrame = d; requestAnimationFrame(raf); }; requestAnimationFrame(raf);
+    const V = () => window.VY, snap = () => { const v = V(), r = v && v.renderer, inf = r && r.info, m = performance.memory;
+      return {run: 1, ts: Date.now(), ver: APP_VERSION, map: mapId, slot, maxFrameMs: Math.round(maxFrame), fps: frames,
+        geo: inf && inf.memory.geometries, tex: inf && inf.memory.textures, calls: inf && inf.render.calls, tris: inf && inf.render.triangles,
+        heapMB: m ? Math.round(m.usedJSHeapSize / 1048576) : null, scene: v && v.scene ? v.scene.children.length : null,
+        hs: window.__hide && window.__hide.state && window.__hide.state(), hp: window.__potato && window.__potato.state && window.__potato.state(),
+        mode: v && v.local && v.local.P && v.local.P.mode, wx: v && v.WC && v.WC.type, vis: document.visibilityState}; };
+    setInterval(() => { try { const o = snap(); maxFrame = 0; frames = 0; localStorage.setItem(BK, JSON.stringify(o)); } catch (e) {} }, 1000);
+    addEventListener('pagehide', () => { try { const o = snap(); o.run = 0; localStorage.setItem(BK, JSON.stringify(o)); } catch (e) {} });
+  } catch (e) { console.warn('[blackbox]', e); }
   LB(100, 'Xong!');
   if (SH && SH.first) { $('load').style.display = 'none'; setTimeout(() => SH.reveal(), 60); } else setTimeout(reveal, 60);
   // tải nền sẵn map mà cửa/cổng của map này dẫn tới (HTTP cache) → lúc bấm chuyển map chỉ còn dựng cảnh, vào nhanh
