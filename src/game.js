@@ -1869,8 +1869,9 @@ ${FRAG_COLOR}
     // (nhân vật remote bị dự đoán đi quá xa rồi giật về). Giờ chia nhỏ thành nhiều bước <=0.05s (tối đa 0.25s thực/khung; tab vừa bật lại sau khi ẩn thì không nhảy vọt).
     let acc=Math.min(rawDt,0.25);while(acc>0.0501){tick(0.05,false);acc-=0.05}
     // màn rạp phủ kín màn hình: chỉ chạy logic (nhân vật, mạng), gần như không vẽ 3D (1 khung/giây) → máy dồn sức cho video
-    if(api.theater){theaterAcc+=rawDt;const draw=theaterAcc>1;if(draw)theaterAcc=0;tick(acc,draw)}else tick(acc);Perf.draw(performance.now());}
+    Perf.begin();if(api.theater){theaterAcc+=rawDt;const draw=theaterAcc>1;if(draw)theaterAcc=0;tick(acc,draw)}else tick(acc);Perf.end();Perf.draw(performance.now());}
   let theaterAcc=0;
+  Perf.context(()=>({map:MAPID,q:TP.quality,pr:+curPR.toFixed(2)}));
   if(!TEST)loop();
   // ===== API cho lớp mạng =====
   api.snapshot=()=>{const p=local.P,mv=p.sp>0.05||!!local.busy||local.plan.length>0,mov=p.sp>0.05&&p.mode==='free'&&!local.busy;
