@@ -323,7 +323,7 @@ export function setupExterior(c) {
       if (r < (cls === 'rock' ? 0.3 : 0.18)) continue;              // đá nhỏ / thân mảnh: bước qua được
       if (cls === 'rock' && ymax * sc < 0.5) continue;
       const p = lc.clone().applyMatrix4(mm);
-      colliders.circles.push({x: p.x, z: p.z, r});
+      colliders.circles.push({x: p.x, z: p.z, r, h: cls === 'rock' ? ymax * sc : 99});   // h = đỉnh vật cản (m): đá thấp nhảy qua được, cây thì không
     }
   }
   // vật thể lẻ (không instancing): đá/cây thả rời → hộp; tường nhà theo MC.block → hộp lớn

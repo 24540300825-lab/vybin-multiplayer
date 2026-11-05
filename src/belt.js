@@ -1,17 +1,17 @@
 // Vật lý 2 sợi dây đai lưng của Bin (skin "TIGHT BONE": 1 xương nút buộc + 2 chuỗi 3 xương, gắn dưới root.x của rig).
 // • Nút buộc (xương lẻ) và gốc 2 sợi dây ghim cứng vào lưng/hông — không mô phỏng.
-// • 2 sợi dây mô phỏng như dây vải mềm: verlet có quán tính + trọng lực thật + cản không khí, chỉ có lò xo RẤT yếu giữ dáng
-//   (yếu dần về phía đầu dây) → rủ xuống, đung đưa theo chuyển động hông/nhảy/lao rồi lắng xuống nhẹ nhàng.
+// • 2 sợi dây mô phỏng như vải áo choàng: lò xo-giảm chấn mềm về dáng animation (trễ êm theo quán tính), gió ngoài trời, tắt dần mượt.
 // • Va chạm với quần: mỗi chân là 1 capsule (xương đùi → xương cẳng, kéo dài lên phía hông) — dây bị đẩy ra ngoài, không xuyên mesh quần.
 // Chi phí: 2 sợi × 3 hạt, 2 bước con mỗi khung, không allocate; tự ngủ khi nhân vật ẩn / ở xa camera.
 import * as THREE from 'three';
 
-const G = -9.8 * 0.6;                 // trọng lực hiệu dụng (vải nhẹ, có lực nâng của không khí)
-const DRAG = 8;                       // cản (1/s) — vải: nhớt, tắt dần êm, không dao động qua lại
-const DRAG_SLOW = 14;                 // cản thêm khi hạt gần như đứng yên → đoạn kết thúc chuyển động rất mượt
-const DEV_MAX = 0.16;                 // lệch tối đa so với dáng animation (m) — kẹp mềm, dây không bay quá xa
-const SPRING = [6, 4, 2.5];         // lò xo giữ dáng (1/s) theo hạt 1..3 — đầu dây tự do nhất
-const SUB = 2;                        // số bước con mỗi khung (ổn định khi hông xoay nhanh)
+// Mô hình "vải mềm" (áo choàng): mỗi hạt là 1 lò xo-giảm chấn MỀM kéo về dáng animation (tần số riêng thấp dần về đầu dây, giảm chấn ~0.55–0.8
+// → trễ êm theo quán tính, vượt đà rất nhẹ rồi tắt dần), + gió ngoài trời (cùng trường gió với cây cỏ) + ràng buộc độ dài + va chạm quần.
+const OMEGA = [8.5, 6.2, 4.6];        // tần số riêng (rad/s) của hạt 1..3: đầu dây càng tự do/chậm → uốn lượn theo sóng trễ
+const ZETA = [0.85, 0.7, 0.6];        // hệ số giảm chấn: <1 = còn lắc nhẹ rồi tắt dần êm; không dao động qua lại mạnh
+const WIND_K = 6;                     // gia tốc gió tối đa ≈ WIND_K × cường độ gió (m/s²)
+const DEV_MAX = 0.2;                  // lệch tối đa so với dáng animation (m) — kẹp mềm
+const SUB = 2;                        // số bước con mỗi khung
 const ITER = 3;                       // vòng ràng buộc độ dài + va chạm
 const R_LEG = 0.078;                  // bán kính ống quần đo từ mesh (m) ở vùng đùi
 const R_STR = 0.010;                  // độ dày sợi dây
@@ -48,7 +48,8 @@ export function makeBelt(root) {
       bones, n,
       restQ: bones.map(b => b.quaternion.clone()),
       P: Array.from({length: n + 1}, () => new THREE.Vector3()),     // hạt: gốc từng xương + đầu mút
-      Q: Array.from({length: n + 1}, () => new THREE.Vector3()),     // vị trí bước trước (verlet)
+      V: Array.from({length: n + 1}, () => new THREE.Vector3()),     // vận tốc (m/s)
+      O: Array.from({length: n + 1}, () => new THREE.Vector3()),     // vị trí đầu bước (để suy ra vận tốc sau ràng buộc)
       T: Array.from({length: n + 1}, () => new THREE.Vector3()),     // mục tiêu theo animation (thế giới)
       L: new Array(n).fill(0.05),                                    // độ dài đoạn
       Wq: bones.map(() => new THREE.Quaternion()),                   // quaternion thế giới ở tư thế nghỉ + animation hông
@@ -100,7 +101,7 @@ export function makeBelt(root) {
       s.tipLen = n > 1 ? L[n - 2] * 0.9 : 0.08;
       fillTargets(s);                                      // lần 2 với tipLen đúng
       L[n - 1] = Math.max(0.01, T[n - 1].distanceTo(T[n]));
-      for (let i = 0; i <= n; i++) { s.P[i].copy(T[i]); s.Q[i].copy(T[i]); }
+      for (let i = 0; i <= n; i++) { s.P[i].copy(T[i]); s.V[i].set(0, 0, 0); }
     }
     // bán kính an toàn: ở tư thế nghỉ dây không được nằm trong capsule (tránh bị "đẩy" ngay khi khởi tạo)
     for (const lg of legs) {
@@ -116,27 +117,33 @@ export function makeBelt(root) {
     primed = true;
   }
 
-  function step(dt) {
+  function step(dt, wind) {
     grp.updateWorldMatrix(true, false);                    // cập nhật cả chuỗi cha (root.x…) một lần
     if (!primed) { prime(); return; }
     updateLegs();
     for (const s of sim) fillTargets(s);
     if (sim[0].T[0].distanceToSquared(lastRoot) > TELEPORT * TELEPORT) { prime(); return; }
     lastRoot.copy(sim[0].T[0]);
-    const h = dt / SUB, g = G * h * h, dragA = Math.exp(-DRAG * h), dragB = Math.exp(-(DRAG + DRAG_SLOW) * h);
+    const h = dt / SUB;
+    // gió: gia tốc theo hướng gió, mạnh/yếu theo từng đợt gió (cùng hàm với cây cỏ) + rung ngang nhẹ
+    let wx = 0, wz = 0, wa = 0;
+    if (wind && wind.a > 0.01) {
+      const ph = wind.t * (1.1 + wind.a * 0.9), gust = 0.55 + 0.45 * (Math.sin(ph) * 0.6 + Math.sin(ph * 2.3 + 1.7) * 0.4);
+      wa = wind.a * WIND_K * (0.35 + 0.65 * gust); wx = wind.x; wz = wind.z;
+    }
     for (let sub = 0; sub < SUB; sub++) {
-      for (const s of sim) {
-        const {n, P, Q, T, L} = s;
-        P[0].copy(T[0]); Q[0].copy(T[0]);                  // gốc dây ghim cứng vào lưng
+      for (let c = 0; c < sim.length; c++) {
+        const s = sim[c], {n, P, V, O, T, L} = s;
+        P[0].copy(T[0]); V[0].set(0, 0, 0);                // gốc dây ghim cứng vào lưng
         for (let i = 1; i <= n; i++) {
-          const p = P[i], q = Q[i];
-          tmpV.copy(p).sub(q);                               // vận tốc theo bước
-          const sp = tmpV.length() / h;                      // m/s
-          tmpV.multiplyScalar(sp < 0.6 ? dragB + (dragA - dragB) * (sp / 0.6) : dragA);   // chậm → cản mạnh hơn (tắt dần êm)
-          q.copy(p);
-          p.add(tmpV); p.y += g;
-          const k = 1 - Math.exp(-SPRING[Math.min(i, SPRING.length) - 1] * h);   // lò xo yếu giữ dáng
-          p.x += (T[i].x - p.x) * k; p.y += (T[i].y - p.y) * k; p.z += (T[i].z - p.z) * k;
+          const p = P[i], v = V[i], k = Math.min(i, OMEGA.length) - 1, w = OMEGA[k], w2 = w * w, zw = 2 * ZETA[k] * w;
+          O[i].copy(p);
+          const fl = wa ? Math.sin(wind.t * 3.1 + i * 1.7 + c * 2.3) * 0.35 * wa : 0;      // phấp phới ngang
+          const ax = -w2 * (p.x - T[i].x) - zw * v.x + wx * wa + wz * fl;
+          const ay = -w2 * (p.y - T[i].y) - zw * v.y;
+          const az = -w2 * (p.z - T[i].z) - zw * v.z + wz * wa - wx * fl;
+          v.x += ax * h; v.y += ay * h; v.z += az * h;
+          p.x += v.x * h; p.y += v.y * h; p.z += v.z * h;
           tmpV.copy(p).sub(T[i]); const dv = tmpV.length();
           if (dv > DEV_MAX) p.copy(T[i]).addScaledVector(tmpV, DEV_MAX / dv);   // kẹp mềm quanh dáng animation
         }
@@ -146,13 +153,14 @@ export function makeBelt(root) {
             P[i].copy(P[i - 1]).addScaledVector(tmpV, L[i - 1] / d);
           }
           for (const lg of legs) for (let i = 1; i <= n; i++) {   // va chạm quần: hạt + điểm giữa đoạn
-            if (pushOut(P[i], lg)) Q[i].lerp(P[i], 0.25);                      // ma sát: mất bớt vận tốc khi cọ vào quần
+            pushOut(P[i], lg);
             if (i > 1) {                                                        // điểm giữa đoạn (i-1 → i) cũng không được xuyên
               mid.copy(P[i]).add(P[i - 1]).multiplyScalar(0.5); mid0.copy(mid);
               if (pushOut(mid, lg)) { mid.sub(mid0); P[i].add(mid); P[i - 1].add(mid); }
             }
           }
         }
+        for (let i = 1; i <= n; i++) V[i].copy(P[i]).sub(O[i]).multiplyScalar(1 / h);   // vận tốc sau ràng buộc (PBD)
       }
     }
     // xoay xương: từ hướng mục tiêu → hướng mô phỏng
@@ -175,11 +183,11 @@ export function makeBelt(root) {
   return {
     chains: sim.length,
     // dt giây; near = true nếu nhân vật đang hiện & gần camera
-    update(dt, near = true) {
+    update(dt, near = true, wind = null) {
       if (!near) { primed = false; return; }       // ngủ: khi hiện lại thì khởi tạo lại tại chỗ (không văng)
       dt = Math.min(dt, 1 / 20);
       if (dt <= 0) return;
-      step(dt);
+      step(dt, wind);
     },
     reset() { primed = false; },
     // chẩn đoán

@@ -305,10 +305,13 @@ ${FRAG_COLOR}
   // colliders + A*
   const G=OUTD?{...MC.grid,R:0.13}:{x0:-1,z0:-9,c:0.1,W:125,H:100,R:0.13};
   const blocked=[new Uint8Array(G.W*G.H),new Uint8Array(G.W*G.H)],cols=[[],[]];
-  if(OUTD){for(const b of EXT.colliders.boxes)cols[0].push(b)}
+  // NHẢY QUA VẬT CẢN THẤP: jh = độ cao đỉnh vật cản (cm trên mặt sàn) ở từng ô chặn; 255 = quá cao (tường, tủ, cây); hard = ô chặn cứng (ranh giới, thân cầu thang) không bao giờ nhảy qua được
+  const jh=[new Uint8Array(G.W*G.H),new Uint8Array(G.W*G.H)],hard=[new Uint8Array(G.W*G.H),new Uint8Array(G.W*G.H)];
+  const jumpOK=(lv,i,j,clr)=>{if(i<0||j<0||i>=G.W||j>=G.H)return false;const k=j*G.W+i;return !hard[lv][k]&&jh[lv][k]>0&&clr>jh[lv][k]/100+0.05};
+  if(OUTD){for(const b of EXT.colliders.boxes){const gy=EXT.walkHeight((b.min.x+b.max.x)/2,(b.min.z+b.max.z)/2);b._h=b.max.y-(gy!=null?gy:A.L0);cols[0].push(b)}}
   // MC.triCol (phòng Vy/Bin): đồ đạc trong file bị GỘP thành khối lớn (vd. cột + dầm mép gác chung 1 mesh) → hộp bao chặn oan cả dải phòng.
   // Thay bằng quét đúng tam giác thật nằm trong dải cao chân→hông (0.12–0.9 m trên mặt sàn) rồi nở ra bằng bán kính nhân vật.
-  const triRaw=MC.triCol?[new Uint8Array(G.W*G.H),new Uint8Array(G.W*G.H)]:null;
+  const triRaw=MC.triCol?[new Uint8Array(G.W*G.H),new Uint8Array(G.W*G.H)]:null,triH=MC.triCol?[new Uint8Array(G.W*G.H),new Uint8Array(G.W*G.H)]:null;
   function rasterMesh(m){const g=m.geometry,pa=g&&g.attributes.position;if(!pa)return;const idx=g.index,n=idx?idx.count:pa.count,M=m.matrixWorld;
     const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),p=new THREE.Vector3();
     for(let t=0;t<n;t+=3){const ia=idx?idx.getX(t):t,ib=idx?idx.getX(t+1):t+1,ic=idx?idx.getX(t+2):t+2;
@@ -317,7 +320,7 @@ ${FRAG_COLOR}
       [A.L0,A.L1].forEach((fy,lv)=>{const lo=fy+0.06,hi=fy+1.0;if(y1<lo||y0>hi)return;
         const e=Math.max(a.distanceTo(b),b.distanceTo(c),c.distanceTo(a)),k=Math.max(1,Math.ceil(e/0.05));
         for(let i=0;i<=k;i++)for(let j=0;j<=k-i;j++){const u=i/k,v=j/k,w=1-u-v;p.set(a.x*w+b.x*u+c.x*v,a.y*w+b.y*u+c.y*v,a.z*w+b.z*u+c.z*v);
-          if(p.y<lo||p.y>hi)continue;const ci=Math.floor((p.x-G.x0)/G.c),cj=Math.floor((p.z-G.z0)/G.c);if(ci>=0&&cj>=0&&ci<G.W&&cj<G.H)triRaw[lv][cj*G.W+ci]=1}})}}
+          if(p.y<lo||p.y>hi)continue;const ci=Math.floor((p.x-G.x0)/G.c),cj=Math.floor((p.z-G.z0)/G.c);if(ci>=0&&cj>=0&&ci<G.W&&cj<G.H){triRaw[lv][cj*G.W+ci]=1;const th=y1>=hi?255:Math.max(1,Math.round((y1-fy)*100));if(th>triH[lv][cj*G.W+ci])triH[lv][cj*G.W+ci]=th}}})}}
   if(triRaw)env.updateMatrixWorld(true);
   for(const m of (OUTD?[]:envMeshes)){
     if(/^Stair/.test(m.name)||isUnder(m,CHAIR.name))continue;
@@ -325,21 +328,22 @@ ${FRAG_COLOR}
     if(m.isInstancedMesh)continue;      // cây/cỏ instancing: Box3 chỉ tính bản mẫu ở gốc toạ độ (0,0,0) → vật cản "ma" chặn nhầm miệng cầu thang trái (các bản thật nằm ngoài nhà)
     const b=new THREE.Box3().setFromObject(m);if(b.isEmpty())continue;
     if((b.max.x-b.min.x)*(b.max.z-b.min.z)>14)continue;
-    [A.L0,A.L1].forEach((fy,lv)=>{if(b.max.y>fy+0.12&&b.min.y<fy+0.9)cols[lv].push(b)});
+    [A.L0,A.L1].forEach((fy,lv)=>{if(b.max.y>fy+0.12&&b.min.y<fy+0.9){const bb=b.clone();bb._h=b.max.y-fy;cols[lv].push(bb)}});
   }
   const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
   cols.forEach((arr,lv)=>{for(const b of arr){
     const i0=cl(Math.floor((b.min.x-G.R-G.x0)/G.c),0,G.W-1),i1=cl(Math.floor((b.max.x+G.R-G.x0)/G.c),0,G.W-1);
     const j0=cl(Math.floor((b.min.z-G.R-G.z0)/G.c),0,G.H-1),j1=cl(Math.floor((b.max.z+G.R-G.z0)/G.c),0,G.H-1);
-    for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++)blocked[lv][j*G.W+i]=1;}});
+    const hh=b._h==null?255:Math.min(255,Math.max(1,Math.round(b._h*100)));
+    for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const k=j*G.W+i;blocked[lv][k]=1;if(hh>jh[lv][k])jh[lv][k]=hh}}});
   if(triRaw){const r=Math.ceil(G.R/G.c);for(let lv=0;lv<2;lv++){const R0=triRaw[lv];for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){if(!R0[j*G.W+i])continue;
-      for(let dj=-r;dj<=r;dj++)for(let di=-r;di<=r;di++){if(di*di+dj*dj>r*r+1)continue;const x=i+di,z=j+dj;if(x>=0&&z>=0&&x<G.W&&z<G.H)blocked[lv][z*G.W+x]=1}}}}
+      for(let dj=-r;dj<=r;dj++)for(let di=-r;di<=r;di++){if(di*di+dj*dj>r*r+1)continue;const x=i+di,z=j+dj;if(x>=0&&z>=0&&x<G.W&&z<G.H){const k=z*G.W+x;blocked[lv][k]=1;const th=triH[lv][j*G.W+i];if(th>jh[lv][k])jh[lv][k]=th}}}}}
   if(OUTD){for(const cc of EXT.colliders.circles){const rr=cc.r+G.R,i0=cl(Math.floor((cc.x-rr-G.x0)/G.c),0,G.W-1),i1=cl(Math.floor((cc.x+rr-G.x0)/G.c),0,G.W-1),j0=cl(Math.floor((cc.z-rr-G.z0)/G.c),0,G.H-1),j1=cl(Math.floor((cc.z+rr-G.z0)/G.c),0,G.H-1);
-      for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;if((x-cc.x)**2+(z-cc.z)**2<=rr*rr)blocked[0][j*G.W+i]=1}
+      for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;if((x-cc.x)**2+(z-cc.z)**2<=rr*rr){blocked[0][j*G.W+i]=1;const hh=Math.min(255,Math.round((cc.h==null?99:cc.h)*100));if(hh>jh[0][j*G.W+i])jh[0][j*G.W+i]=hh}}
       cols[0].push(new THREE.Box3(new THREE.Vector3(cc.x-cc.r,A.L0,cc.z-cc.r),new THREE.Vector3(cc.x+cc.r,A.L0+1,cc.z+cc.r)))}
-    {const w=MC.walk0;for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;if(x<w[0]||x>w[1]||z<w[2]||z>w[3]){blocked[0][j*G.W+i]=1;blocked[1][j*G.W+i]=1}}}}
+    {const w=MC.walk0;for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;if(x<w[0]||x>w[1]||z<w[2]||z>w[3]){blocked[0][j*G.W+i]=1;blocked[1][j*G.W+i]=1;hard[0][j*G.W+i]=1;hard[1][j*G.W+i]=1}}}}
   if(!OUTD){const fl=MC.mezz.map(n=>box(n));
-    for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;let ok=false;for(const b of fl)if(x>b.min.x+0.12&&x<b.max.x-0.12&&z>b.min.z+0.12&&z<b.max.z-0.12){ok=true;break}if(!ok)blocked[1][j*G.W+i]=1}}
+    for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;let ok=false;for(const b of fl)if(x>b.min.x+0.12&&x<b.max.x-0.12&&z>b.min.z+0.12&&z<b.max.z-0.12){ok=true;break}if(!ok){blocked[1][j*G.W+i]=1;hard[1][j*G.W+i]=1}}}
   for(let lv=0;lv<2;lv++)for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;
     for(const S of stairs)if(x>S.x0-0.02&&x<S.x1+0.02&&z>S.z0-0.4&&z<S.z1+0.2)blocked[lv][j*G.W+i]=0;}
   // lối vào chân cầu thang từ phía giữa nhà (dải trước chân thang): vật trang trí (bụi cây ở gốc toạ độ) từng chặn kín lối này nên A*/WASD không vào được cầu thang trái
@@ -347,10 +351,10 @@ ${FRAG_COLOR}
     for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;if((x-e)*dir>-0.02&&(x-e)*dir<0.7&&z>S.z1-0.02&&z<S.z1+0.3&&z<MC.walk0[3])blocked[0][j*G.W+i]=0}}
   // thân cầu thang (giữa chân và đỉnh) là VẬT CẢN với đường đi A* / click-để-đi: chỉ miệng cầu thang (chân & đỉnh) được mở. Trước đây thân cầu thang để trống nên đường đi cắt ngang qua cầu thang ở tầng 0.
   for(let lv=0;lv<2;lv++)for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;
-    for(const S of stairs){if(x>S.x0-0.02&&x<S.x1+0.02&&z>S.z0&&z<S.z1+0.02)blocked[lv][j*G.W+i]=1;
-      else if(x>S.x0-0.16&&x<S.x1+0.16&&z>S.z0&&z<S.z1-0.03)blocked[lv][j*G.W+i]=1;}}      // vành đệm bán kính nhân vật dọc hông cầu thang: đường đi không sượt/cắt góc hông
+    for(const S of stairs){if(x>S.x0-0.02&&x<S.x1+0.02&&z>S.z0&&z<S.z1+0.02){blocked[lv][j*G.W+i]=1;hard[lv][j*G.W+i]=1}
+      else if(x>S.x0-0.16&&x<S.x1+0.16&&z>S.z0&&z<S.z1-0.03){blocked[lv][j*G.W+i]=1;hard[lv][j*G.W+i]=1}}}      // vành đệm bán kính nhân vật dọc hông cầu thang: đường đi không sượt/cắt góc hông
   console.log('colliders',cols[0].length,cols[1].length);
-  window.__G={G,blocked,A,cols,envMeshes,isUnder,CHAIR,stairs};
+  window.__G={G,blocked,A,cols,envMeshes,isUnder,CHAIR,stairs,jh,hard};
   const colGroup=new THREE.Group();colGroup.visible=false;scene.add(colGroup);
   cols.forEach((arr,lv)=>arr.forEach(b=>colGroup.add(new THREE.Box3Helper(b,lv?0x44ff88:0xff5555))));
   $('cCol').onchange=e=>colGroup.visible=e.target.checked;
@@ -484,7 +488,7 @@ ${FRAG_COLOR}
   if(DEF.colors)char.traverse(o=>{if(!(o.isMesh))return;(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{
     const c=DEF.colors[m.name];if(c&&m.color){m.color.set(c);if('metalness' in m){m.metalness=0;m.roughness=1;}}})});
   toonify(char);scene.add(char);
-  let belt=null;try{belt=makeBelt(char)}catch(e){console.warn('[belt]',e)}   // đai lưng Bin: vật lý lò xo nhẹ (src/belt.js)
+  const beltWind={a:0,t:0,x:1,z:0};let belt=null;try{belt=makeBelt(char)}catch(e){console.warn('[belt]',e)}   // đai lưng Bin: vật lý lò xo nhẹ (src/belt.js)
   char.traverse(o=>{if((o.isMesh||o.isSkinnedMesh)&&(()=>{for(let p=o;p&&p!==char;p=p.parent)if(/^cs_/.test(p.name))return true;return false})()){o.visible=false;o.layers.disable(0);}
     else if(o.isMesh||o.isSkinnedMesh){o.frustumCulled=false;o.castShadow=true;o.receiveShadow=false;}});
   ['Workstation','Workstation001','LIVING_STUDIO','SleepingArea'].forEach(n=>{const o=char.getObjectByName(n);if(o)o.removeFromParent()});
@@ -861,6 +865,7 @@ ${FRAG_COLOR}
 
   // ----- collision helpers (lưới chặn dùng chung) -----
   const CHB=(()=>{const b=new THREE.Box3().setFromObject(CHAIR);return b.isEmpty()?null:[b.min.x-0.1,b.min.z-0.1,b.max.x+0.1,b.max.z+0.1]})();
+  let airClr=0;      // độ cao lòng bàn chân so với mặt sàn khi đang nhảy (m) — lớn hơn đỉnh vật cản thì bước qua được
   function walkable(ox,oz,x,z){
     const S=stairAt(x,z),W=stairAt(ox,oz),ins=!!S,was=!!W,lv=(was&&!ins)?(z<W.midZ?1:0):P.level;
     if(ins){
@@ -875,7 +880,7 @@ ${FRAG_COLOR}
     if(lv===0){const w=MC.walk0;if(x<w[0]||x>w[1]||z<w[2]||z>w[3])return false}
     else{const w=MC.l1;if(x<w[0]||x>w[1]||z<w[2]||z>(w[3]==null?stairs[0].z0+0.02:w[3]))return false}
     if(lv===A.chairL&&CHB&&x>CHB[0]&&x<CHB[2]&&z>CHB[1]&&z<CHB[3]&&!(ox>CHB[0]&&ox<CHB[2]&&oz>CHB[1]&&oz<CHB[3]))return false;
-    const c=cell(x,z);return free(lv,c[0],c[1]);}
+    const c=cell(x,z);return free(lv,c[0],c[1])||(airClr>0.05&&jumpOK(lv,c[0],c[1],airClr));}
   function stepMove(dx,dz){
     // ĐANG Ở TRÊN CẦU THANG (WASD): chỉ đi DỌC trục thang (lên/xuống), thành phần ngang bị bỏ, nhân vật tự trượt về giữa bậc.
     // → không thể lạng sang tay vịn / tường / mép (vùng hay glitch); ra khỏi thang chỉ ở chân hoặc đỉnh.
@@ -900,7 +905,7 @@ ${FRAG_COLOR}
     P.sp*=0.5;}
     function pushOut(){
     if(inStair(P.pos.x,P.pos.z))return;
-    const c=cell(P.pos.x,P.pos.z);if(free(P.level,c[0],c[1]))return;
+    const c=cell(P.pos.x,P.pos.z);if(free(P.level,c[0],c[1])||(airClr>0.05&&jumpOK(P.level,c[0],c[1],airClr)))return;
     let best=null,bd=1e9;
     for(let r=1;r<8&&!best;r++)for(let dj=-r;dj<=r;dj++)for(let di=-r;di<=r;di++){if(Math.max(Math.abs(di),Math.abs(dj))!==r)continue;
       if(free(P.level,c[0]+di,c[1]+dj)){const d=di*di+dj*dj;if(d<bd){bd=d;best=[c[0]+di,c[1]+dj]}}}
@@ -913,16 +918,18 @@ ${FRAG_COLOR}
   //  • DOUBLEJUMP: khung đầu = khung 11 của JUMP mới (đỉnh nhảy, khớp tư thế đầu DOUBLEJUMP) → bấm Space lần 2 trước đỉnh thì chờ tới đỉnh rồi nối liền, sau đỉnh thì blend rất ngắn
   //  • DIVE: clip chỉ lăn về phía trước → xoay nhân vật về hướng phím (90° trái/phải, 180° lùi, 45° khi giữ 2 phím) rồi lăn; lao ~2.6 m theo đường cong sin
   let air=null;
+  const footL=char.getObjectByName('footl'),footR=char.getObjectByName('footr');      // đo độ cao chân (Bin) để biết nhảy qua được vật cản nào
   const AF=30,J_APEX=11/AF,J_LAND=16/AF,DJ_LAND=18/AF,DV_T0=3/AF,DV_T1=25/AF,DV_END=28/AF,DIVE_D=2.6,DIVE_V=DIVE_D*Math.PI/(2*(DV_T1-DV_T0));
   const clipDur=k=>acts[K[k]].getClip().duration;
   const landSfx=()=>{const S=stairAt(P.pos.x,P.pos.z);sfxAt('step',{f:{s:S?'stair':'wood',run:true},range:13})};
   function startJump(){play('JUMP',{once:true,restart:true,fade:0.08});air={k:'jump',t:0,dur:clipDur('JUMP'),dj:false,landed:false};stopT=0;idleHeld=false}
   function startDJ(fade){play('DJUMP',{once:true,restart:true,fade});air={k:'djump',t:0,dur:clipDur('DJUMP'),dj:true,landed:false};stopT=0}
   function startDive(dx,dz){const m=Math.hypot(dx,dz)||1;play('DIVE',{once:true,restart:true,fade:0.08});air={k:'dive',t:0,dur:clipDur('DIVE'),dx:dx/m,dz:dz/m,landed:false};stopT=0;idleHeld=false}
-  function endAir(inp){air=null;P.sp=0;stopT=0;idleHeld=false;
+  function endAir(inp){air=null;airClr=0;P.sp=0;stopT=0;idleHeld=false;
     if(inp.mag>0.1){if(inp.run){const a=play('RUN',{fade:0.04,restart:true});if(a)a.time=10/AF}else play('WALK',{fade:0.1,restart:true})}}
   function airUpdate(dt,inp){
     let A=air;A.t+=dt;const rq=inp.air;
+    if(A.k!=='dive'&&footL&&footR)airClr=Math.max(0,Math.min(footL.matrixWorld.elements[13],footR.matrixWorld.elements[13])-char.position.y-0.17);else airClr=0;
     if(A.k==='jump'&&rq&&rq.k==='j'&&!A.dj){A.dj=true;em('air',['j'])}
     if(A.k==='jump'&&A.dj&&A.t>=J_APEX){startDJ(A.t-J_APEX<0.04?0:0.06);A=air}
     if(A.k==='dive'){
@@ -987,7 +994,7 @@ ${FRAG_COLOR}
   // nên khi người kia dừng sát tường/bồn cầu mà gói tin trễ/rớt, nhân vật kia hiện ra "đi xuyên" rồi giật về. Giờ: đoạn ngoại suy bị cắt ở ô bị chặn đầu tiên,
   // và mỗi bước lướt cũng phải qua kiểm tra va chạm (kẹt >0.5s mới bỏ qua, phòng khi hai bên lệch đường đi).
   function clipSeg(lv,x0,z0,x1,z1){const d=Math.hypot(x1-x0,z1-z0);if(d<0.02)return [x1,z1];const n=Math.ceil(d/0.05);let lx=x0,lz=z0;
-    for(let k=1;k<=n;k++){const t=k/n,x=x0+(x1-x0)*t,z=z0+(z1-z0)*t,c=cell(x,z);if(!free(lv,c[0],c[1]))return [lx,lz];lx=x;lz=z}return [x1,z1]}
+    for(let k=1;k<=n;k++){const t=k/n,x=x0+(x1-x0)*t,z=z0+(z1-z0)*t,c=cell(x,z);if(!free(lv,c[0],c[1])&&!(airClr>0.05&&jumpOK(lv,c[0],c[1],airClr)))return [lx,lz];lx=x;lz=z}return [x1,z1]}
   let corBlk=0;
   // Gói vị trí tới TRƯỚC lệnh (đi/ngồi/ngủ…) là cũ so với lộ trình đang chạy: đừng kéo bản sao về đó (gây "đóng băng rồi nhảy"); đợi gói gửi sau lệnh.
   let cmdT=0;function netCmd(){cmdT=performance.now()}
@@ -1028,7 +1035,7 @@ ${FRAG_COLOR}
     char.position.set(P.pos.x+off.x*c+off.z*s,P.pos.y+off.y,P.pos.z-off.x*s+off.z*c);
     if(cur===acts[K.WALK])cur.timeScale=CFG.walkAnim;else if(cur===acts[K.RUN])cur.timeScale=CFG.runAnim;
     updateLayers(dt);mixer.update(dt);if(afterMix.length){const q=afterMix.splice(0);q.forEach(f=>{try{f()}catch(e){console.error(e)}})}
-    if(belt)belt.update(dt,char.visible&&char.position.distanceToSquared(camera.position)<1600);
+    if(belt){beltWind.a=OUTD?TU.uWindA.value:0;beltWind.t=TU.uWindT.value;beltWind.x=FU.uWindDir.value.x;beltWind.z=FU.uWindDir.value.y;belt.update(dt,char.visible&&char.position.distanceToSquared(camera.position)<1600,beltWind)}
     updateEyes(dt);blinkTick();sfxTick();mouthTick(dt);
   }
   play('REST',{fade:0});
