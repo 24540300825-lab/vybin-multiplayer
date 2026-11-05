@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {mergeGeometries,toCreasedNormals} from 'three/addons/utils/BufferGeometryUtils.js';
+import {makeBelt} from './belt.js';
 import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
 import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
 import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -469,7 +470,8 @@ ${FRAG_COLOR}
   const KB={WATCH:'ACT_BIN_WATCHING',WATCH_IDLE:'ACT_BIN_WATCHING_IDLE',OFFWATCH:'ACT_BIN_OFFWATCH',REST:'ACT_BIN_RESTPOSE',IDLE:'ACT_BIN_IDLE',WALK:'ACT_BIN_WALK',RUN:'ACT_BIN_RUN',
     CLIMBCHAIR_L:'ACT_BIN_CLIMB ON CHAIR_L',CLIMBCHAIR_R:'ACT_BIN_CLIMB ON CHAIR_R',OFFCHAIR_L:'ACT_BIN_OFF CHAIR_L',OFFCHAIR_R:'ACT_BIN_OFF CHAIR_R',
     CLIMBBED_L:'ACT_BIN_SLEEP_CLIMB ON BED_L',CLIMBBED_R:'ACT_BIN_SLEEP_CLIMB ON BED_R',SLEEP_L:'ACT_BIN_SLEEP-LOOP BREATHE_L',SLEEP_R:'ACT_BIN_SLEEP-LOOP BREATHE_R',
-    OFFBED_L:'ACT_BIN_SLEEP_OFF BED_L',OFFBED_R:'ACT_BIN_SLEEP_OFF BED_R'};
+    OFFBED_L:'ACT_BIN_SLEEP_OFF BED_L',OFFBED_R:'ACT_BIN_SLEEP_OFF BED_R',
+    JUMP:'ACT_BIN_JUMP',DJUMP:'ACT_BIN_DOUBLEJUMP',DIVE:'ACT_BIN_DIVE'};
   const DEF_BIN={id:'bin',K:KB,eye:{close:'ACT_BIN_EYE_CLOSE',open:'ACT_BIN_EYE_OPEN',blink:'ACT_BIN_BLINK'},eyeMeshes:['Sphere002','Sphere003'],trim:null,idleBurst:true,foot:{walk:[0.29,0.77],run:[0.20,0.68]},colors:{BLACK:'#16161b',SKIN:'#f2c9b3',BLUE:'#2b37b5',ORANGE:'#f26b1d'},pos:new THREE.Vector3(4.5,0,-1.5),yaw:0.4,ctrl:'wasd'};
   {let from='';try{from=sessionStorage.getItem('vyFrom')||''}catch(e){}const sp=MC.spawnFrom&&(MC.spawnFrom[from]||MC.spawnFrom.default);
    if(sp){[DEF_VY,DEF_BIN].forEach((D,k)=>{D.pos.set(sp[0]+(k?0.45:0)*Math.cos(sp[2]),sp[3]?A.L1:A.L0,sp[1]-(k?0.45:0)*Math.sin(sp[2]));D.yaw=sp[2];D.level=sp[3]||0})}}
@@ -482,6 +484,7 @@ ${FRAG_COLOR}
   if(DEF.colors)char.traverse(o=>{if(!(o.isMesh))return;(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{
     const c=DEF.colors[m.name];if(c&&m.color){m.color.set(c);if('metalness' in m){m.metalness=0;m.roughness=1;}}})});
   toonify(char);scene.add(char);
+  let belt=null;try{belt=makeBelt(char)}catch(e){console.warn('[belt]',e)}   // đai lưng Bin: vật lý lò xo nhẹ (src/belt.js)
   char.traverse(o=>{if((o.isMesh||o.isSkinnedMesh)&&(()=>{for(let p=o;p&&p!==char;p=p.parent)if(/^cs_/.test(p.name))return true;return false})()){o.visible=false;o.layers.disable(0);}
     else if(o.isMesh||o.isSkinnedMesh){o.frustumCulled=false;o.castShadow=true;o.receiveShadow=false;}});
   ['Workstation','Workstation001','LIVING_STUDIO','SleepingArea'].forEach(n=>{const o=char.getObjectByName(n);if(o)o.removeFromParent()});
@@ -534,6 +537,7 @@ ${FRAG_COLOR}
     else if(n.startsWith(DEF.eye.open))eye.OPEN.push(mixer.clipAction(c));
     else if(n.startsWith(DEF.eye.blink))eye.BLINK.push(mixer.clipAction(c));
     else if(n.startsWith('ACT_')&&!n.includes('__'))acts[n]=mixer.clipAction(c);});
+  const HAS_AIR=!!(K.JUMP&&acts[K.JUMP]&&acts[K.DJUMP]&&acts[K.DIVE]);   // chỉ Bin có clip nhảy / nhảy đôi / lao
   // KHÔNG stop() action ngay trong sự kiện 'finished': sự kiện bắn ra GIỮA lúc mixer.update đang duyệt danh sách action,
   // stop() đổi chỗ action trong danh sách → action thân (WATCHING_IDLE, REST…) bị bỏ qua đúng 1 khung → nhân vật chớp về tư thế gốc.
   // Gom lại, chạy sau khi mixer.update xong.
@@ -903,15 +907,48 @@ ${FRAG_COLOR}
     if(best){const tx=G.x0+(best[0]+.5)*G.c,tz=G.z0+(best[1]+.5)*G.c;P.pos.x+=(tx-P.pos.x)*0.35;P.pos.z+=(tz-P.pos.z)*0.35;}}
   const nearestDist=fn=>Math.min(...['L','R'].map(s=>{const v=fn(s);return Math.hypot(v.x-P.pos.x,v.z-P.pos.z)}));
 
+  // ===== NHẢY / NHẢY ĐÔI / LAO (DIVE) — nhân vật có clip JUMP, DOUBLEJUMP, DIVE (Bin) =====
+  // Clip tự mang chuyển động đứng (hông lên/xuống) nên KHÔNG cộng thêm độ cao; code chỉ lo chuyển động ngang + chuyển cảnh:
+  //  • JUMP: khung đầu & cuối = khung 10 của RUN → từ đang chạy chỉ cần blend ngắn; xong thì trả về RUN đúng khung 10 (không giật pha chân)
+  //  • DOUBLEJUMP: khung đầu = khung 15 của JUMP (đỉnh nhảy) → bấm Space lần 2 trước đỉnh thì chờ tới đỉnh rồi nối liền, sau đỉnh thì blend rất ngắn
+  //  • DIVE: clip chỉ lăn về phía trước → xoay nhân vật về hướng phím (90° trái/phải, 180° lùi, 45° khi giữ 2 phím) rồi lăn; lao ~2.6 m theo đường cong sin
+  let air=null;
+  const AF=30,J_APEX=15/AF,J_LAND=24/AF,DJ_LAND=18/AF,DV_T0=3/AF,DV_T1=25/AF,DV_END=28/AF,DIVE_D=2.6,DIVE_V=DIVE_D*Math.PI/(2*(DV_T1-DV_T0));
+  const clipDur=k=>acts[K[k]].getClip().duration;
+  const landSfx=()=>{const S=stairAt(P.pos.x,P.pos.z);sfxAt('step',{f:{s:S?'stair':'wood',run:true},range:13})};
+  function startJump(){play('JUMP',{once:true,restart:true,fade:0.08});air={k:'jump',t:0,dur:clipDur('JUMP'),dj:false,landed:false};stopT=0;idleHeld=false}
+  function startDJ(fade){play('DJUMP',{once:true,restart:true,fade});air={k:'djump',t:0,dur:clipDur('DJUMP'),dj:true,landed:false};stopT=0}
+  function startDive(dx,dz){const m=Math.hypot(dx,dz)||1;play('DIVE',{once:true,restart:true,fade:0.08});air={k:'dive',t:0,dur:clipDur('DIVE'),dx:dx/m,dz:dz/m,landed:false};stopT=0;idleHeld=false}
+  function endAir(inp){air=null;P.sp=0;stopT=0;idleHeld=false;
+    if(inp.mag>0.1){if(inp.run){const a=play('RUN',{fade:0.04,restart:true});if(a)a.time=10/AF}else play('WALK',{fade:0.1,restart:true})}}
+  function airUpdate(dt,inp){
+    let A=air;A.t+=dt;const rq=inp.air;
+    if(A.k==='jump'&&rq&&rq.k==='j'&&!A.dj){A.dj=true;em('air',['j'])}
+    if(A.k==='jump'&&A.dj&&A.t>=J_APEX){startDJ(A.t-J_APEX<0.04?0:0.06);A=air}
+    if(A.k==='dive'){
+      P.yaw+=angDiff(Math.atan2(A.dx,A.dz),P.yaw)*(1-Math.exp(-dt*34));
+      let v=0;if(A.t>=DV_T0&&A.t<=DV_T1)v=DIVE_V*Math.sin(Math.PI*(A.t-DV_T0)/(DV_T1-DV_T0));
+      P.sp=v;if(v>0.05)stepMove(A.dx*v*dt,A.dz*v*dt)}
+    else if(inp.mag>0.1){const diff=angDiff(Math.atan2(inp.x,inp.z),P.yaw);P.yaw+=clamp(diff*(1-Math.exp(-dt*30)),-22*dt,22*dt);
+      P.sp=inp.run?CFG.run:CFG.walk;stepMove(Math.sin(P.yaw)*P.sp*dt,Math.cos(P.yaw)*P.sp*dt)}
+    else P.sp=0;
+    if(!A.landed&&A.t>=(A.k==='jump'?J_LAND:A.k==='djump'?DJ_LAND:DV_T1-0.05)){A.landed=true;landSfx()}
+    if(A.t>=A.dur-1e-3||(A.k==='dive'&&A.t>=DV_END&&inp.mag>0.1))endAir(inp)}
   // ----- WASD control -----
   function manualUpdate(dt,inp){if(inp.interact){em('int');emitOff++;try{manualUpdate0(dt,inp)}finally{emitOff--}}else manualUpdate0(dt,inp)}
   function manualUpdate0(dt,inp){
     const lockW=(P.mode==='watch'||(busy&&busy.kind==='climbWatch'))&&api.cineLock;      // đang mở màn rạp: phím không làm nhân vật đứng dậy
     if(lockW){inp.mag=0;inp.interact=false}
     if(busy&&(inp.mag>0.1||inp.interact)&&!plan[0]){if(busy.kind==='climbBed')plan=[{t:'offBed'}];else if(busy.kind==='climbChair')plan=[{t:'offChair'}];else if(busy.kind==='climbWatch')plan=[{t:'offWatch'}]}
+    if(air&&(busy||plan[0]))air=null;
     if(busy||plan[0]){
       if(!busy&&plan[0]&&plan[0].t==='wp'&&inp.mag>0.1)plan=[];
       else{updatePlan(dt);return}}
+    if(air){airUpdate(dt,inp);return}
+    if(HAS_AIR&&inp.air&&P.mode==='free'&&!stairAt(P.pos.x,P.pos.z)){const r=inp.air;
+      if(r.k==='j'){startJump();em('air',['j'])}
+      else if(r.k==='d'&&(r.dx||r.dz)){startDive(r.dx,r.dz);em('air',['d',Math.round(r.dx*100)/100,Math.round(r.dz*100)/100])}
+      if(air){airUpdate(dt,{...inp,air:null});return}}
     if(inp.interact){
       if(P.mode==='bed'){plan=[{t:'offBed'}];return}
       if(P.mode==='sit'||P.mode==='type'){plan=[{t:'offChair'}];return}
@@ -990,31 +1027,37 @@ ${FRAG_COLOR}
     const c=Math.cos(P.yaw),s=Math.sin(P.yaw);
     char.position.set(P.pos.x+off.x*c+off.z*s,P.pos.y+off.y,P.pos.z-off.x*s+off.z*c);
     if(cur===acts[K.WALK])cur.timeScale=CFG.walkAnim;else if(cur===acts[K.RUN])cur.timeScale=CFG.runAnim;
-    updateLayers(dt);mixer.update(dt);if(afterMix.length){const q=afterMix.splice(0);q.forEach(f=>{try{f()}catch(e){console.error(e)}})}updateEyes(dt);blinkTick();sfxTick();mouthTick(dt);
+    updateLayers(dt);mixer.update(dt);if(afterMix.length){const q=afterMix.splice(0);q.forEach(f=>{try{f()}catch(e){console.error(e)}})}
+    if(belt)belt.update(dt,char.visible&&char.position.distanceToSquared(camera.position)<1600);
+    updateEyes(dt);blinkTick();sfxTick();mouthTick(dt);
   }
   play('REST',{fade:0});
-  return{id:DEF.id,DEF,char,P,K,acts,runMode,logic,finish,setNet,netCmd,dispose,cmdMove,cmdSleep,cmdSit,cmdWake,cmdOffChair,cmdWatch,cmdUnwatch,mouthSay,mouth:()=>mouth,blink:()=>{em('blink');blink(clock)},
+  return{id:DEF.id,DEF,char,P,K,acts,runMode,logic,finish,belt:()=>belt,air:()=>air,setNet,netCmd,dispose,cmdMove,cmdSleep,cmdSit,cmdWake,cmdOffChair,cmdWatch,cmdUnwatch,mouthSay,mouth:()=>mouth,blink:()=>{em('blink');blink(clock)},
     get plan(){return plan},get cur(){return cur},get busy(){return busy}};
   }
   const DEFS={vy:DEF_VY,bin:DEF_BIN};
   const local=makeChar(ctx.localGlb,{...DEFS[ctx.localSlot]});api.local=local;let remote=null;
-  const rinp={x:0,z:0,mag:0,run:false,interact:false};let rinpT=0;
+  const rinp={x:0,z:0,mag:0,run:false,interact:false,air:null};let rinpT=0;
   const runMode=local.runMode,P=local.P,{cmdMove,cmdSleep,cmdSit,cmdWake,cmdOffChair}=local;
   // tách 2 nhân vật không chồng lên nhau
   function separate(){if(!remote)return;const a=local.P,b=remote.P;if(a.mode!=='free'||b.mode!=='free'||local.busy||remote.busy||a.level!==b.level)return;
     const dx=b.pos.x-a.pos.x,dz=b.pos.z-a.pos.z,d=Math.hypot(dx,dz),m=0.38;if(d>=m||d<1e-4)return;
     const k=(m-d)/2/d;a.pos.x-=dx*k;a.pos.z-=dz*k;b.pos.x+=dx*k;b.pos.z+=dz*k;}
   // phím
-  const keys=new Set();let interactFlag=false;
-  addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
-    if(e.code==='KeyE'&&!e.repeat)interactFlag=true;keys.add(e.code);if(/^Key[WASD]$/.test(e.code))e.preventDefault();});
-  addEventListener('keyup',e=>keys.delete(e.code));addEventListener('blur',()=>keys.clear());
+  const keys=new Set();let interactFlag=false,pendAir=null;const lastTap={};
   const _fv=new THREE.Vector3();
-  function readInput(){
-    camera.getWorldDirection(_fv);let fx=_fv.x,fz=_fv.z;const fl=Math.hypot(fx,fz)||1;fx/=fl;fz/=fl;
+  function keyDir(){camera.getWorldDirection(_fv);let fx=_fv.x,fz=_fv.z;const fl=Math.hypot(fx,fz)||1;fx/=fl;fz/=fl;
     const ix=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0),iz=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0);
-    let x=fx*iz+(-fz)*ix,z=fz*iz+fx*ix;const m=Math.hypot(x,z);if(m>0){x/=m;z/=m}
-    const inp={x,z,mag:m>0?1:0,run:runMode.v||keys.has('ShiftLeft')||keys.has('ShiftRight'),interact:interactFlag};interactFlag=false;return inp;}
+    let x=fx*iz+(-fz)*ix,z=fz*iz+fx*ix;const m=Math.hypot(x,z);if(m>0){x/=m;z/=m}return{x,z,m}}
+  addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+    if(e.code==='KeyE'&&!e.repeat)interactFlag=true;keys.add(e.code);if(/^Key[WASD]$/.test(e.code))e.preventDefault();
+    // Space = nhảy (bấm lần 2 trên không = nhảy đôi); bấm đôi nhanh một phím WASD = lao (dive) theo hướng phím (giữ thêm phím khác → chéo 45°)
+    if(e.code==='Space'){if(!e.repeat)pendAir={k:'j'};e.preventDefault()}
+    else if(/^Key[WASD]$/.test(e.code)&&!e.repeat){const t=e.timeStamp;if(t-(lastTap[e.code]||-1e9)<280){lastTap[e.code]=0;const d=keyDir();if(d.m>0)pendAir={k:'d',dx:d.x,dz:d.z}}else lastTap[e.code]=t}});
+  addEventListener('keyup',e=>keys.delete(e.code));addEventListener('blur',()=>keys.clear());
+  function readInput(){
+    const {x,z,m}=keyDir();
+    const inp={x,z,mag:m>0?1:0,run:runMode.v||keys.has('ShiftLeft')||keys.has('ShiftRight'),interact:interactFlag,air:pendAir};interactFlag=false;pendAir=null;return inp;}
 
   // input
   const ray=new THREE.Raycaster(),mv=new THREE.Vector2();
@@ -1789,7 +1832,7 @@ ${FRAG_COLOR}
     if(pendPR!=null){setPR(pendPR);pendPR=null}
     try{
     const inp=readInput();
-    local.logic(dt,inp);if(remote){if(rinp.mag&&clockG-rinpT>1.6)rinp.mag=0;remote.logic(dt,rinp);rinp.interact=false}
+    local.logic(dt,inp);if(remote){if(rinp.mag&&clockG-rinpT>1.6)rinp.mag=0;remote.logic(dt,rinp);rinp.interact=false;rinp.air=null}
     separate();
     local.finish(dt);if(remote)remote.finish(dt);envMixer.update(dt);updDoors();updHalo(dt);
     if(api.sendInput)api.sendInput(inp);if(api.onTick)api.onTick(dt);
@@ -1890,7 +1933,7 @@ ${FRAG_COLOR}
   api.applyCmd=(t,a)=>{if(!remote)return;remote.netCmd();switch(t){
     case 'move':remote.cmdMove(a[0],a[1],a[2],!!a[3]);break;case 'sleep':remote.cmdSleep();break;case 'sit':remote.cmdSit(a||undefined);break;
     case 'wake':remote.cmdWake();break;case 'watch':remote.cmdWatch(a);break;case 'unwatch':remote.cmdUnwatch();break;case 'off':remote.cmdOffChair();break;case 'blink':remote.blink();break;
-    case 'int':rinp.interact=true;break;case 'door':{if(Array.isArray(a)){const d=doorList.find(x=>x.node.name===a[0]);if(d)doorApply(d,!!a[1],a[2]|0,!localIsBin())}else{const d=doorList.find(x=>x.node.name===a);if(d)toggleDoor(d)}break}}};
+    case 'int':rinp.interact=true;break;case 'air':rinp.air=a[0]==='d'?{k:'d',dx:+a[1]||0,dz:+a[2]||0}:{k:'j'};break;case 'door':{if(Array.isArray(a)){const d=doorList.find(x=>x.node.name===a[0]);if(d)doorApply(d,!!a[1],a[2]|0,!localIsBin())}else{const d=doorList.find(x=>x.node.name===a);if(d)toggleDoor(d)}break}}};
   const localIsBin=()=>local&&local.id==='bin';
   // bảng cửa gửi kèm snapshot: "<0|1><phiên bản base36>" cho từng cửa, theo thứ tự tên
   api.doorSig=()=>doorsSorted.map(d=>(doorOpenish(d)?1:0)+(d.v||0).toString(36)).join(',');
