@@ -9,7 +9,7 @@ import {OTHER} from './session.js';
 const r3 = v => Math.round(v * 1000) / 1000;
 
 export function bindSync(sess, api, loadChar) {
-  let remoteLoading = false, queue = [], snapT = 0, lastInT = 0, seq = 0, goneT = 0, lastDr = '', needNow = false, wasMv = 0;
+  let stopBurst = 0, remoteLoading = false, queue = [], snapT = 0, lastInT = 0, seq = 0, goneT = 0, lastDr = '', needNow = false, wasMv = 0;
 
   async function ensureRemote(slot) {
     if (api.remote && api.remote.id === slot) return;
@@ -49,7 +49,7 @@ export function bindSync(sess, api, loadChar) {
   api.onTick = dt => {
     snapT -= dt;
     const st = api.snapshot(); if (!st) return;
-    if (wasMv && !st.mv) snapT = 0;           // vừa dừng hẳn (phím hoặc click-đi): gửi gói chốt ngay để máy kia không lướt quá đà rồi bị kéo ngược
+    if (wasMv && !st.mv) { snapT = 0; stopBurst = 3; }   // vừa dừng hẳn: gửi gói chốt ngay + nhắc lại 2 lần (0.15s, 0.45s) — mất 1 gói thì máy kia vẫn dừng đúng chỗ, không phải chờ gói đứng yên 2.5s
     wasMv = st.mv;
     if (snapT > 0 && !needNow) return;
     needNow = false;
@@ -57,7 +57,7 @@ export function bindSync(sess, api, loadChar) {
     // bảng trạng thái cửa: gửi khi đổi, khi đứng yên, và định kỳ (mất gói cũng tự khớp lại)
     if (api.doorSig) { const dr = api.doorSig(); if (dr !== lastDr || !st.mv || seq % 8 === 0) { msg.dr = dr; lastDr = dr; } }
     sess.send(msg);
-    snapT = (st.mv ? 1 / CONFIG.snapshotHz : 1 / CONFIG.idleHz);
+    snapT = (st.mv ? 1 / CONFIG.snapshotHz : stopBurst > 0 ? (stopBurst-- === 3 ? 0.15 : 0.3) : 1 / CONFIG.idleHz);
   };
 
   // ----- net -> local -----

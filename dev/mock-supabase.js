@@ -4,6 +4,19 @@
 const DB_KEY = 'vybin-mock-db', bc = new BroadcastChannel('vybin-mock');
 const LAT = +(new URLSearchParams(location.search).get('mocklat') || 0);
 const later = fn => (LAT ? setTimeout(fn, LAT) : queueMicrotask(fn));
+// Giả lập mạng xấu cho tin broadcast của game: ?mockjit=ms (rung trễ ngẫu nhiên 0..ms, GIỮ thứ tự như websocket), ?mockloss=0..1 (tỉ lệ rớt gói vị trí/phím 's','i'),
+// ?mocklossall=1 (rớt cả lệnh), ?mockstall=ms (thỉnh thoảng nghẽn cả đường truyền ms — giống Wi-Fi chập chờn)
+const QS = new URLSearchParams(location.search), JIT = +(QS.get('mockjit') || 0), LOSS = +(QS.get('mockloss') || 0), LOSSALL = QS.has('mocklossall'), STALL = +(QS.get('mockstall') || 0);
+let lastDeliver = 0, stallUntil = 0;
+const laterNet = (payload, fn) => {
+  const k = payload && payload.k;
+  if (LOSS && (LOSSALL || k === 's' || k === 'i') && Math.random() < LOSS) return;
+  const now = performance.now();
+  if (STALL && now > stallUntil + 3000 && Math.random() < 0.004) stallUntil = now + STALL;
+  if (!LAT && !JIT && !STALL) return queueMicrotask(fn);
+  const t = Math.max(lastDeliver, now + LAT + Math.random() * JIT, stallUntil); lastDeliver = t;
+  setTimeout(fn, t - now);
+};
 const load = () => { try { return JSON.parse(localStorage.getItem(DB_KEY)) || {rooms: {}, slots: {}, messages: []}; } catch (e) { return {rooms: {}, slots: {}, messages: []}; } };
 const save = d => localStorage.setItem(DB_KEY, JSON.stringify(d));
 const uuid = () => crypto.randomUUID();
@@ -91,7 +104,7 @@ class Channel {
 bc.onmessage = ({data: m}) => {
   for (const c of chans) {
     if (c.name !== m.ch && m.t !== 'insert') continue;
-    if (m.t === 'b' && m.from !== c.id) c.b.filter(x => x.ev === m.event).forEach(x => later(() => x.cb({payload: m.payload})));
+    if (m.t === 'b' && m.from !== c.id) c.b.filter(x => x.ev === m.event).forEach(x => laterNet(m.payload, () => x.cb({payload: m.payload})));
     else if (m.t === 'pres' && m.from !== c.id) { c.pres[m.key] = {payload: m.payload, from: m.from}; c._sync(); }
     else if (m.t === 'leave') { delete c.pres[m.key]; c._sync(); }
     else if (m.t === 'preq' && m.from !== c.id) c._ann();

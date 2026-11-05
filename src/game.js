@@ -484,6 +484,42 @@ ${FRAG_COLOR}
   const K=DEF.K;
   let emitOff=0;const em=(t,a)=>{if(!DEF.remote&&!emitOff&&api.emit)api.emit(t,a)};
   let net=null,netMis=0,lvMis=0;
+  // ===== NỘI SUY SNAPSHOT cho bản sao (remote) =====
+  // Trước đây bản sao vừa TỰ MÔ PHỎNG bằng phím của đối phương (gói 'i' thưa, đến trễ) vừa bị correct() kéo về snapshot ngoại suy → 2 hệ thống cùng ghi
+  // vị trí: đi trễ, dừng quá đà rồi bị kéo ngược (rubberband), khác tầng thì rơi xuống sàn dưới, nhảy qua đá thì bị pushOut đẩy ngược…
+  // Giờ khi bản sao ở trạng thái tự do (không leo/ngồi/nằm, không chạy lộ trình click), vị trí–độ cao–tầng–hướng–tốc độ CHỈ lấy từ snapshot của chủ nhân vật,
+  // phát lại trễ ~0.1–0.4s (tự chỉnh theo độ rung mạng) và nội suy giữa 2 gói → liên tục, dừng đúng chỗ, không xuyên sàn. Animation chọn theo tốc độ nội suy.
+  const NB=[];let nOff=null,nJit=0.02,nSeq=-1;
+  const RUN_SP=(CFG.walk+CFG.run)/2*0.85;
+  const netI=()=>DEF.remote&&NB.length>0&&P.mode==='free'&&!busy&&!plan[0];
+  const netWP=()=>DEF.remote&&NB.length>0&&!busy&&plan[0]&&plan[0].t==='wp';
+  let nStill=0;
+  const nTgt={x:0,y:0,z:0,w:0,l:0,sp:0};
+  function netSample(){
+    const now=performance.now(),delay=Math.min(400,Math.max(110,110+2.5*nJit*1000));
+    const tR=now-nOff-delay,last=NB[NB.length-1];
+    if(tR>=last.ts||NB.length===1){
+      nTgt.x=last.x;nTgt.y=last.y;nTgt.z=last.z;nTgt.w=last.w;nTgt.l=last.l;nTgt.sp=0;
+      if(last.mv&&last.sp>0.05){const e=Math.min(0.25,(tR-last.ts)/1000);      // gói kế chưa tới (mất gói / rung): ngoại suy ngắn ≤0.25s, cắt ở vật cản
+        const c=clipSeg(last.l,last.x,last.z,last.x+last.vx*e,last.z+last.vz*e);nTgt.x=c[0];nTgt.z=c[1];nTgt.sp=e<0.25?last.sp:0}
+      return}
+    let i=NB.length-2;while(i>0&&NB[i].ts>tR)i--;
+    const a=NB[i],b=NB[i+1],u=Math.max(0,Math.min(1,(tR-a.ts)/Math.max(1,b.ts-a.ts)));
+    nTgt.x=a.x+(b.x-a.x)*u;nTgt.y=a.y+(b.y-a.y)*u;nTgt.z=a.z+(b.z-a.z)*u;nTgt.w=a.w+angDiff(b.w,a.w)*u;nTgt.l=u<0.5?a.l:b.l;
+    // tốc độ: theo quãng đường thật giữa 2 gói (gói đứng yên 2.5s/lần thì ~0), không tin vx/vz khi khoảng cách 2 gói dài
+    const dtab=(b.ts-a.ts)/1000;nTgt.sp=dtab<0.6?Math.hypot(b.x-a.x,b.z-a.z)/Math.max(0.03,dtab):(b.mv?b.sp:0);
+    if(!a.mv&&!b.mv)nTgt.sp=0;}
+  function netFree(dt,anim){
+    netSample();
+    const dx=nTgt.x-P.pos.x,dz=nTgt.z-P.pos.z,dy=nTgt.y-P.pos.y,d=Math.hypot(dx,dz);
+    if(d>2.5||Math.abs(dy)>1.5||nTgt.l!==P.level&&d>0.6){P.pos.set(nTgt.x,nTgt.y,nTgt.z)}     // lệch lớn (vừa chuyển từ leo/ngồi, mới vào): đặt thẳng
+    else{const k=1-Math.exp(-dt*(d>0.5?14:30));P.pos.x+=dx*k;P.pos.z+=dz*k;P.pos.y+=dy*(1-Math.exp(-dt*30))}
+    P.level=nTgt.l;P.sp=nTgt.sp;nStill=P.sp<0.05?nStill+dt:0;
+    P.yaw+=angDiff(nTgt.w,P.yaw)*(1-Math.exp(-dt*18));
+    if(!anim)return;
+    if(P.sp>0.05){play(P.sp>RUN_SP?'RUN':'WALK',{fade:0.15});idleHeld=false;stopT=0}
+    else{stopT+=dt;if(stopT>0.14||(cur!==acts[K.WALK]&&cur!==acts[K.RUN]))idleTick(dt)}
+  }
   const char=chrG.scene;
   if(DEF.colors)char.traverse(o=>{if(!(o.isMesh))return;(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{
     const c=DEF.colors[m.name];if(c&&m.color){m.color.set(c);if('metalness' in m){m.metalness=0;m.roughness=1;}}})});
@@ -796,6 +832,16 @@ ${FRAG_COLOR}
     if(!it){ if(P.mode==='free')idleTick(dt); return; }
     switch(it.t){
       case 'wp':{
+        if(netWP()){            // bản sao đi lộ trình (click-đi / tới giường, ghế, sofa): vị trí theo snapshot, chỉ dùng lộ trình để biết lúc nào tới đích cuối
+          let j=0;while(plan[j+1]&&plan[j+1].t==='wp')j++;const fin=plan[j];
+          netFree(dt,false);
+          if(P.sp>0.05)play(P.sp>RUN_SP?'RUN':'WALK',{fade:0.2});
+          const dF=Math.hypot(fin.x-P.pos.x,fin.z-P.pos.z);
+          // tới đích: sát điểm cuối, hoặc gần đích mà chủ nhân vật đã bắt đầu hành động kế (leo giường/ghế…) hay đã đứng hẳn (mv=0)
+          const ownBusy=net&&net.b,ownStill=net&&!net.mv;
+          if(dF<0.05||(dF<0.35&&(ownBusy||(ownStill&&nStill>0.3)))){P.pos.x=fin.x;P.pos.z=fin.z;if(fin.setLevel!=null)P.level=fin.setLevel;plan.splice(0,j+1)}
+          else if(ownStill&&!ownBusy&&nStill>1.0)plan.splice(0,j+1);       // chủ nhân vật đã dừng hẳn ở chỗ khác (huỷ lộ trình): bỏ lộ trình, về nội suy tự do
+          break}
         const dx=it.x-P.pos.x,dz=it.z-P.pos.z,d=Math.hypot(dx,dz);
         const last=!(plan[1]&&plan[1].t==='wp');
         const arrive=last?0.02:it.strict?0.04:Math.max(0.1,P.sp*0.12);
@@ -932,7 +978,8 @@ ${FRAG_COLOR}
     if(A.k!=='dive'&&footL&&footR)airClr=Math.max(0,Math.min(footL.matrixWorld.elements[13],footR.matrixWorld.elements[13])-char.position.y-0.17);else airClr=0;
     if(A.k==='jump'&&rq&&rq.k==='j'&&!A.dj){A.dj=true;em('air',['j'])}
     if(A.k==='jump'&&A.dj&&A.t>=J_APEX){startDJ(A.t-J_APEX<0.04?0:0.06);A=air}
-    if(A.k==='dive'){
+    if(DEF.remote&&netI()){}          // bản sao: vị trí/hướng/tốc độ do nội suy snapshot của chủ nhân vật quyết định (netFree), ở đây chỉ chạy đồng hồ clip
+    else if(A.k==='dive'){
       P.yaw+=angDiff(Math.atan2(A.dx,A.dz),P.yaw)*(1-Math.exp(-dt*34));
       let v=0;if(A.t>=DV_T0&&A.t<=DV_T1)v=DIVE_V*Math.sin(Math.PI*(A.t-DV_T0)/(DV_T1-DV_T0));
       P.sp=v;if(v>0.05)stepMove(A.dx*v*dt,A.dz*v*dt)}
@@ -940,7 +987,7 @@ ${FRAG_COLOR}
       P.sp=inp.run?CFG.run:CFG.walk;stepMove(Math.sin(P.yaw)*P.sp*dt,Math.cos(P.yaw)*P.sp*dt)}
     else P.sp=0;
     if(!A.landed&&A.t>=(A.k==='jump'?J_LAND:A.k==='djump'?DJ_LAND:DV_T1-0.05)){A.landed=true;landSfx()}
-    if(A.t>=A.dur-1e-3||(A.k==='dive'&&A.t>=DV_END&&inp.mag>0.1))endAir(inp)}
+    if(A.t>=A.dur-1e-3||(A.k==='dive'&&A.t>=DV_END&&inp.mag>0.1))endAir(DEF.remote&&netI()?{mag:P.sp>0.05?1:0,run:P.sp>RUN_SP}:inp)}
   // ----- WASD control -----
   function manualUpdate(dt,inp){if(inp.interact){em('int');emitOff++;try{manualUpdate0(dt,inp)}finally{emitOff--}}else manualUpdate0(dt,inp)}
   function manualUpdate0(dt,inp){
@@ -951,11 +998,11 @@ ${FRAG_COLOR}
     if(busy||plan[0]){
       if(!busy&&plan[0]&&plan[0].t==='wp'&&inp.mag>0.1)plan=[];
       else{updatePlan(dt);return}}
-    if(air){airUpdate(dt,inp);return}
-    if(HAS_AIR&&inp.air&&P.mode==='free'&&!stairAt(P.pos.x,P.pos.z)){const r=inp.air;
+    if(air){airUpdate(dt,inp);if(netI())netFree(dt,false);return}
+    if(HAS_AIR&&inp.air&&P.mode==='free'&&(DEF.remote||!stairAt(P.pos.x,P.pos.z))){const r=inp.air;
       if(r.k==='j'){startJump();em('air',['j'])}
       else if(r.k==='d'&&(r.dx||r.dz)){startDive(r.dx,r.dz);em('air',['d',Math.round(r.dx*100)/100,Math.round(r.dz*100)/100])}
-      if(air){airUpdate(dt,{...inp,air:null});return}}
+      if(air){airUpdate(dt,{...inp,air:null});if(netI())netFree(dt,false);return}}
     if(inp.interact){
       if(P.mode==='bed'){plan=[{t:'offBed'}];return}
       if(P.mode==='sit'||P.mode==='type'){plan=[{t:'offChair'}];return}
@@ -965,6 +1012,7 @@ ${FRAG_COLOR}
     if(P.mode==='bed'||P.mode==='sit'||P.mode==='type'||P.mode==='watch'){
       if(inp.mag>0.1){if(P.mode==='watch')cmdUnwatch();else plan=[{t:P.mode==='bed'?'offBed':'offChair'}]}
       return;}
+    if(netI()){netFree(dt,true);return}
     if(inp.mag>0.1){
       const diff=angDiff(Math.atan2(inp.x,inp.z),P.yaw);
       P.yaw+=clamp(diff*(1-Math.exp(-dt*30)),-22*dt,22*dt);
@@ -984,9 +1032,10 @@ ${FRAG_COLOR}
     clock+=dt;
     if(DEF.ctrl==='wasd')manualUpdate(dt,inp);else updatePlan(dt);
     for(const x of ['L','R'])if(occ['bed'+x]===DEF.id&&P.mode!=='bed'&&!(busy&&busy.kind==='climbBed')&&!plan.some(i=>i.t==='climbBed'))occ['bed'+x]=null;
-    if(!busy&&!plan[0]&&P.mode==='free')pushOut();
-    if(DEF.ctrl==='wasd'){const S=stairAt(P.pos.x,P.pos.z);if(P._S&&!S&&!plan[0])P.level=P.pos.z<P._S.midZ?1:0;P._S=S;}
-    if(!busy&&P.mode==='free'){const h=heightAt(P.pos.x,P.pos.z,P.level);P.pos.y+=(h-P.pos.y)*(1-Math.exp(-dt*(stairAt(P.pos.x,P.pos.z)?40:16)));}
+    const NI=netI();
+    if(!busy&&!plan[0]&&P.mode==='free'&&!NI)pushOut();
+    if(DEF.ctrl==='wasd'){const S=stairAt(P.pos.x,P.pos.z);if(P._S&&!S&&!plan[0]&&!NI)P.level=P.pos.z<P._S.midZ?1:0;P._S=S;}
+    if(!busy&&P.mode==='free'&&!NI&&!netWP()){const h=heightAt(P.pos.x,P.pos.z,P.level);P.pos.y+=(h-P.pos.y)*(1-Math.exp(-dt*(stairAt(P.pos.x,P.pos.z)?40:16)));}
     if(DEF.remote&&net)correct(dt);
   }
   // ----- nhân vật remote: nắn dần về snapshot của chủ nhân vật (chủ là authority) -----
@@ -997,8 +1046,8 @@ ${FRAG_COLOR}
     for(let k=1;k<=n;k++){const t=k/n,x=x0+(x1-x0)*t,z=z0+(z1-z0)*t,c=cell(x,z);if(!free(lv,c[0],c[1])&&!(airClr>0.05&&jumpOK(lv,c[0],c[1],airClr)))return [lx,lz];lx=x;lz=z}return [x1,z1]}
   let corBlk=0;
   // Gói vị trí tới TRƯỚC lệnh (đi/ngồi/ngủ…) là cũ so với lộ trình đang chạy: đừng kéo bản sao về đó (gây "đóng băng rồi nhảy"); đợi gói gửi sau lệnh.
-  let cmdT=0;function netCmd(){cmdT=performance.now()}
-  function correct(dt){const s=net;if((plan[0]||busy)&&s.rt<cmdT)return;const age=Math.min(0.8,(performance.now()-s.t)/1000);
+  let cmdT=0;function netCmd(){cmdT=performance.now();nStill=0}      // lệnh mới (đi/ngồi/ngủ…): đếm lại thời gian 'chủ đứng yên' cho lộ trình mới
+  function correct(dt){const s=net;if((plan[0]||busy)&&s.rt<cmdT)return;if(netI()||netWP()){netModeSync(dt,s);return}const age=Math.min(0.8,(performance.now()-s.t)/1000);
     let tx=s.x+s.vx*age,tz=s.z+s.vz*age;
     if(P.mode==='free'&&(s.vx||s.vz)&&!stairAt(s.x,s.z)&&!stairAt(tx,tz)){const c=clipSeg(s.l,s.x,s.z,tx,tz);tx=c[0];tz=c[1]}
     const dx=tx-P.pos.x,dz=tz-P.pos.z,d=Math.hypot(dx,dz);
@@ -1016,12 +1065,24 @@ ${FRAG_COLOR}
         else if(!stairAt(s.x,s.z)&&Math.hypot(s.x-P.pos.x,s.z-P.pos.z)<0.8){lvMis+=dt;if(lvMis>0.7){P.level=s.l;lvMis=0}}
         else lvMis=0;}
       if(P.sp<0.05&&!plan[0])P.yaw+=angDiff(s.w,P.yaw)*(1-Math.exp(-dt*6));}
-    // đồng bộ chế độ (nằm/ngồi) nếu lệch kéo dài
+    netModeSync(dt,s);}
+  // đồng bộ chế độ (nằm/ngồi/xem phim) nếu lệch kéo dài
+  function netModeSync(dt,s){
     if(s.m!==P.mode&&!s.b&&!plan[0]){netMis+=dt;if(netMis>0.8){netMis=0;
       if(s.m==='watch')cmdWatch(s.s);else if(P.mode==='watch')cmdUnwatch();
       else if(s.m==='bed')cmdSleep();else if(s.m==='sit'||s.m==='type')cmdSit(s.m==='type'?'type':0);else if(P.mode==='bed')cmdWake();else cmdOffChair();}}
     else netMis=0;}
-  function setNet(s){net=s}
+  function setNet(s){
+    if(s.n!=null&&nSeq>=0){if(s.n<nSeq-500||s.n===1){NB.length=0;nOff=null}else if(s.n<=nSeq)return}   // gói cũ/đến sai thứ tự: bỏ; số thứ tự quay về đầu = đối phương tải lại trang
+    if(s.n!=null)nSeq=s.n;net=s;
+    if(s.ts==null)return;
+    const o=s.rt-s.ts;                                  // lệch đồng hồ + trễ một chiều của gói này
+    if(nOff==null||o<nOff)nOff=o;else nOff+=(o-nOff)*0.01;   // ước lượng theo gói nhanh nhất (trôi lên chậm khi đường truyền đổi)
+    nJit+=(Math.min(400,o-nOff)/1000-nJit)*0.1;          // độ rung trễ (s)
+    if(NB.length&&s.ts<=NB[NB.length-1].ts)return;
+    NB.push({ts:s.ts,x:s.x,y:s.y,z:s.z,w:s.w,l:s.l,mv:s.mv,vx:s.vx,vz:s.vz,sp:Math.hypot(s.vx,s.vz)});
+    while(NB.length>2&&NB[1].ts<s.ts-3000)NB.shift();
+  }
   function dispose(){
     for(const x of ['L','R'])if(occ['bed'+x]===DEF.id)occ['bed'+x]=null;if(occ.chair===DEF.id)occ.chair=null;for(const k of ['sofa0','sofa1'])if(occ[k]===DEF.id)occ[k]=null;
     SFX.typing(DEF.id,false);mixer.stopAllAction();mixer.uncacheRoot(char);scene.remove(char);
@@ -1047,9 +1108,9 @@ ${FRAG_COLOR}
   const rinp={x:0,z:0,mag:0,run:false,interact:false,air:null};let rinpT=0;
   const runMode=local.runMode,P=local.P,{cmdMove,cmdSleep,cmdSit,cmdWake,cmdOffChair}=local;
   // tách 2 nhân vật không chồng lên nhau
-  function separate(){if(!remote)return;const a=local.P,b=remote.P;if(a.mode!=='free'||b.mode!=='free'||local.busy||remote.busy||a.level!==b.level)return;
+  function separate(){if(!remote)return;const a=local.P,b=remote.P;if(a.mode!=='free'||b.mode!=='free'||local.busy||remote.busy||a.level!==b.level||local.plan.length||(local.air&&local.air()))return;   // đang đi lộ trình (click/tới giường…) hay đang nhảy: cho đi lướt qua nhau, không chặn đứng giữa đường
     const dx=b.pos.x-a.pos.x,dz=b.pos.z-a.pos.z,d=Math.hypot(dx,dz),m=0.38;if(d>=m||d<1e-4)return;
-    const k=(m-d)/2/d;a.pos.x-=dx*k;a.pos.z-=dz*k;b.pos.x+=dx*k;b.pos.z+=dz*k;}
+    const k=(m-d)/d;a.pos.x-=dx*k;a.pos.z-=dz*k;}      // chỉ đẩy nhân vật CỦA MÌNH (bản sao do máy kia quyết định — đẩy nó làm 2 bên lệch nhau)
   // phím
   const keys=new Set();let interactFlag=false,pendAir=null;const lastTap={};
   const _fv=new THREE.Vector3();
@@ -1931,12 +1992,12 @@ ${FRAG_COLOR}
   if(!TEST)loop();
   // ===== API cho lớp mạng =====
   api.snapshot=()=>{const p=local.P,mv=p.sp>0.05||!!local.busy||local.plan.length>0,mov=p.sp>0.05&&p.mode==='free'&&!local.busy;
-    return{x:r3(p.pos.x),y:r3(p.pos.y),z:r3(p.pos.z),w:r3(p.yaw),l:p.level,m:p.mode,b:local.busy?local.busy.kind:0,vx:mov?r3(Math.sin(p.yaw)*p.sp):0,vz:mov?r3(Math.cos(p.yaw)*p.sp):0,mv:mv?1:0,mp:MAPID,s:p.mode==='watch'?p.seat:undefined}};
+    return{x:r3(p.pos.x),y:r3(p.pos.y),z:r3(p.pos.z),w:r3(p.yaw),l:p.level,m:p.mode,b:local.busy?local.busy.kind:0,vx:mov?r3(Math.sin(p.yaw)*p.sp):0,vz:mov?r3(Math.cos(p.yaw)*p.sp):0,mv:mv?1:0,mp:MAPID,s:p.mode==='watch'?p.seat:undefined,ts:Math.round(performance.now())}};
   api.addRemote=(slot,glb)=>{if(remote)return;remote=makeChar(glb,{...DEFS[slot],remote:true});api.remote=remote;rinp.mag=0};
   api.setRemoteVisible=v=>{if(remote&&remote.char.visible!==v)remote.char.visible=v};
   api.removeRemote=()=>{if(!remote)return;remote.dispose();remote=null;api.remote=null;if(window.__halo)endHalo()};
   api.setRemoteInput=m=>{rinp.x=m.x;rinp.z=m.z;rinp.run=!!m.r;rinp.mag=m.m?1:0;rinpT=clockG};
-  api.applyState=(m,lat)=>{if(remote)remote.setNet({x:m.x,y:m.y,z:m.z,w:m.w,l:m.l,m:m.m,b:m.b,s:m.s,mv:m.mv,vx:m.vx||0,vz:m.vz||0,rt:performance.now(),t:performance.now()-(lat||0)*1000})};
+  api.applyState=(m,lat)=>{if(remote)remote.setNet({x:m.x,y:m.y,z:m.z,w:m.w,l:m.l,m:m.m,b:m.b,s:m.s,mv:m.mv,vx:m.vx||0,vz:m.vz||0,n:m.n,ts:m.ts,rt:performance.now(),t:performance.now()-(lat||0)*1000})};
   api.applyCmd=(t,a)=>{if(!remote)return;remote.netCmd();switch(t){
     case 'move':remote.cmdMove(a[0],a[1],a[2],!!a[3]);break;case 'sleep':remote.cmdSleep();break;case 'sit':remote.cmdSit(a||undefined);break;
     case 'wake':remote.cmdWake();break;case 'watch':remote.cmdWatch(a);break;case 'unwatch':remote.cmdUnwatch();break;case 'off':remote.cmdOffChair();break;case 'blink':remote.blink();break;
