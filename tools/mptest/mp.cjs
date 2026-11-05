@@ -65,7 +65,7 @@ function metrics(own,obs){
   let best=null;for(let D=0;D<=700;D+=20){let s=0;for(const o of obs){const w=at(o.t-D);s+=(o.x-w.x)**2+(o.z-w.z)**2}const r=Math.sqrt(s/obs.length);if(!best||r<best.r)best={D,r}}
   let mx=0,ymx=0,lvBad=0,mdBad=0,snaps=0,jerk=0;
   for(let i=0;i<obs.length;i++){const o=obs[i],w=at(o.t-best.D);const e=Math.hypot(o.x-w.x,o.z-w.z);mx=Math.max(mx,e);if(o.m==='free'&&w.m==='free')ymx=Math.max(ymx,Math.abs(o.y-w.y));if(o.l!==w.l)lvBad++;if(o.m!==w.m)mdBad++;
-    if(i>0){const p=obs[i-1],st=Math.hypot(o.x-p.x,o.z-p.z)+Math.abs(o.y-p.y),dt=(o.t-p.t)/1000;const w0=at(p.t-best.D),os=Math.hypot(w.x-w0.x,w.z-w0.z)+Math.abs(w.y-w0.y);if(st>0.25&&st>os*2+0.1)snaps++;
+    if(i>0){const p=obs[i-1],st=Math.hypot(o.x-p.x,o.z-p.z)+Math.abs(o.y-p.y),dt=(o.t-p.t)/1000;const w0=at(p.t-best.D),os=Math.hypot(w.x-w0.x,w.z-w0.z)+Math.abs(w.y-w0.y);if(st>0.25&&st>os*2+0.1){snaps++;if(process.env.SNAPDBG)console.log('SNAP t='+((o.t-obs[0].t)/1000).toFixed(2),'obs',JSON.stringify(p),'→',JSON.stringify(o),'own@',JSON.stringify(w))}
       if(i>1){const q=obs[i-2],v1=Math.hypot(o.x-p.x,o.z-p.z)/Math.max(dt,1e-3),v0=Math.hypot(p.x-q.x,p.z-q.z)/Math.max((p.t-q.t)/1000,1e-3);if(Math.abs(v1-v0)>6)jerk++}}}
   const lo=obs[obs.length-1],lw=own[own.length-1];
   return {lagMs:best.D,rms:+best.r.toFixed(3),max:+mx.toFixed(3),yMax:+ymx.toFixed(3),lvBad:+(lvBad/obs.length).toFixed(3),modeBad:+(mdBad/obs.length).toFixed(3),snaps,jerk,endErr:+Math.hypot(lo.x-lw.x,lo.z-lw.z).toFixed(3),endY:+Math.abs(lo.y-lw.y).toFixed(3),endMode:lo.m+'/'+lw.m,n:obs.length,

@@ -839,7 +839,7 @@ ${FRAG_COLOR}
           const dF=Math.hypot(fin.x-P.pos.x,fin.z-P.pos.z);
           // tới đích: sát điểm cuối, hoặc gần đích mà chủ nhân vật đã bắt đầu hành động kế (leo giường/ghế…) hay đã đứng hẳn (mv=0)
           const ownBusy=net&&net.b,ownStill=net&&!net.mv;
-          if(dF<0.05||(dF<0.35&&(ownBusy||(ownStill&&nStill>0.3)))){P.pos.x=fin.x;P.pos.z=fin.z;if(fin.setLevel!=null)P.level=fin.setLevel;plan.splice(0,j+1)}
+          if(dF<0.05||(dF<0.35&&(ownBusy||(ownStill&&nStill>0.3)))){if(fin.setLevel!=null)P.level=fin.setLevel;plan.splice(0,j+1)}      // không kéo giật về điểm cuối: bước kế (leo/ngồi) tự đặt tư thế, còn lại nội suy tự do khớp dần
           else if(ownStill&&!ownBusy&&nStill>1.0)plan.splice(0,j+1);       // chủ nhân vật đã dừng hẳn ở chỗ khác (huỷ lộ trình): bỏ lộ trình, về nội suy tự do
           break}
         const dx=it.x-P.pos.x,dz=it.z-P.pos.z,d=Math.hypot(dx,dz);
