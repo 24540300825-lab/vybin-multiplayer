@@ -39,6 +39,7 @@ export function mountCinema({api, sess, voice, slot, other, toast, music}) {
     <div class="cWho" id="cnWho"></div>
     <div class="cAct">
       <button class="cb" id="cnHostB" title="Quyền điều khiển">${ic('crown')}<span id="cnHostT">Host</span></button>
+      <button class="cb" id="cnResync" title="Phim bị đứng / lệch? Đồng bộ lại với host"><span>⟳ Đồng bộ</span></button>
       <button class="cb" id="cnFs" title="Toàn màn hình">${ic('expand')}</button>
       <button class="cb" id="cnMin" title="Tạm rời (thu nhỏ, phim vẫn chạy)">${ic('shrink')}<span>Tạm rời</span></button>
       <button class="cb off" id="cnOff" title="Tắt TV">${ic('power')}<span id="cnOffT">Tắt TV</span></button>
@@ -176,6 +177,25 @@ export function mountCinema({api, sess, voice, slot, other, toast, music}) {
   }
   el.tap.onclick = () => { el.tap.hidden = true; if (player) { if (S && S.playing) player.play(); } };
   let quietUntil = 0;
+  let lastSt = 0, stk = {t: -1, at: 0, stage: 0};
+  // Đồng bộ lại: bên khách xin host gửi lại trạng thái, rồi dựng lại trình phát tại đúng điểm hiện tại (dùng khi phim đứng 1 bên mà host không hề biết)
+  function resync(hard = true) {
+    if (!S || me.st === 'off') return;
+    if (!isHost()) send({t: 'hi'});
+    if (hard) { if (player) { try { player.destroy(); } catch (e) {} player = null; } playerKey = ''; loadingKey = ''; el.tap.hidden = true; }
+    quiet(1500); ensurePlayer().then(() => { if (player && player.sync) { quiet(1500); player.seek(posNow()); S.playing ? player.play() : player.pause(); } });
+    stk = {t: -1, at: now(), stage: 0};
+  }
+  $('cnResync').onclick = () => { resync(true); toast('Đang đồng bộ lại…'); };
+  // Tự phát hiện đứng hình: đang phát mà đồng hồ trình phát không nhúc nhích ≥4 s → thử tua+phát lại; vẫn đứng 5 s nữa → dựng lại trình phát. Khách quá 12 s không nghe host → hỏi lại trạng thái.
+  function watchdog() {
+    if (!player || !S || !S.src || !player.sync || loadingKey || !S.playing || document.hidden) { stk.t = -1; return; }
+    const t = player.time();
+    if (stk.t < 0 || Math.abs(t - stk.t) > 0.25) { stk = {t, at: now(), stage: 0}; return; }
+    const st = now() - stk.at;
+    if (stk.stage === 0 && st > 4000) { stk.stage = 1; quiet(1500); try { player.seek(posNow()); player.play(); } catch (e) {} }
+    else if (stk.stage === 1 && st > 9000) { stk.stage = 2; toast('Phim bị đứng — đang đồng bộ lại…'); resync(true); }
+  }
   const quiet = (ms = 900) => { quietUntil = now() + ms; };
   function correct() {                    // khách: kéo trình phát về đúng trạng thái host; host: đảm bảo trình phát khớp trạng thái mình đặt
     if (!player || !S || !S.src || !player.sync || loadingKey) return;
@@ -186,7 +206,7 @@ export function mountCinema({api, sess, voice, slot, other, toast, music}) {
     const dur = player.dur();
     if (Math.abs(t - want) > lim && !(dur && want > dur - 1)) { quiet(1500); player.seek(want); }
   }
-  setInterval(() => { if (me.st === 'off') return; if (!isHost()) correct(); tickUi(); if (isHost() && S && S.playing && ++beat % 8 === 0) broadcast(); }, 500);
+  setInterval(() => { if (me.st === 'off') return; if (!isHost()) { correct(); if (S && S.playing && peerIn() && lastSt && now() - lastSt > 12000) { lastSt = now(); send({t: 'hi'}); } } watchdog(); tickUi(); if (isHost() && S && S.playing && ++beat % 8 === 0) broadcast(); }, 500);
   let beat = 0, seeking = false;
   function tickUi() {
     if (!root.classList.contains('show')) return;
@@ -237,6 +257,7 @@ export function mountCinema({api, sess, voice, slot, other, toast, music}) {
         const mine = isHost();
         if (mine && S && (m.v < S.v || (m.v === S.v && slot === 'bin'))) { broadcast(); break; }        // tranh host cùng lúc: phiên bản mới hơn thắng, hoà thì Bin giữ
         const lat = Math.min(0.4, (sess.rtt || 150) / 2000);
+        lastSt = now();
         S = {v: m.v, host: m.host, src: m.src, playing: !!m.playing, pos: (m.pos || 0) + (m.playing ? lat : 0), at: now(), q: m.q || []};
         render(); if (me.st !== 'off') { ensurePlayer().then(correct); if (S.src && S.src.type === 'stream' && !isHost()) rtcWant(); }
         break;
