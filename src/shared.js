@@ -15,5 +15,5 @@ export const K={WATCH:'ACT_WATCHING',WATCH_IDLE:'ACT_WATCHING_IDLE',OFFWATCH:'AC
  OFFBED_L:'ACT_SLEEP_OFF BED_L',OFFBED_R:'ACT_SLEEP_OFF BED_R'};
 export const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 export const sstep=(a,b,x)=>{x=clamp((x-a)/(b-a),0,1);return x*x*(3-2*x)};
-export const angDiff=(a,b)=>{let d=a-b;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;return d};
+export const angDiff=(a,b)=>{const d=a-b;if(!Number.isFinite(d))return 0;return d-2*Math.PI*Math.round(d/(2*Math.PI))};   // không vòng lặp: giá trị Infinity/quá lớn từng có thể treo cả trang
 export const $=id=>document.getElementById(id);

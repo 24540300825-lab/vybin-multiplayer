@@ -46,7 +46,8 @@ export const Lofi=(()=>{
     else if(Math.random()<0.3)nz(t,0.03,'highpass',8000,0.025);
     if(s%2===0&&Math.random()<TR[ti].lead){const m=ch[0]+12+pent[(Math.random()*5)|0]+(Math.random()<0.4?12:0);tone(m,t,0.9,'triangle',0.09,2200,0.5);}
   }
-  function sched(){while(nextT<ctx.currentTime+0.25){step(stp,nextT+(stp%2?S*TR[ti].sw:0));nextT+=S;stp=(stp+1)%16;if(stp===0)bar++;}}
+  function sched(){if(!(S>0.01))return;if(!(nextT>ctx.currentTime-0.4))nextT=ctx.currentTime+0.05;   /* tab bị đóng băng/tạm dừng lâu rồi quay lại: không bù hàng nghìn nốt đã lỡ (từng làm đứng trang) */
+  while(nextT<ctx.currentTime+0.25){step(stp,nextT+(stp%2?S*TR[ti].sw:0));nextT+=S;stp=(stp+1)%16;if(stp===0)bar++;}}
   return{
     get on(){return on},
     async toggle(){if(!ctx)init();if(ctx.state==='suspended')await ctx.resume();

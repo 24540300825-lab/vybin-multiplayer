@@ -32,7 +32,7 @@ export function bindSync(sess, api, loadChar) {
   // tin bị rơi/trễ => nhân vật kia "đứng im rồi giật". Giờ: chỉ gửi 'i' khi đổi trạng thái đi/dừng/chạy hoặc đổi hướng đáng kể (<=6/s);
   // hướng phím hiện tại luôn kèm theo trong snapshot (8/s) nên mất 1 tin cũng không làm nhân vật bị kẹt. Tổng khi di chuyển <= ~14 tin/s.
   let curIn = {x: 0, z: 0, r: 0, m: 0}, lastMv = 0, lastRun = 0, lastAng = 0;
-  const angD = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
+  const angD = (a, b) => { const d = a - b; if (!Number.isFinite(d)) return 0; return d - 2 * Math.PI * Math.round(d / (2 * Math.PI)); };   // không vòng lặp (Infinity làm treo trang)
   api.sendInput = inp => {
     const mv = inp.mag > 0.1 ? 1 : 0, run = inp.run ? 1 : 0, now = performance.now(), ang = mv ? Math.atan2(inp.x, inp.z) : 0;
     curIn = {x: r3(inp.x), z: r3(inp.z), r: run, m: mv};
