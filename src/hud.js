@@ -166,8 +166,20 @@ import('./ui/float.js').then(({float})=>{
     if(window.VY.EXT){clearInterval(t);return}   // map ngoài vườn: không có đèn nhà
     const top=document.getElementById('hTop');if(!top||document.getElementById('iLamp'))return;
     const b=document.createElement('button');b.className='ib';b.id='iLamp';b.setAttribute('aria-label','Đèn trong nhà');b.innerHTML='<i class="ic">'+ic('bulb')+'</i>';top.appendChild(b);
-    const paint=()=>{const on=VY.api.lamps();b.classList.toggle('lampOff',!on);b.title=(on?'Tắt':'Bật')+' đèn trong nhà (L)';b.setAttribute('aria-pressed',on)};paint();
-    const tog=()=>{VY.api.lamps(!VY.api.lamps());paint();window.__vyToast&&window.__vyToast(VY.api.lamps()?'Đã bật đèn':'Đã tắt đèn — chỉ còn ánh sáng tự nhiên');try{SFX.play('click')}catch(e){}};
-    b.onclick=tog;addEventListener('vylamps',paint);
+    // bấm nút → bảng nhỏ 2 công tắc: "Ánh đèn chung" và "Đèn bàn · đèn cây · đèn thả" (+ tắt/bật hết). Phím L: bật/tắt tất cả
+    const pop=document.createElement('div');pop.id='lampPop';pop.className='hud panel';pop.setAttribute('role','menu');pop.hidden=true;
+    pop.innerHTML='<b class="lpT">Đèn trong nhà</b><button class="lpR" data-g="a" role="menuitemcheckbox"><span>Ánh đèn chung</span><i class="lpS"></i></button><button class="lpR" data-g="b" role="menuitemcheckbox"><span>Đèn bàn · đèn cây · đèn thả</span><i class="lpS"></i></button><button class="lpAll"></button>';
+    document.body.appendChild(pop);
+    const paint=()=>{const on=VY.api.lamps(),ga=VY.api.lampGroup('a'),gb=VY.api.lampGroup('b');b.classList.toggle('lampOff',!on);b.classList.toggle('lampHalf',on&&!(ga&&gb));b.title='Đèn trong nhà (L: bật/tắt hết)';b.setAttribute('aria-expanded',!pop.hidden);
+      pop.querySelectorAll('.lpR').forEach(r=>{const v=VY.api.lampGroup(r.dataset.g);r.classList.toggle('on',v);r.setAttribute('aria-checked',v)});pop.querySelector('.lpAll').textContent=on?'Tắt hết (phòng tối)':'Bật hết'};paint();
+    const place=()=>{const r=b.getBoundingClientRect(),w=pop.offsetWidth||260;pop.style.top=Math.round(r.bottom+8)+'px';pop.style.left=Math.round(Math.max(8,Math.min(innerWidth-w-8,r.left+r.width/2-w/2)))+'px'};
+    const open=v=>{pop.hidden=!v;if(v)place();paint()};
+    const say=m=>{window.__vyToast&&window.__vyToast(m);try{SFX.play('click')}catch(e){}};
+    const tog=()=>{VY.api.lamps(!VY.api.lamps());paint();say(VY.api.lamps()?'Đã bật hết đèn':'Đã tắt hết đèn — phòng tối, chỉ còn ánh sáng tự nhiên')};
+    pop.addEventListener('click',e=>{const r=e.target.closest('.lpR');if(r){const g=r.dataset.g,v=!VY.api.lampGroup(g);VY.api.lampGroup(g,v);paint();say((v?'Bật ':'Tắt ')+(g==='a'?'ánh đèn chung':'đèn bàn · đèn cây · đèn thả'));return}
+      if(e.target.closest('.lpAll'))tog()});
+    b.onclick=e=>{e.stopPropagation();open(pop.hidden)};addEventListener('vylamps',paint);
+    addEventListener('pointerdown',e=>{if(!pop.hidden&&!pop.contains(e.target)&&!b.contains(e.target))open(false)},true);
+    addEventListener('keydown',e=>{if(e.code==='Escape'&&!pop.hidden)open(false)});addEventListener('resize',()=>{if(!pop.hidden)place()});
     addEventListener('keydown',e=>{if(e.code!=='KeyL'||e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;const T=e.target;if(T&&(/INPUT|TEXTAREA|SELECT/.test(T.tagName)||T.isContentEditable))return;if(document.querySelector('.modal.on,#mpGate.on,#cine.on'))return;tog()});
   },300)})();

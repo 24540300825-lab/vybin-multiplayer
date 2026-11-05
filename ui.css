@@ -913,7 +913,7 @@ html.vy-arrange #hMusic,html.vy-arrange #hBR{opacity:.35;pointer-events:none}
 #pXu{display:none}   /* Xu nay nằm ở ô tài nguyên trên thanh công cụ */
 @media(max-width:640px){#hTop .tbg{flex-direction:column;gap:.5rem;border-left:0;padding:.5rem 0 0;border-top:1px solid rgba(255,255,255,.28)}#hTop .tbg[data-g="0"]{border-top:0;padding-top:0}#hRes{margin:0 0 .25rem}.tbMenu{right:calc(100% + .5rem);top:0}}
 #hRes:has(#rXu:empty){display:none}
-#hTop #iLamp.lampOff{opacity:.55}#hTop #iLamp.lampOff .ic{filter:grayscale(1) drop-shadow(var(--sh))}
+#hTop #iLamp.lampHalf{opacity:.8}#hTop #iLamp.lampOff{opacity:.55}#hTop #iLamp.lampOff .ic{filter:grayscale(1) drop-shadow(var(--sh))}
 #kSide .ks{padding:0 .5rem 0 .875rem}
 #hTop .tbg .mlb{display:none}
 
@@ -921,3 +921,14 @@ html.vy-arrange #hMusic,html.vy-arrange #hBR{opacity:.35;pointer-events:none}
 html.media{--cap:linear-gradient(to right,rgba(24,18,12,.62),rgba(24,18,12,.5));--panel:rgba(26,25,23,.9)}
 html.media .cap,html.media .panel,html.media .mbox,html.media #toast,html.media #fcPill,html.media #kSide .ks,html.media .tbMenu,html.media #hCall,html.media #hRes{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 html.media .hud,html.media .panel{transition:none!important}
+/* bảng công tắc đèn 2 nhóm (src/hud.js) */
+#lampPop{position:fixed;z-index:14;width:16.5rem;padding:.75rem;border-radius:1.5rem;display:flex;flex-direction:column;gap:.25rem;color:#fff}
+#lampPop[hidden]{display:none}
+#lampPop .lpT{font-size:.8rem;opacity:.7;padding:.25rem .5rem .5rem;font-weight:600}
+#lampPop .lpR{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.6rem .75rem;border:0;border-radius:1rem;background:none;color:inherit;font:inherit;font-size:.95rem;text-align:left;cursor:pointer}
+#lampPop .lpR:hover{background:rgba(255,255,255,.08)}
+#lampPop .lpS{flex:none;width:2.25rem;height:1.3rem;border-radius:1rem;background:rgba(255,255,255,.22);position:relative;transition:background .15s}
+#lampPop .lpS::after{content:'';position:absolute;top:.15rem;left:.15rem;width:1rem;height:1rem;border-radius:50%;background:#fff;transition:transform .15s}
+#lampPop .lpR.on .lpS{background:#f2b84b}#lampPop .lpR.on .lpS::after{transform:translateX(.95rem)}
+#lampPop .lpAll{margin-top:.25rem;padding:.6rem;border:0;border-radius:1rem;background:rgba(255,255,255,.1);color:inherit;font:inherit;font-size:.9rem;cursor:pointer}
+#lampPop .lpAll:hover{background:rgba(255,255,255,.18)}

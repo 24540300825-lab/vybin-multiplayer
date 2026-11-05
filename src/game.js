@@ -166,7 +166,7 @@ ${FRAG_COLOR}
          {float lp=0.0;for(int li=0;li<10;li++){if(float(li)>=uLN)break;vec3 ld=uLP[li].xyz-vWP;float q=clamp(1.0-dot(ld,ld)/(uLP[li].w*uLP[li].w),0.0,1.0);lp+=q*q;}
           lp=min(lp,1.4);
           col*=1.0-0.15*uLK*inH*(1.0-min(lp,1.0));
-          col*=1.0-0.3*uLOff*inH;
+          col*=1.0-0.6*uLOff*inH;
           col+=diffuseColor.rgb*vec3(1.0,0.8,0.52)*lp*uLK*0.85;}
          #ifdef VY_AO
          if(uAOK>0.001){// AO bake sẵn (nhân vào TỔNG màu, sau cả ánh đèn nội thất) (khối 3D, src/ao.js): đọc tại vị trí + pháp tuyến×0.12 m; mờ dần ra ngoài khối; yếu hơn ở chỗ đang có nắng để nổi highlight
@@ -280,8 +280,13 @@ ${FRAG_COLOR}
   const pickStair=(x0,z0,x1,z1,up)=>{let best=stairs[0],bd=1e9;for(const S of stairs){const a=up?S.botZ:S.topZ,b=up?S.topZ:S.botZ,d=Math.hypot(x0-S.cx,z0-a)+Math.hypot(S.cx-x1,b-z1);if(d<bd){bd=d;best=S}}return best};
   // ===== đèn trong nhà → các "vũng sáng" cục bộ (đèn thả bếp, đèn sàn, đèn bàn…): gần đèn sáng ấm, xa đèn tối dần =====
   // công tắc đèn trong nhà (nhớ lại giữa các lần chơi): tắt → chỉ còn ánh nắng/ánh trời
-  const LI={on:true,k:1,mats:null};try{LI.on=localStorage.getItem('vyLamps')!=='0'}catch(e){}LI.k=LI.on?1:0;
-  api.lamps=v=>{if(v===undefined)return LI.on;LI.on=!!v;try{localStorage.setItem('vyLamps',v?'1':'0')}catch(e){}window.dispatchEvent(new CustomEvent('vylamps',{detail:LI.on}));return LI.on};
+  // đèn nhà 2 nhóm: a = ánh đèn chung (sáng ấm phủ cả nhà) · b = các đèn có bóng (đèn thả, đèn cây, đèn bàn, đèn ngủ: chao phát sáng + vũng sáng quanh đèn). Tắt cả 2 → phòng tối.
+  const LI={a:true,b:true,ka:1,kb:1,mats:null};
+  try{const o=localStorage.getItem('vyLamps');const ga=localStorage.getItem('vyLampA'),gb=localStorage.getItem('vyLampB');LI.a=ga!=null?ga!=='0':o!=='0';LI.b=gb!=null?gb!=='0':o!=='0'}catch(e){}LI.ka=LI.a?1:0;LI.kb=LI.b?1:0;
+  const lampsEv=()=>window.dispatchEvent(new CustomEvent('vylamps',{detail:{a:LI.a,b:LI.b}}));
+  const lampsSave=()=>{try{localStorage.setItem('vyLampA',LI.a?'1':'0');localStorage.setItem('vyLampB',LI.b?'1':'0');localStorage.setItem('vyLamps',LI.a||LI.b?'1':'0')}catch(e){}};
+  api.lamps=v=>{if(v===undefined)return LI.a||LI.b;LI.a=LI.b=!!v;lampsSave();lampsEv();return LI.a||LI.b};     // bật/tắt tất cả (phím L)
+  api.lampGroup=(g,v)=>{const k=g==='b'?'b':'a';if(v===undefined)return LI[k];LI[k]=!!v;lampsSave();lampsEv();return LI[k]};
   const LAMPS=[];
   {env.updateMatrixWorld(true);const pend=[],other=[],studioP=[],studioO=[];
    env.traverse(o=>{const n=o.name||'';
@@ -1870,10 +1875,11 @@ ${FRAG_COLOR}
     const des=c=>c.clone().lerp(grayOf(c),WC.des);
     const sunC=des(k.sun),aS=des(k.ambS),aG=des(k.ambG);const sI=Math.min(1.15,(0.35+0.65*k.sunI)*(0.4+0.6*WC.dim)*Math.max(fade,0.2))*(1+flash*1.2),aI=0.95+flash*0.5;
     const raw=(c,v)=>{const w=c.clone().convertLinearToSRGB();v.value.set(w.r,w.g,w.b)};raw(sunC,TU.uSunC);TU.uSunC.value.multiplyScalar(sI);raw(aS,TU.uAmbS);TU.uAmbS.value.multiplyScalar(aI);raw(aG,TU.uAmbG);TU.uAmbG.value.multiplyScalar(aI);
-    LI.k+=((LI.on?1:0)-LI.k)*(dt>0?Math.min(1,dt*5):1);   // bật/tắt đèn nhà: mờ dần ~0.4s
-    const lamp=Math.max(k.lamp,WC.dim<0.5?0.3:0)*0.95*LI.k;TU.uLampC.value.set(1.0*lamp,0.62*lamp,0.3*lamp);TU.uLK.value=(0.7+0.5*Math.min(1,Math.max(k.lamp,WC.dim<0.5?0.3:0)))*LI.k;TU.uLOff.value=1-LI.k;
-    if(LI.mats===null){LI.mats=[];if(!OUTD)env.traverse(o=>{if(!o.isMesh)return;[].concat(o.material).forEach(m=>{if(m&&/^(CH_lampshade|CH_bulb|FWS_lamp_glow)$/.test(m.name)&&!LI.mats.some(q=>q.m===m))LI.mats.push({m,e:m.emissiveIntensity})})})}
-    LI.mats.forEach(q=>{q.m.emissiveIntensity=q.e*(0.06+0.94*LI.k)});
+    {const fl=dt>0?Math.min(1,dt*5):1;LI.ka+=((LI.a?1:0)-LI.ka)*fl;LI.kb+=((LI.b?1:0)-LI.kb)*fl}   // bật/tắt đèn nhà: mờ dần ~0.4s
+    const lamp=Math.max(k.lamp,WC.dim<0.5?0.3:0)*0.95*LI.ka;TU.uLampC.value.set(1.0*lamp,0.62*lamp,0.3*lamp);TU.uLK.value=(0.7+0.5*Math.min(1,Math.max(k.lamp,WC.dim<0.5?0.3:0)))*LI.kb;
+    TU.uLOff.value=(1-LI.ka)*(0.35+0.65*(1-LI.kb))*(0.55+0.45*(1-k.day));   // tắt ánh chung → tối bớt; tắt thêm đèn có bóng → tối hẳn
+    if(LI.mats===null){LI.mats=[];if(!OUTD)scene.traverse(o=>{if(!o.isMesh)return;[].concat(o.material).forEach(m=>{if(m&&/^(CH_lampshade|CH_bulb|FWS_lamp_glow)$/.test(m.name)&&!LI.mats.some(q=>q.m===m))LI.mats.push({m,e:m.emissiveIntensity})})})}
+    LI.mats.forEach(q=>{q.m.emissiveIntensity=q.e*(0.06+0.94*LI.kb)});
     // sky
     skyU.cTop.value.copy(des(k.top));skyU.cMid.value.copy(des(k.mid));skyU.cPink.value.copy(des(k.pink));skyU.cHor.value.copy(des(k.hor));
     const dayB=0.25+0.75*k.day;skyU.cCl.value.copy(des(k.hor).lerp(new THREE.Color('#ffffff'),0.45*k.day)).multiplyScalar(dayB*(1-0.25*WC.des));
