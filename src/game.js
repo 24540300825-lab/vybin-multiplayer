@@ -35,7 +35,7 @@ const OCCW_GLSL=`
 `;
 export function init(ctx){
   const envG=ctx.env,treeG=ctx.tree,MAPID=window.MAPID;
-  const renderer=new THREE.WebGLRenderer({antialias:true});
+  const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
   Perf.attach(renderer);
   renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
