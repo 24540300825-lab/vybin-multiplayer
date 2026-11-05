@@ -43,7 +43,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
   const loadModel = name => cache[name] ||= loader.loadAsync('assets/furniture/' + name + '.glb?v=1').then(g => g.scene);
   const glbReady = {};   // file cây đã tải xong (để dựng InstancedMesh đồng bộ)
-  const loadGlb = path => cache['@' + path] ||= loader.loadAsync('assets/' + path + '.glb?v=1').then(g => (glbReady[path] = g.scene));
+  const loadGlb = path => cache['@' + path] ||= loader.loadAsync('assets/' + path + '.glb?v=2').then(g => (glbReady[path] = g.scene));
   const isG = def => !!(def && def.glb);
   // biến thể cây: node v<k> trong file; vật liệu toon + đổ bóng phẳng low-poly (làm 1 lần cho mỗi vật liệu)
   async function variantOf(def, v) {
@@ -57,7 +57,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
   // lớp vẽ của vườn (exterior.js): cây → 'tree', bụi/dương xỉ → 'bush', cỏ/hoa/lau → 'flower' (lay gió, cúi khi đi qua);
   // đá, gốc, khúc gỗ, nấm, xương rồng → 'rock' + vật liệu cứng (không lay gió)
   const CLS = {g_sapling: 'tree', g_tree: 'tree', g_conifer: 'tree', g_autumn: 'tree', g_palm: 'tree', g_bigtree: 'tree', g_bush: 'bush', g_fern: 'bush',
-    g_grass: 'flower', g_flower: 'flower', g_reed: 'flower', g_rock: 'rock', g_stump: 'rock', g_log: 'rock', g_mushroom: 'rock', g_cactus: 'rock'};
+    g_grass: 'grass', g_flower: 'flower', g_reed: 'flower', g_rock: 'rock', g_stump: 'rock', g_log: 'rock', g_mushroom: 'rock', g_cactus: 'rock'};
   const clsOf = def => def.cls || CLS[def.id] || 'bush';
   const rawOf = def => clsOf(def) === 'rock';
   // các mảnh của 1 biến thể: {geometry, material, raw}. Hình học đã "nướng" ma trận cục bộ (nếu có) → ma trận bản thể = ma trận món.
@@ -70,7 +70,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     node.traverse(o => {
       if (!o.isMesh) return;
       const l = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld); let g = o.geometry;
-      if (!l.equals(new THREE.Matrix4())) { g = g.clone(); g.applyMatrix4(l); }
+      if (!l.equals(new THREE.Matrix4())) { g = g.clone(); g.applyMatrix4(l); if (g.attributes._root) g.attributes._root.applyMatrix4(l); }
       [].concat(o.material).forEach((m, i) => out.push({geometry: g, material: m, raw: rawOf(def)}));
     });
     partCache.set(k, out); return out;
@@ -80,7 +80,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     let r = rawMat.get(key); if (r) return r;
     r = m.clone(); r.name = m.name; r.metalness = 0; r.roughness = 1;
     // đá cuội: cùng màu kem + độ rực với đá/đá lát của vườn (exterior.js PATHC, desat 0.82) thay vì xám đậm của atlas
-    if (stone) { r.map = null; r.color.setRGB(0.86, 0.84, 0.74).multiplyScalar(1.14); r.userData.desat = 0.82; r.name = 'ROCK_user'; }
+    if (stone) { r.map = null; r.vertexColors = false; r.color.setRGB(0.86, 0.84, 0.74).multiplyScalar(1.14); r.userData.desat = 0.82; r.name = 'ROCK_user'; }
     else r.userData.desat = 0.85;
     if (api.toonMat && r.isMeshStandardMaterial) { try { api.toonMat(r); } catch (e) {} }
     rawMat.set(key, r); return r;
@@ -93,7 +93,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     g.scale.setScalar(sc);
     if (ghost) {
       const inner = node.clone(true); inner.position.set(0, 0, 0);
-      inner.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = false; o.material = [].concat(o.material).map(m => { const q = new THREE.MeshStandardMaterial({color: 0xffffff, map: m.map || null, transparent: true, opacity: 0.6, depthWrite: false, flatShading: true}); q.userData.ghost = 1; return q; }); if (o.material.length === 1) o.material = o.material[0]; } });
+      inner.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = false; o.material = [].concat(o.material).map(m => { const q = new THREE.MeshStandardMaterial({color: m.color ? m.color.clone() : 0xffffff, map: m.map || null, vertexColors: !!m.vertexColors, transparent: true, opacity: 0.6, depthWrite: false, flatShading: true}); q.userData.ghost = 1; return q; }); if (o.material.length === 1) o.material = o.material[0]; } });
       g.add(inner); g.userData.inner = inner;
     }
     return g;   // món thật: KHÔNG có mesh riêng — vẽ bằng InstancedMesh chung (xem rebuildInst)

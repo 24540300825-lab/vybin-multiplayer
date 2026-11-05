@@ -76,7 +76,7 @@ export function init(ctx){
   function toonMat(m){
       m.onBeforeCompile=sh=>{if(m.userData.leafMask)patchLeafMask(sh);Object.assign(sh.uniforms,TU);if(aoOn(m))Object.assign(sh.uniforms,AOU);
         const F2=!!m.userData.fol2,GB=!!m.userData.grass,FOL=!F2&&!GB&&(/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf,SW=!F2&&!GB&&(/Wind/i.test(m.name||'')||m.userData.sway||FOL),GRD=!!m.userData.ground||/Stylized Grass/i.test(m.name||'');
-        const VS0=(F2||GB)?vertFol2(sh.vertexShader,!!m.userData.cloudV,NOISE_GLSL,GB||!!m.userData.squash):sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+        const VS0=(F2||GB)?vertFol2(sh.vertexShader,!!m.userData.cloudV,NOISE_GLSL,GB||!!m.userData.squash,!!m.userData.stemR):sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
           #ifdef SWAYX
           {vec4 q=vec4(transformed,1.0);
           #ifdef USE_INSTANCING
@@ -176,7 +176,7 @@ ${FRAG_COLOR}
          #endif
          outgoingLight=col+totalEmissiveRadiance;}
         #include <opaque_fragment>`);if(STY)STY.patch(sh,m);if(m.userData.vyDec)patchDecal(sh,m)};
-      m.customProgramCacheKey=()=>'vytoon10'+(aoOn(m)?'A':'')+(STY?STY.key(m):'')+(m.userData.vyDec?'D'+m.userData.vyDec:'')+(m.userData.occW?'W':'')+(m.userData.fol2?'F':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
+      m.customProgramCacheKey=()=>'vytoon10'+(aoOn(m)?'A':'')+(STY?STY.key(m):'')+(m.userData.vyDec?'D'+m.userData.vyDec:'')+(m.userData.occW?'W':'')+(m.userData.fol2?'F':'')+(m.userData.stemR?'R':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
 
   // mái ngói cánh Vy/Bin: GLB ngoại cảnh chỉ có mái cánh phòng khách (Roof_Living) → nhân bản sang 2 cánh kia
   // (khớp kích thước mái gốc Roof_Vy/Roof_Bin trong LIVING_ROOM.glb: rộng 10.85, lệch tâm ±0.425, cao 6.4). skipX = x tâm cánh đang ở (giữ hở để nhìn vào)

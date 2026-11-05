@@ -135,7 +135,7 @@ Toàn bộ hiệu ứng âm thanh nằm trong `src/sfx.js`, tổng hợp bằng 
 - Game: `api.seatSet/seatDel/seatFree` (chỗ ngồi thêm, id chuỗi 'f<id>:<k>'), `api.pickHook` (giành cú bấm khi đang đặt đồ), `api.toonMat`.
 
 ## 10. Cây & vườn rải ngoài trời — Poly Nature Pack
-- File: `assets/nature/glb/<id>.glb` (mỗi file nhiều biến thể, node `v0…vN`) + texture dùng chung `assets/nature/tex/`. Xuất từ .blend bằng `tools/blend2glb/` (không cần Blender).
+- File: `assets/nature/glb/<id>.glb` (mỗi file nhiều biến thể, node `v0…vN`) — KHÔNG texture/shader của pack: chỉ màu (màu đỉnh từ atlas + màu lá phẳng như vườn) và thuộc tính `_ROOT` (gốc từng nhánh cho gió). Game vẽ bằng đúng shader cây cỏ của vườn. Xuất từ .blend bằng `tools/blend2glb/` (không cần Blender).
 - Danh mục: `game_config.items` trường `glb`, `variants`, `out` (chỉ trồng ngoài Vườn), `scatter {n, r, gap, s:[min,max]}`, `solidR` / `solidBox` (chặn đường).
 - Mỗi cây = 1 dòng `game_placed`, `state = {v: biến thể, s: tỉ lệ}`. RPC `game_place_many` (rải ≤ 12 món/lần), `game_place_pickup_many` (chổi cất).
 - Vẽ: `InstancedMesh` theo (loại, biến thể, mảnh mesh) trong `src/build/furniture.js` → `rebuildInst()`. Vẽ CHUNG đường ống cây vườn: `api.ext.setUser()` (exterior.js) → styleMat (gió theo tâm tán, tô bụi, hoa cúi khi đi qua, mờ khi chắn camera, giảm rực), bóng lá, chia ô + cull, LOD giảm tam giác, chỉ ô gần đổ bóng; không bị thưa theo khoảng cách. Đá/gốc/khúc gỗ/nấm/xương rồng = vật cứng (không lay gió), đá cuội cùng màu kem với đá vườn. Map trong nhà: cây ngoài vườn vẽ vào ngoại cảnh (EXTV) dời theo MC.ext.

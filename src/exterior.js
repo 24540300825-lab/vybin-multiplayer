@@ -97,7 +97,7 @@ function geoInfo(g) {
 export function setupExterior(c) {
   const {scene, env, MC, toonMat} = c;
   const depthMat = makeDepthMat();
-  let grassDepth = null;
+  let grassDepth = null, stemDepth = null;
   const group = new THREE.Group(); group.name = 'EXT_CELLS'; scene.add(group);
   const cells = [];          // {im, cls, n, cx, cz, r}
   const INDOOR = !!(c.MC && c.MC.indoor); CLASS = INDOOR ? CLASS_IN : CLASS_OUT;
@@ -124,6 +124,7 @@ export function setupExterior(c) {
     r = m.isMeshStandardMaterial ? m.clone() : new THREE.MeshStandardMaterial({color: m.color.clone(), map: m.map}); r.name = nm; r.side = THREE.DoubleSide;
     const gi = geoInfo(geo);
     r.userData = {...r.userData, cloudV: true, center: gi.c.clone(), hInv: 1 / gi.h};
+    if (geo.attributes._root) r.userData.stemR = true;      // cây cỏ người chơi rải: gốc gió theo từng nhánh (foliage.js STEMR)
     if (grass) {
       r.userData.grass = true; r.color.set(0xffffff);
       r.alphaMap = grassMask(); r.alphaTest = 0.4;          // mỗi cọng/cụm cỏ là card có UV (TEXCOORD_0) trỏ vào atlas alpha 6400² → cắt hình đúng như trong Blender
@@ -132,7 +133,7 @@ export function setupExterior(c) {
       if (gi.h < 0.9) r.userData.squash = true;             // hoa thấp: cúi xuống quanh chân người chơi
       else r.userData.occ = true;                           // bụi/cây cao: mờ dần khi chắn giữa camera và người
       // lá chưa có màu/texture (trắng): tô xanh lá theo palette của các lá có màu trong file
-      if (!r.map && r.color.r > 0.95 && r.color.g > 0.95 && r.color.b > 0.95) {
+      if (!r.map && !geo.attributes.color && r.color.r > 0.95 && r.color.g > 0.95 && r.color.b > 0.95) {     // (có màu đỉnh = đã có màu thật → giữ)
         if (FOLMAP && /Foliage_v01_C/.test(nm)) { r.color.setRGB(0.3, 0.4, 0.2); r.userData.bush = true; }     // bụi: màu xanh phẳng + shading 'tự đổ bóng' trong shader (BUSHF, foliage.js) — không dùng gradient texture (gây dải màu lạ)
         else r.color.setRGB(0.30, 0.42, 0.04);
       }
@@ -293,7 +294,7 @@ export function setupExterior(c) {
       im.computeBoundingSphere();
       { const ids = arr.map(mm => mm.pid); if (ids[0] !== undefined) im.userData.ids = ids; }     // cây người chơi rải: id từng bản thể (bấm chọn được)
       if (mat.userData.grass) { if (!grassDepth) grassDepth = makeDepthMat(grassMask()); im.customDepthMaterial = grassDepth; }
-      else if (mat.userData.fol2) im.customDepthMaterial = depthMat;
+      else if (mat.userData.fol2) im.customDepthMaterial = mat.userData.stemR ? (stemDepth ||= makeDepthMat(null, true)) : depthMat;
       group.add(im);
       // mức LOD xa: cùng ma trận (dùng chung buffer), hình học đã giảm ~85% tam giác
       let im1 = null; const lg = CLASS[cls].lod ? simplified(src.geometry, cls === 'tree' || cls === 'bush' ? 0.12 : 0.16) : null;

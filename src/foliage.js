@@ -36,18 +36,27 @@ vec3 windOffset(vec3 lp, vec3 baseW, float sc){
   return (d * w + fl * (0.35 + 0.65 * h)) * sc;
 }`;
 
-const WIND_PROJECT = `
+// STEMR: cây cỏ người chơi rải (assets/nature) — mỗi đỉnh có _root = gốc NHÁNH của nó (cụm hoa/cỏ được tách thành nhánh lúc xuất GLB)
+// → gió, pha gió, lệch màu và "cúi khi đi qua" tính theo từng nhánh như từng cây hoa của vườn, cả cụm không lắc/bay như 1 khối.
+// Không có STEMR (cây cỏ của vườn) → y hệt cũ (gốc = gốc bản thể).
+const STEM_ROOT = `
+vec3 lp0 = transformed, rl = vec3( 0.0 );
+#ifdef STEMR
+  lp0 -= _root; rl = _root;
+#endif
+`;
+const WIND_PROJECT = STEM_ROOT + `
 vec4 mvPosition = vec4( transformed, 1.0 );
 float instScale = 1.0;
-vec3 instBase = vec3( 0.0 );
+vec3 instBase = rl;
 #ifdef USE_INSTANCING
   mvPosition = instanceMatrix * mvPosition;
   instScale = length( instanceMatrix[0].xyz );
-  instBase = instanceMatrix[3].xyz;
+  instBase = ( instanceMatrix * vec4( rl, 1.0 ) ).xyz;
 #endif
 vec4 wpos = modelMatrix * mvPosition;
 vec3 rootW = ( modelMatrix * vec4( instBase, 1.0 ) ).xyz;
-wpos.xyz += windOffset( transformed, rootW, instScale );
+wpos.xyz += windOffset( lp0, rootW, instScale );
 #ifdef SQUASH
 { vec2 d0 = rootW.xz - uPl[0].xz, d1 = rootW.xz - uPl[1].xz; float r0 = length( d0 ), r1 = length( d1 );
   float k0 = 1.0 - smoothstep( 0.15, 2.4, r0 ), k1 = 1.0 - smoothstep( 0.15, 2.4, r1 ); k0 *= k0; k1 *= k1;
@@ -64,8 +73,8 @@ gl_Position = projectionMatrix * mvPosition;
 `;
 
 // vs: vertex shader gốc của three (đã chứa các #include). Trả về shader mới. noise: NOISE_GLSL của game (vn3) để tính bóng mây theo đỉnh.
-export function vertFol2(vs, withCloud, noise, squash) {
-  return (squash ? '#define SQUASH\n' : '') + 'uniform vec3 uPl[2];uniform vec3 uCenter;uniform float uHInv,uHybrid;varying float vLeafH,vHash,vCS;varying vec2 vRoot;uniform float uCloudSh;\n' + (withCloud ? noise + '\n' : '') + WIND_FN + '\n' + vs
+export function vertFol2(vs, withCloud, noise, squash, stem) {
+  return (squash ? '#define SQUASH\n' : '') + (stem ? '#define STEMR\nattribute vec3 _root;\n' : '') + 'uniform vec3 uPl[2];uniform vec3 uCenter;uniform float uHInv,uHybrid;varying float vLeafH,vHash,vCS;varying vec2 vRoot;uniform float uCloudSh;\n' + (withCloud ? noise + '\n' : '') + WIND_FN + '\n' + vs
     .replace('#include <beginnormal_vertex>', `
       vec3 objectNormal = vec3( normal );
       { vec3 nRad = normalize( position - uCenter + vec3( 0.0, 1e-3, 0.0 ) ); objectNormal = normalize( mix( vec3( 0.0, 1.0, 0.0 ), nRad, uHybrid ) ); }
@@ -115,23 +124,23 @@ export const FRAG_COLOR = `
 `;
 
 // vật liệu bóng đổ: dùng chung hàm gió → bóng lá đung đưa khớp lá
-export function makeDepthMat(alphaMap) {
+export function makeDepthMat(alphaMap, stem) {
   const d = new THREE.MeshDepthMaterial({depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide});
   if (alphaMap) { d.alphaMap = alphaMap; d.alphaTest = 0.4; }
-  d.customProgramCacheKey = () => alphaMap ? 'fol2-depth-a' : 'fol2-depth1';
+  d.customProgramCacheKey = () => (alphaMap ? 'fol2-depth-a' : 'fol2-depth1') + (stem ? 'R' : '');
   d.onBeforeCompile = sh => {
     sh.uniforms.uWindT = TUref.uWindT; sh.uniforms.uWindA = TUref.uWindA; sh.uniforms.uWindDir = FU.uWindDir;
-    sh.vertexShader = 'uniform float uWindT,uWindA;\n' + WIND_FN + '\n' + sh.vertexShader.replace('#include <project_vertex>', `
+    sh.vertexShader = (stem ? '#define STEMR\nattribute vec3 _root;\n' : '') + 'uniform float uWindT,uWindA;\n' + WIND_FN + '\n' + sh.vertexShader.replace('#include <project_vertex>', STEM_ROOT + `
 vec4 mvPosition = vec4( transformed, 1.0 );
 float instScale = 1.0;
-vec3 instBase = vec3( 0.0 );
+vec3 instBase = rl;
 #ifdef USE_INSTANCING
   mvPosition = instanceMatrix * mvPosition;
   instScale = length( instanceMatrix[0].xyz );
-  instBase = instanceMatrix[3].xyz;
+  instBase = ( instanceMatrix * vec4( rl, 1.0 ) ).xyz;
 #endif
 vec4 wpos = modelMatrix * mvPosition;
-wpos.xyz += windOffset( transformed, ( modelMatrix * vec4( instBase, 1.0 ) ).xyz, instScale );
+wpos.xyz += windOffset( lp0, ( modelMatrix * vec4( instBase, 1.0 ) ).xyz, instScale );
 mvPosition = viewMatrix * wpos;
 gl_Position = projectionMatrix * mvPosition;`);
   };
