@@ -14,8 +14,9 @@ const DEV_MAX = 0.2;                  // lệch tối đa so với dáng animati
 const SUB = 2;                        // số bước con mỗi khung
 const ITER = 3;                       // vòng ràng buộc độ dài + va chạm
 const R_LEG = 0.078;                  // bán kính ống quần đo từ mesh (m) ở vùng đùi
-const R_STR = 0.010;                  // độ dày sợi dây
+const R_STR = 0.007;                  // độ dày sợi dây
 const EXTEND = 0.9;                   // kéo capsule lên phía hông (tỉ lệ chiều dài đùi) để phủ cả vùng hông
+const NT = 10, NA = 18, TMIN = -0.25, TMAX = 1.0;   // lưới bán kính quần theo (vị trí dọc đùi, góc quanh đùi)
 const TELEPORT = 0.6;                 // gốc dây dịch > 0.6 m trong 1 khung → đặt lại (dịch chuyển / đổi map)
 
 export function makeBelt(root) {
@@ -38,6 +39,55 @@ export function makeBelt(root) {
     const th = root.getObjectByName('thigh' + s), lg = root.getObjectByName('leg' + s);
     if (th && lg) legs.push({th, lg, a: new THREE.Vector3(), b: new THREE.Vector3(), r: R_LEG + R_STR});
   }
+
+  // Bề mặt quần thật: đọc đỉnh mesh quần (ở tư thế nghỉ lúc khởi tạo) → lưới bán kính r(t, θ) trong hệ toạ độ xương đùi.
+  // Dây bị đẩy ra đúng mặt quần (kể cả chỗ ống quần phình/nếp gấp) thay vì capsule tròn → không còn lẹm vào mesh.
+  (function bake() {
+    let pants = null;
+    root.traverse(o => { if (!pants && o.isSkinnedMesh && /CLOTH_Retopo_GEO/.test(o.name)) pants = o; });
+    if (!pants || !legs.length || !pants.getVertexPosition) return;
+    root.updateMatrixWorld(true);
+    const v = new THREE.Vector3(), q = new THREE.Vector3(), w = new THREE.Vector3(), cnt = pants.geometry.attributes.position.count;
+    for (const lg of legs) {
+      lg.th.updateWorldMatrix(true, false);
+      const inv = new THREE.Matrix4().copy(lg.th.matrixWorld).invert();
+      const kl = new THREE.Vector3(); lg.lg.getWorldPosition(kl); kl.applyMatrix4(inv);        // vị trí gối trong hệ đùi
+      lg.L = kl.length(); lg.ax = kl.clone().normalize();
+      const front = new THREE.Vector3(0, 0, 1); front.addScaledVector(lg.ax, -front.dot(lg.ax)).normalize();   // hướng θ = 0 (phía trước)
+      lg.fv = front; lg.uv = new THREE.Vector3().crossVectors(lg.ax, front);
+      const R = new Float32Array(NT * NA);
+      const cx = new THREE.Vector3(); lg.th.getWorldPosition(cx); root.worldToLocal(cx); const side = Math.sign(cx.x) || 1;
+      for (let i = 0; i < cnt; i++) {
+        pants.getVertexPosition(i, v); v.applyMatrix4(pants.matrixWorld).applyMatrix4(inv);
+        const t = v.dot(lg.ax) / lg.L; if (t < TMIN || t > TMAX) continue;
+        w.copy(v).addScaledVector(lg.ax, -v.dot(lg.ax)); const d = w.length(); if (d > 0.15) continue;
+        cx.copy(v).applyMatrix4(lg.th.matrixWorld); root.worldToLocal(cx);          // vị trí trong hệ nhân vật: chân trái x>0, phải x<0
+        if (Math.abs(cx.x) >= 0.012 && Math.sign(cx.x) !== side) continue;
+        const th = Math.atan2(w.dot(lg.uv), w.dot(lg.fv)), ti = Math.min(NT - 1, Math.max(0, Math.floor((t - TMIN) / (TMAX - TMIN) * NT))),
+              ai = ((Math.round(th / (2 * Math.PI) * NA) % NA) + NA) % NA;
+        if (d > R[ti * NA + ai]) R[ti * NA + ai] = d;
+      }
+      // lấp ô trống từ ô lân cận, rồi nở nhẹ (đỉnh thưa: mặt quần giữa 2 đỉnh nằm ngoài dây cung)
+      for (let pass = 0; pass < 8; pass++) {
+        const R2 = R.slice();
+        for (let ti = 0; ti < NT; ti++) for (let ai = 0; ai < NA; ai++) if (!R[ti * NA + ai]) {
+          let sum = 0, n = 0;
+          for (const [dt, da] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const t2 = ti + dt; if (t2 < 0 || t2 >= NT) continue; const x = R[t2 * NA + (ai + da + NA) % NA]; if (x) { sum += x; n++; } }
+          if (n) R2[ti * NA + ai] = sum / n;
+        }
+        R.set(R2);
+      }
+      let mean = 0, nn = 0; for (const x of R) if (x) { mean += x; nn++; } mean = nn ? mean / nn : 0.075;
+      for (let k = 0; k < R.length; k++) if (!R[k]) R[k] = mean;
+      const Rd = R.slice();
+      for (let ti = 0; ti < NT; ti++) for (let ai = 0; ai < NA; ai++) {
+        let m = R[ti * NA + ai];
+        for (const [dt, da] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const t2 = ti + dt; if (t2 < 0 || t2 >= NT) continue; m = Math.max(m, 0.94 * R[t2 * NA + (ai + da + NA) % NA]); }
+        Rd[ti * NA + ai] = m + 0.004;
+      }
+      lg.prof = Rd; lg.inv = new THREE.Matrix4(); lg.off = 0;
+    }
+  })();
 
   const tmpV = new THREE.Vector3(), tmpW = new THREE.Vector3(), cur = new THREE.Vector3(), des = new THREE.Vector3();
   const mid = new THREE.Vector3(), mid0 = new THREE.Vector3(), ab = new THREE.Vector3(), ap = new THREE.Vector3(), cp = new THREE.Vector3();
@@ -74,11 +124,36 @@ export function makeBelt(root) {
       lg.th.getWorldPosition(lg.b); lg.lg.getWorldPosition(tmpV);         // b = đùi (gốc), tmpV = cẳng
       lg.a.copy(lg.b).sub(tmpV).multiplyScalar(EXTEND).add(lg.b);         // a = điểm kéo lên hông
       lg.b.copy(tmpV);                                                    // capsule a(hông) → b(gối)
+      if (lg.prof) lg.inv.copy(lg.th.matrixWorld).invert();
     }
+  }
+
+  const pq = new THREE.Vector3(), pw = new THREE.Vector3();
+  function profR(lg, t, th) {           // bán kính mặt quần (nội suy song tuyến)
+    const ft = Math.min(NT - 1.001, Math.max(0, (t - TMIN) / (TMAX - TMIN) * NT - 0.5)), t0 = Math.floor(ft), a = ft - t0;
+    let fa = th / (2 * Math.PI) * NA; fa = ((fa % NA) + NA) % NA; const a0 = Math.floor(fa) % NA, a1 = (a0 + 1) % NA, b = fa - Math.floor(fa), P = lg.prof;
+    const r0 = P[t0 * NA + a0] * (1 - b) + P[t0 * NA + a1] * b, r1 = P[(t0 + 1) * NA + a0] * (1 - b) + P[(t0 + 1) * NA + a1] * b;
+    return r0 * (1 - a) + r1 * a + R_STR + lg.off;
+  }
+  // khoảng hở có dấu giữa p và mặt quần của chân lg (âm = đang nằm trong quần); đặt pq/pw (hệ đùi) để đẩy ra
+  function profClear(p, lg) {
+    pq.copy(p).applyMatrix4(lg.inv);
+    const t = pq.dot(lg.ax) / lg.L; if (t < TMIN || t > TMAX) return 9;
+    pw.copy(pq).addScaledVector(lg.ax, -pq.dot(lg.ax)); const d = pw.length();
+    const th = Math.atan2(pw.dot(lg.uv), pw.dot(lg.fv)); lg.cR = profR(lg, t, th); lg.cD = d; lg.cT = t;
+    return d - lg.cR;
+  }
+  function pushProfile(p, lg) {
+    const c = profClear(p, lg); if (c >= 0) return false;
+    if (lg.cD < 1e-5) pw.copy(lg.fv); else pw.multiplyScalar(1 / lg.cD);
+    pq.copy(lg.ax).multiplyScalar(lg.cT * lg.L).addScaledVector(pw, lg.cR);
+    p.copy(pq).applyMatrix4(lg.th.matrixWorld);
+    return true;
   }
 
   // đẩy điểm p ra khỏi capsule; trả về true nếu có chạm
   function pushOut(p, lg) {
+    if (lg.prof) return pushProfile(p, lg);
     ab.copy(lg.b).sub(lg.a); const l2 = ab.lengthSq() || 1e-9;
     ap.copy(p).sub(lg.a); const t = Math.max(0, Math.min(1, ap.dot(ab) / l2));
     cp.copy(lg.a).addScaledVector(ab, t);
@@ -105,6 +180,11 @@ export function makeBelt(root) {
     }
     // bán kính an toàn: ở tư thế nghỉ dây không được nằm trong capsule (tránh bị "đẩy" ngay khi khởi tạo)
     for (const lg of legs) {
+      if (lg.prof) {            // đo độ hở của dây ở tư thế nghỉ (chẩn đoán)
+        lg.off = 0; let m = 9;
+        for (const s of sim) for (let i = 1; i <= s.n; i++) m = Math.min(m, profClear(s.T[i], lg));
+        lg.off = 0; lg.restClear = m; continue;       // nếu rest đã lẹm vào quần thì va chạm đẩy dây ra ngoài mặt quần (≤ ~1 cm) thay vì hạ mặt quần
+      }
       let r = R_LEG + R_STR;
       for (const s of sim) for (let i = 1; i <= s.n; i++) {
         ab.copy(lg.b).sub(lg.a); const l2 = ab.lengthSq() || 1e-9;
@@ -194,8 +274,10 @@ export function makeBelt(root) {
     maxDev() { let m = 0; for (const s of sim) for (let i = 1; i <= s.n; i++) m = Math.max(m, s.P[i].distanceTo(s.T[i])); return m; },
     // khoảng cách nhỏ nhất từ hạt tới trục capsule chân trừ bán kính (âm = xuyên quần)
     minClear() { let m = 9; for (const lg of legs) for (const s of sim) for (let i = 1; i <= s.n; i++) {
+      if (lg.prof) { m = Math.min(m, profClear(s.P[i], lg)); continue; }
       ab.copy(lg.b).sub(lg.a); const l2 = ab.lengthSq() || 1e-9; ap.copy(s.P[i]).sub(lg.a);
       const t = Math.max(0, Math.min(1, ap.dot(ab) / l2)); cp.copy(lg.a).addScaledVector(ab, t); m = Math.min(m, s.P[i].distanceTo(cp) - lg.r); } return m; },
-    legR() { return legs.map(l => +l.r.toFixed(3)); },
+    dbg() { const o = []; for (const lg of legs) for (const s of sim) { o.push(s.P.slice(1).map((p, i) => { const c = lg.prof ? profClear(p, lg) : 0; return (c * 1000).toFixed(0) + '/t' + (lg.cT || 0).toFixed(2) + '/dev' + (p.distanceTo(s.T[i + 1]) * 100).toFixed(1); }).join(' ')); } return o.join('\n'); },
+    legR() { return legs.map(l => l.prof ? 'profile rest=' + (l.restClear || 0).toFixed(3) + ' front R(t)=' + Array.from({length: NT}, (_, i) => l.prof[i * NA].toFixed(3)).join('/') : +l.r.toFixed(3)); },
   };
 }
