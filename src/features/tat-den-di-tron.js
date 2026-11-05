@@ -91,9 +91,10 @@ export default {
         if (R && sameMap()) { const dx = R.P.pos.x - L.P.pos.x, dz = R.P.pos.z - L.P.pos.z, d = Math.hypot(dx, dz);
           const a = Math.abs(Math.atan2(Math.sin(Math.atan2(dx, dz) - L.P.yaw), Math.cos(Math.atan2(dx, dz) - L.P.yaw)));
           const same = Math.abs(R.P.pos.y - L.P.pos.y) < 1.5;   // khác tầng thì KHÔNG tính (kể cả đứng chồng lên nhau trên màn hình)
-          inCone = same && (d < RANGE && a < CONE || d < 0.8); }
+          inCone = same && (d < RANGE && a < CONE || d < 0.8); }   // same = cùng tầng (chênh cao < 1.5 m)
         G.lit = inCone ? G.lit + dt : Math.max(0, G.lit - dt * 2);
-        if (G.lit >= HOLD) { ctx.send('found', {}); return end(true, `🔦 TÌM THẤY ${oN.toUpperCase()}!`); }
+        if (G.claim && now - G.claim > 2000) { G.claim = 0; return end(true, `🔦 TÌM THẤY ${oN.toUpperCase()}!`); }   // không thấy trả lời: coi như đúng
+        if (G.lit >= HOLD && !G.claim) { G.claim = now; ctx.send('found', {sy: +L.P.pos.y.toFixed(2), sx: +L.P.pos.x.toFixed(2), sz: +L.P.pos.z.toFixed(2)}); }   // xin xác nhận: người trốn kiểm tra lại độ cao thật của chính mình
         show(`<div class="m">🔦 Đi tìm ${oN}! ${Math.ceil(SEEK - G.t)} s</div><div class="s">${G.lit > 0.05 ? 'Hình như thấy gì đó…' : 'Soi đèn pin quanh phòng'}</div>`);
       } else {
         mask(L, 0.4, 0);   // hết giờ trốn: mất đèn pin, chỉ còn chút ánh sáng quanh chân
@@ -109,7 +110,11 @@ export default {
       let x = (v.x * 0.5 + 0.5) * innerWidth, y = (-v.y * 0.5 + 0.5) * innerHeight; if (v.z > 1) { x = innerWidth - x; y = innerHeight - y; }
       const m = 70; ping.style.left = Math.max(m, Math.min(innerWidth - m, x)) + 'px'; ping.style.top = Math.max(m, Math.min(innerHeight - m, y)) + 'px';
       ping.hidden = false; ping.style.animation = 'none'; void ping.offsetWidth; ping.style.animation = ''; clearTimeout(pingTm); pingTm = setTimeout(() => { ping.hidden = true; }, 3000); });
-    ctx.on('found', () => end(false, `😱 Bị ${oN} tìm thấy rồi!`));
+    ctx.on('found', d => { if (!G || G.done) return; const L = VY() && VY().local;   // người trốn là bên biết chắc mình ở tầng nào
+      if (L && d && d.sy != null && (Math.abs(d.sy - L.P.pos.y) >= 1.5 || !sameMap())) { ctx.send('foundno', {}); return; }
+      ctx.send('foundok', {}); end(false, `😱 Bị ${oN} tìm thấy rồi!`); });
+    ctx.on('foundok', () => { if (G && !G.done && G.claim) end(true, `🔦 TÌM THẤY ${oN.toUpperCase()}!`); });
+    ctx.on('foundno', () => { if (G && !G.done) { G.claim = 0; G.lit = 0; ctx.toast('Khác tầng — chưa thấy được 😅'); } });
     ctx.on('timeout', () => end(false, `${oN} trốn kỹ quá!`));
     function end(win, msg) { if (!G || G.done) return; finish(win, msg); }
     function finish(win, msg) {
