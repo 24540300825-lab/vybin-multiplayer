@@ -1,16 +1,34 @@
 # PHÒNG VY — WORKROOM · Tiến độ
 
-## Milestone 0 — Khảo sát: XONG (10/11/2026)
-## Milestone 1 — Nền Work Mode: XONG trên nhánh `workroom-m1` (bản test), chưa lên bản chính
-Đã có: ghim START WORKING ở bàn phòng Vy → ngồi + gõ phím → Work Mode; sidebar 10 mục, thanh trên, AI Copilot (bật/tắt, biết module + sự kiện); Overview, Task Manager, Hoạt động & Lịch sử, Cài đặt & Kết nối chạy bằng dữ liệu thật; sự kiện có mã EVENT-00N và 10 bước tiến trình; BACK TO ROOM; cổng chủ phòng 3 lớp; sao lưu .json.
-Chưa có (đúng lộ trình): 6 module chuyên môn hiển thị "chưa hoạt động — cần gì — milestone nào".
-Kiểm thử: `tools/` chưa chứa kịch bản này; đã chạy Chromium headless với backend giả lập (xem báo cáo trong chat). CHƯA chạy với đăng nhập Google thật của Vy trên bản test.
+Cập nhật: 10/11/2026 · nhánh `workroom-m1` (bản test). **Chưa lên bản chính.**
 
-## Việc tiếp theo
-- M2: kiểm tra máy của Vy (RAM/VRAM/ổ đĩa), cài Ollama, chọn model, nối vào AI Assistant + Copilot, lớp AI Provider. Xem thư mục `.vybin-bridge` và bảng `cc_bridge_*` có dùng lại được không.
-- M3: đọc thư mục Drive "MẪU CHO CLAUDE" (chưa đọc được: cần kết nối Google Drive), phân loại, đưa vào Knowledge Hub.
-- Đầu ra của mọi module phải đúng định dạng Google (Docs / Sheets) theo mẫu trong thư mục đó.
+| Milestone | Trạng thái |
+|---|---|
+| M0 Khảo sát | Xong |
+| M1 Nền Work Mode (ghim bàn phòng Vy, vào/ra, khung, cổng chủ phòng) | Xong |
+| M2 AI trên máy (Ollama, lớp Provider, stream, dừng, hết giờ, tải model, thống kê, AI ngoài) | Xong — chưa chạy với Ollama thật trên máy Vy |
+| M3 Dữ liệu chung + Knowledge Hub (nạp Drive/file, phân loại, Chính thức/Tham khảo/Nháp, tìm đoạn liên quan, ghi nguồn) | Xong |
+| M4 Content Studio (AI viết nháp theo mẫu, soạn thảo, AI sửa đoạn chọn, phiên bản, Google Docs, .docx) | Xong |
+| M5 Editorial Desk (kiểm tự động + AI, góc nhìn độc giả, chặn sửa dữ kiện, nhận/bỏ/sửa tay, so sánh, khôi phục) | Xong |
+| M6 Timeline Studio (đọc mẫu, AI đề xuất, sửa trong bảng, sao chép mẫu sang Sheets và ghi đúng cột, đồng bộ 2 chiều có kiểm xung đột, Excel, tạo việc) | Xong |
+| M7 Staff Assignment (danh bạ, lịch bận, xung đột tính bằng mã, AI đề xuất, duyệt, Lịch công tác tuần → Docs/.docx, Calendar, tạo việc) | Xong |
+| M8 Quy trình liên module (Intake brief, 10 bước, đánh dấu phụ thuộc, Action Engine, Copilot, nhật ký, Gmail nháp, khoá, sao lưu/khôi phục) | Xong |
 
-## Cần chủ dự án
-- Kết nối Google Drive (để đọc thư mục mẫu) hoặc gửi file trực tiếp.
-- Vy đăng nhập bản test và thử Work Mode một lần.
+## Kiểm thử đã chạy (Chromium headless)
+- Workroom độc lập (`dev/workroom.html`, kho cục bộ) + **Ollama giả** đúng hình dạng API + **Google API giả** ở tầng mạng: 110 kiểm tra, đạt hết (nền, AI online/offline/thiếu model/lỗi model/hết giờ/dừng/tải model, Intake, Action Engine, Knowledge, docx/xlsx ghi–đọc, Content, Editorial, Timeline ghi đúng cột mẫu thật, đồng bộ Sheet/Docs có xung đột, Staff xung đột, phụ thuộc dữ liệu, Gmail chỉ nháp, khoá, sao lưu/khôi phục, màn 390px/820px).
+- Trong game 3D (backend giả lập 2 người): Bin không thấy gì; Vy bấm ghim → đi tới ghế → ngồi gõ phím → Work Mode; đủ 10 module; BACK TO ROOM về đúng chỗ, game vẽ lại; đứng dậy như cũ.
+- Supabase THẬT: Bin đọc 0 dòng ở cả 12 bảng `wr_*`, bị chặn ghi; Vy đọc/ghi được.
+
+## CHƯA kiểm chứng
+- Ollama thật trên máy của Vy (chất lượng tiếng Việt của model, tốc độ, quyền "thiết bị trên máy" của Chrome).
+- Google thật: cần bật API + thêm quyền trong Google Cloud Console (xem WORKROOM_INTEGRATIONS.md), rồi Vy kết nối.
+- Đọc thư mục Drive mẫu bằng tài khoản của Vy (thư mục thuộc 24540300825@uah.edu.vn — Vy cần có quyền xem).
+
+## Việc cần chủ dự án / Vy
+1. Google Cloud Console: bật Drive, Sheets, Calendar, Gmail API; thêm 3 quyền vào màn đồng ý (WORKROOM_INTEGRATIONS.md).
+2. Chia sẻ thư mục "MẪU CHO CLAUDE" cho Gmail của Vy (quyền xem).
+3. Vy vào Workroom → làm theo thẻ "Bắt đầu sử dụng" ở Overview.
+
+## Ghi chú kỹ thuật cho phiên sau
+- Bộ kiểm thử nằm ngoài repo (scratchpad của phiên). Ollama giả: `/api/version|tags|chat|pull`; Google giả: Drive copy/create/upload/get, Sheets get/values/batchUpdate, Calendar insert, Gmail drafts.
+- Dữ liệu thử của Workroom độc lập nằm ở `localStorage['vyWorkroomDev']`.

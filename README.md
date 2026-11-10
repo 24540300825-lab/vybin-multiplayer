@@ -42,6 +42,7 @@ WASD + Shift (chạy) + E (tương tác) + click để đi; chuột phải/kéo 
 - `src/perf.js` đo fps/p95/hitch/draw calls/tris.
 
 > **Mở rộng về sau: đọc `docs/EXTENDING.md`** (thêm minigame/tính năng bằng 1 file + 1 dòng, thêm map = 1 khối dữ liệu `src/map-configs.js`, giao thức có số phiên bản).
+> **PHÒNG VY — Workroom** (không gian làm việc của Vy, mở từ bàn phòng Vy): đọc `docs/WORKROOM_ARCHITECTURE.md`, hướng dẫn dùng ở `docs/WORKROOM_USER_GUIDE.md`.
 
 ## 4. Thêm map mới
 1. Xuất `.glb` → chạy `python3 tools/optimize_glb.py in.glb assets/map-xxx.glb` (nén texture, không đụng mesh/animation).

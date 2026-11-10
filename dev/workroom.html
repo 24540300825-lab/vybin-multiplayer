@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Workroom — bản thử (không có game, dữ liệu cục bộ)</title>
+<style>html,body{margin:0;height:100%;background:#12151b;font:16px system-ui,sans-serif}</style>
+</head><body>
+<!-- Trang thử nhanh giao diện Workroom mà không cần mở game 3D. Dữ liệu chỉ nằm trong trình duyệt này (kho cục bộ), không đụng dữ liệu thật.
+     Dùng cho phát triển/kiểm thử: http://localhost:8124/dev/workroom.html -->
+<script src="../config.js"></script>
+<script type="module">
+  import {openWorkroom} from '../src/workroom/index.js';
+  const css = document.createElement('link'); css.id = 'wrCss'; css.rel = 'stylesheet'; css.href = '../workroom.css'; document.head.append(css);
+  const SH = {slot: 'vy', sess: null, devLocal: true, frame: {focus() {}, contentWindow: {focus() {}}}};
+  window.WR = await openWorkroom(SH, {onClose: () => console.log('BACK TO ROOM')});
+</script>
+</body></html>

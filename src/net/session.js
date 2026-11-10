@@ -47,6 +47,8 @@ export class Session {
     // Bản mới: tài khoản Google (một tài khoản = một nhân vật). Chưa đăng nhập => dừng ở đây, main.js hiện màn đăng nhập.
     // Giả lập (?mock=) vẫn dùng phiên ẩn danh như cũ để test.
     let {data: {session}} = await this.sb.auth.getSession();
+    // Workroom vừa xin quyền Google Workspace (xem src/workroom/google.js): giữ access token ngắn hạn cho phiên này, không lưu refresh token.
+    try { if (session && session.provider_token && sessionStorage.getItem('vyGPending')) { sessionStorage.removeItem('vyGPending'); sessionStorage.setItem('vyGTok', JSON.stringify({t: session.provider_token, at: Date.now(), sc: sessionStorage.getItem('vyGScope') || ''})); } } catch (e) {}
     this.account = !CONFIG.mock || CONFIG.mockAccount;
     if (this.account) {
       if (!session || !session.user || session.user.is_anonymous) { this.needLogin = true; this.setState('login', ''); return; }

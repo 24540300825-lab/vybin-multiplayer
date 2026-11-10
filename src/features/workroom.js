@@ -24,8 +24,11 @@ export default {
     }
     const start = () => { if (seated()) return open(); want = performance.now(); L.cmdSit('type'); };
     api.chairPin = {label: 'START WORKING', act: start};
-    api.onChairSeated = () => { if (want && performance.now() - want < 30000) open(); else want = 0; };
+    // chỉ mở khi Vy ngồi xuống theo lệnh START WORKING (tư thế gõ phím); ngồi thường bằng phím E không mở. Đổi ý (đi chỗ khác) → lệnh ngồi bị huỷ, không mở.
+    api.onChairSeated = () => { if (want && L.P.mode === 'type') open(); want = 0; };
     api.onChairLeft = () => { want = 0; };
     ctx.ui.addButton({icon: '💼', label: '', title: 'Workroom — ngồi vào bàn làm việc', onClick: start});
+    // vừa quay lại từ trang cấp quyền Google (trang phải tải lại) → tự ngồi vào bàn và mở lại Workroom
+    try { if (sessionStorage.getItem('vyWrReopen')) { sessionStorage.removeItem('vyWrReopen'); setTimeout(start, 1200); } } catch (e) {}
   },
 };
