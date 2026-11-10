@@ -37,6 +37,14 @@ export async function bootShell() {
   // toast: hiện trong trang game đang chạy (cùng chỗ với toast của game), chưa có game thì hiện ở vỏ
   SH.toast = m => { try { const w = SH.frame && SH.frame.contentWindow; if (w && w.__vyToast) return w.__vyToast(m); } catch (e) {} ownToast(m); };
   SH.LB = LB;
+  // PHÒNG VY — Workroom: chỉ nhân vật VY mới có cửa vào; quyền thật do máy chủ xác nhận (wr_is_owner). Mã + CSS chỉ tải khi mở.
+  if (slot === 'vy') {
+    let acc = null;
+    SH.workroom = {
+      access: () => (acc ||= import('./workroom/store.js').then(m => m.checkAccess(SH)).catch(() => false)),
+      open: async opt => (await import('./workroom/index.js')).openWorkroom(SH, opt),
+    };
+  }
 
   // ---------- dịch vụ liên tục ----------
   if (sess) {

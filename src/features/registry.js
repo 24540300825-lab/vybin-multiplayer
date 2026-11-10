@@ -4,4 +4,5 @@ export const FEATURES = [
   // () => import('./vi-du-vay-tay.js'),
   () => import('./khoai-nong.js'),   // minigame Khoai nóng (🥔) — rượt nhau ngoài vườn
   () => import('./tat-den-di-tron.js'),   // minigame Tắt đèn đi trốn (🔦) — trong nhà
+  () => import('./workroom.js'),   // PHÒNG VY — Workroom: ghim START WORKING ở bàn phòng Vy (chỉ chủ phòng)
 ];

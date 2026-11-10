@@ -836,11 +836,11 @@ ${FRAG_COLOR}
     if(p>=0.995||(!b.a.isRunning()&&p>0.9)){
       busy=null;P.pos.y=b.y1;
       if(b.kind==='climbBed'){P.mode='bed';if(plan[0]&&plan[0].t==='offBed'){}else{play('SLEEP_'+P.side,{fade:0.05});eyeClose();sfxAt('sleep',{range:12});}}
-      else if(b.kind==='climbChair'){if(plan[0]&&plan[0].t==='offChair'){P.mode='sit'}else if(!K.SIT){P.mode='sit';}else if(plan[0]&&plan[0].t==='type'){plan.shift();P.mode='type';play('TYPE',{fade:0.05});}else{P.mode='sit';play('SIT',{fade:0.1});}}
+      else if(b.kind==='climbChair'){if(plan[0]&&plan[0].t==='offChair'){P.mode='sit'}else if(!K.SIT){P.mode='sit';}else if(plan[0]&&plan[0].t==='type'){plan.shift();P.mode='type';play('TYPE',{fade:0.05});}else{P.mode='sit';play('SIT',{fade:0.1});}if(!DEF.remote&&api.onChairSeated)api.onChairSeated()}
       else if(b.kind==='offBed'){sfxAt('wake',{range:12});occ['bed'+P.side]=null;const dr=endDrift('OFFBED_'+P.side);P.mode='free';P.level=1;P.stand=null;anchor=null;toRest(dr);}
       else if(b.kind==='climbWatch'){P.mode='watch';if(!(plan[0]&&plan[0].t==='offWatch'))play('WATCH_IDLE',{fade:0.15});if(!DEF.remote&&api.onWatchSeated&&!isX(P.seat))api.onWatchSeated()}
       else if(b.kind==='offWatch'){const wasX=isX(P.seat),lv=wasX&&XSEAT[P.seat]?XSEAT[P.seat].lv:0;for(const k in occ)if(/^sofa/.test(k)&&occ[k]===DEF.id)occ[k]=null;const dr=endDrift('OFFWATCH');P.mode='free';P.level=lv;P.stand=null;P.seat=undefined;anchor=null;toRest(dr);if(!DEF.remote&&api.onWatchLeft&&!wasX)api.onWatchLeft()}
-      else if(b.kind==='offChair'){occ.chair=null;const dr=endDrift('OFFCHAIR_'+P.side);P.mode='free';P.level=A.chairL;P.stand=null;anchor=null;toRest(dr);}
+      else if(b.kind==='offChair'){if(!DEF.remote&&api.onChairLeft)api.onChairLeft();occ.chair=null;const dr=endDrift('OFFCHAIR_'+P.side);P.mode='free';P.level=A.chairL;P.stand=null;anchor=null;toRest(dr);}
     }
   }
 
@@ -1195,7 +1195,7 @@ ${FRAG_COLOR}
      const dx=to.x-c.x,dz=to.z-c.z,d=Math.hypot(dx,dz)||1;return{x:c.x+dx/d*Math.min(1.6,d*0.6),z:c.z+dz/d*Math.min(1.6,d*0.6),lv:c.y>2?1:0}};
    const P0=local.P,items=[
     {key:'tv',icon:'tv',label:'Xem TV',at:()=>tvPt,state:()=>api.cinema&&api.cinema.pinState?api.cinema.pinState():null,act:()=>{if(api.cinema&&SOFA)api.cinema.fromPin();else{const s=tvStand();if(s)cmdMove(s.x,s.z,s.lv,false)}}},
-    {key:'chair',icon:'chair',label:'Ngồi',at:()=>chairPt,state:()=>P0.mode==='sit'||P0.mode==='type'?{on:true,label:'Đứng dậy'}:null,act:()=>{if(P0.mode==='sit'||P0.mode==='type')cmdOffChair();else cmdSit()}},
+    {key:'chair',icon:'chair',label:'Ngồi',at:()=>chairPt,state:()=>P0.mode==='sit'||P0.mode==='type'?{on:true,label:'Đứng dậy'}:(api.chairPin?{label:api.chairPin.label}:null),act:()=>{if(P0.mode==='sit'||P0.mode==='type')cmdOffChair();else if(api.chairPin)api.chairPin.act();else cmdSit()}},
     {key:'bed',icon:'sleep',label:'Ngủ',at:()=>bedPt,state:()=>P0.mode==='bed'?{on:true,label:'Thức dậy'}:null,act:()=>{if(P0.mode==='bed')cmdWake();else cmdSleep()}},
     ...(MC.doors?[]:[{key:'door',icon:'door',label:MC.doorLabel||'Bản đồ',at:()=>doorPt,act:()=>{if(MC.doorTo&&window.__switchMap){window.__switchMap(MC.doorTo);return}const b=$('iMap');if(b)b.click()}}]),
     ...(MC.doors||[]).map((d,i)=>{const b=ctr(d.node),p=b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+(b.max.y-b.min.y>0.5?-0.8:0.15),(b.min.z+b.max.z)/2):null;
@@ -2024,7 +2024,7 @@ ${FRAG_COLOR}
     // Giảm tải 3D (trần độ phân giải thấp hơn, màn tần số quét cao thì vẽ 1/3 thay vì 1/2) + CSS bỏ làm mờ nền kính (xem html.media trong ui.css).
     if((mediaN++&15)===0){const m=!!document.querySelector('#hYt.on,#hCall.on,#cine.mini');if(m!==media){media=m;document.documentElement.classList.toggle('media',m);adaptCool=Math.min(adaptCool,10)}}
     const hz=1000/rIv,minDt=!hasFoc?1000/30:hz>100?(media?3000/hz:2000/hz):0;throttled=!hasFoc;
-    if(minDt&&t-lastDraw<minDt-2)return;lastDraw=t;
+    if(api.lowDraw&&t-lastDraw<240)return;if(minDt&&t-lastDraw<minDt-2)return;lastDraw=t;
     rawDt=R.getDelta();if(resumeN>0){resumeN--;rawDt=Math.min(rawDt,1/60)}Perf.frame(rawDt*1000);
     // BẮT KỊP THỜI GIAN THẬT: máy yếu/khung hình tụt <20fps trước đây bị ép dt<=0.05s => thế giới chạy CHẬM so với đồng hồ thật, trong khi máy kia vẫn chạy đúng tốc độ
     // (nhân vật remote bị dự đoán đi quá xa rồi giật về). Giờ chia nhỏ thành nhiều bước <=0.05s (tối đa 0.25s thực/khung; tab vừa bật lại sau khi ẩn thì không nhảy vọt).

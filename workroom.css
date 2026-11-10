@@ -1,0 +1,112 @@
+/* PHÒNG VY — WORKROOM. Chỉ tải khi mở Work Mode. Mọi luật nằm trong #wr, đơn vị px (không dùng rem của HUD game). */
+#wr{
+  --paper:#fbf6ea; --paper2:#f3ead8; --card:#fffdf7; --ink:#3b2a1a; --ink2:#7a6650; --ink3:#a8957d;
+  --line:#e6dac2; --sun:#ffc46b; --sun2:#ffe2ad; --coral:#e9764f; --wood:#2f2217; --wood2:#3d2d1f; --wood-ink:#f3e7d0;
+  --ok:#3f9b5c; --warn:#c98a1b; --bad:#c8493c; --r:14px;
+  position:fixed; inset:0; z-index:20; display:none; color:var(--ink); background:var(--paper);
+  font:500 15px/1.5 'Nunito Sans','Nunito',system-ui,sans-serif; -webkit-font-smoothing:antialiased;
+  grid-template-columns:232px minmax(0,1fr); grid-template-rows:56px minmax(0,1fr);
+  opacity:0; transform:scale(1.015); transition:opacity .28s ease, transform .36s cubic-bezier(.2,.8,.2,1);
+}
+#wr.on{display:grid} #wr.in{opacity:1; transform:none}
+#wr *{box-sizing:border-box}
+#wr button,#wr input,#wr select,#wr textarea{font:inherit; color:inherit}
+#wr button{cursor:pointer; border:0; background:none; padding:0}
+#wr button:focus-visible,#wr input:focus-visible,#wr select:focus-visible,#wr textarea:focus-visible{outline:2px solid var(--coral); outline-offset:2px}
+#wr h1,#wr h2,#wr h3,#wr p{margin:0}
+#wr svg{width:20px; height:20px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
+
+/* ---- sidebar ---- */
+#wr .wr-side{grid-row:1/3; background:var(--wood); color:var(--wood-ink); display:flex; flex-direction:column; padding:14px 10px; gap:2px; overflow:auto}
+#wr .wr-brand{padding:6px 10px 16px; font:900 17px/1.2 'Nunito',sans-serif; letter-spacing:.02em}
+#wr .wr-brand small{display:block; font:600 12px/1.4 'Nunito Sans',sans-serif; color:#bfae93; letter-spacing:0}
+#wr .wr-nav{display:flex; align-items:center; gap:10px; width:100%; padding:9px 10px; border-radius:10px; text-align:left; font-weight:700; color:#d8c9ae; transition:background .12s,color .12s}
+#wr .wr-nav:hover{background:var(--wood2); color:#fff}
+#wr .wr-nav.on{background:var(--sun); color:var(--ink)}
+#wr .wr-nav em{margin-left:auto; font:700 11px/1 'Nunito Sans',sans-serif; font-style:normal; padding:3px 6px; border-radius:20px; background:rgba(255,255,255,.1); color:#bfae93}
+#wr .wr-nav.on em{background:rgba(59,42,26,.14); color:var(--ink)}
+#wr .wr-sep{height:1px; background:rgba(255,255,255,.08); margin:8px 6px}
+#wr .wr-side .sp{flex:1}
+#wr .wr-dev{margin:8px 4px 0; padding:8px 10px; border-radius:10px; background:rgba(233,118,79,.18); color:#ffcdb9; font:700 12px/1.4 'Nunito Sans',sans-serif}
+
+/* ---- topbar ---- */
+#wr .wr-top{display:flex; align-items:center; gap:10px; padding:0 16px; border-bottom:1px solid var(--line); background:var(--card); min-width:0}
+#wr .wr-top h1{font:800 16px/1 'Nunito',sans-serif; white-space:nowrap}
+#wr .wr-top .sp{flex:1}
+#wr .wr-evsel{max-width:300px; min-width:0; padding:6px 10px; border:1px solid var(--line); border-radius:10px; background:var(--paper); font-weight:700}
+#wr .wr-chip{display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:20px; background:var(--paper2); font:700 12.5px/1 'Nunito Sans',sans-serif; color:var(--ink2); white-space:nowrap}
+#wr .wr-chip i{width:8px; height:8px; border-radius:50%; background:var(--ink3)}
+#wr .wr-chip.ok i{background:var(--ok)} #wr .wr-chip.warn i{background:var(--warn)} #wr .wr-chip.bad i{background:var(--bad)}
+#wr .wr-chip.bad{color:var(--bad)}
+#wr .wr-ib{display:inline-flex; align-items:center; gap:6px; padding:7px 10px; border-radius:10px; font-weight:700; color:var(--ink2)}
+#wr .wr-ib:hover,#wr .wr-ib.on{background:var(--paper2); color:var(--ink)}
+#wr .wr-exit{display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:10px; background:var(--ink); color:var(--paper); font:800 13px/1 'Nunito',sans-serif; letter-spacing:.04em}
+#wr .wr-exit:hover{background:#56402b}
+
+/* ---- main + copilot ---- */
+#wr .wr-body{display:grid; grid-template-columns:minmax(0,1fr); min-height:0}
+#wr.cop .wr-body{grid-template-columns:minmax(0,1fr) 340px}
+#wr .wr-main{overflow:auto; padding:26px 32px 48px}
+#wr .wr-wrap{max-width:1040px; margin:0 auto}
+#wr .wr-cop{display:none; border-left:1px solid var(--line); background:var(--card); flex-direction:column; min-height:0}
+#wr.cop .wr-cop{display:flex}
+#wr .wr-cop header{padding:14px 16px; border-bottom:1px solid var(--line); font:800 15px/1.2 'Nunito',sans-serif}
+#wr .wr-cop .ctx{padding:12px 16px; display:grid; gap:6px; font-size:13.5px; color:var(--ink2)}
+#wr .wr-cop .ctx b{color:var(--ink)}
+#wr .wr-cop .msg{margin:4px 16px; padding:12px 14px; border-radius:12px; background:var(--paper2); font-size:14px}
+#wr .wr-cop .sp{flex:1}
+#wr .wr-cop footer{padding:12px 16px; border-top:1px solid var(--line)}
+#wr .wr-cop textarea{width:100%; min-height:64px; resize:none; padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:var(--paper)}
+#wr textarea:disabled,#wr input:disabled{opacity:.6; cursor:not-allowed}
+
+/* ---- nội dung ---- */
+#wr .wr-h{display:flex; align-items:flex-end; gap:12px; margin-bottom:18px}
+#wr .wr-h h2{font:900 26px/1.15 'Nunito',sans-serif}
+#wr .wr-h p{color:var(--ink2)}
+#wr .wr-grid{display:grid; gap:16px; grid-template-columns:repeat(2,minmax(0,1fr))}
+#wr .wr-card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:18px 20px; min-width:0}
+#wr .wr-card.span{grid-column:1/-1}
+#wr .wr-card h3{font:800 15px/1.2 'Nunito',sans-serif; margin-bottom:12px; display:flex; align-items:center; gap:8px}
+#wr .wr-card h3 span{margin-left:auto; font:700 12.5px/1 'Nunito Sans',sans-serif; color:var(--ink3)}
+#wr .wr-empty{color:var(--ink3); padding:6px 0}
+#wr .wr-row{display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line); min-width:0}
+#wr .wr-row:first-of-type{border-top:0}
+#wr .wr-row .t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600}
+#wr .wr-row .m{color:var(--ink3); font-size:13px; white-space:nowrap}
+#wr .wr-row.done .t{text-decoration:line-through; color:var(--ink3)}
+#wr .wr-tag{display:inline-block; padding:2px 8px; border-radius:20px; background:var(--paper2); color:var(--ink2); font:700 12px/1.5 'Nunito Sans',sans-serif; white-space:nowrap}
+#wr .wr-tag.code{background:var(--sun2); color:var(--ink)} #wr .wr-tag.late{background:#f8dcd7; color:var(--bad)}
+#wr .wr-tag.high{background:#fbe3d6; color:#b4522f} #wr .wr-tag.demo{background:#e4e0f5; color:#5b4b9a}
+#wr .wr-btn{display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:10px; background:var(--sun); color:var(--ink); font-weight:800}
+#wr .wr-btn:hover{background:#ffb84d} #wr .wr-btn:disabled{opacity:.5; cursor:default}
+#wr .wr-btn.ghost{background:var(--paper2)} #wr .wr-btn.ghost:hover{background:var(--line)}
+#wr .wr-x{color:var(--ink3); padding:4px; border-radius:8px} #wr .wr-x:hover{color:var(--bad); background:#f8dcd7}
+#wr .wr-form{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+#wr .wr-form input,#wr .wr-form select,#wr .wr-in{padding:8px 11px; border:1px solid var(--line); border-radius:10px; background:var(--paper); min-width:0}
+#wr .wr-form .grow{flex:1 1 220px}
+#wr .wr-check{width:22px; height:22px; border-radius:7px; border:2px solid var(--ink3); display:grid; place-items:center; flex:none; color:transparent}
+#wr .wr-check.on{background:var(--ok); border-color:var(--ok); color:#fff} #wr .wr-check svg{width:14px; height:14px; stroke-width:3}
+#wr .wr-bar{height:8px; border-radius:8px; background:var(--paper2); overflow:hidden} #wr .wr-bar i{display:block; height:100%; background:var(--ok); border-radius:8px; transition:width .3s}
+#wr .wr-stages{display:flex; gap:4px; flex-wrap:wrap; margin-top:8px}
+#wr .wr-stages span{padding:3px 9px; border-radius:20px; font:700 12px/1.5 'Nunito Sans',sans-serif; background:var(--paper2); color:var(--ink3)}
+#wr .wr-stages span.past{color:var(--ink2)} #wr .wr-stages span.now{background:var(--ink); color:var(--paper)}
+#wr .wr-steps{display:grid; gap:10px}
+#wr .wr-step{display:flex; gap:12px; align-items:flex-start}
+#wr .wr-step .n{width:26px; height:26px; border-radius:50%; background:var(--paper2); display:grid; place-items:center; font-weight:800; flex:none}
+#wr .wr-step.ok .n{background:var(--ok); color:#fff}
+#wr .wr-step b{display:block} #wr .wr-step span{color:var(--ink2); font-size:14px}
+#wr .wr-list{margin:0; padding-left:18px; color:var(--ink2)} #wr .wr-list li{margin:3px 0}
+#wr .wr-err{margin-top:8px; color:var(--bad); font-weight:700}
+#wr .wr-note{position:absolute; left:50%; bottom:22px; transform:translateX(-50%); padding:10px 18px; border-radius:24px; background:var(--ink); color:var(--paper); font-weight:700; opacity:0; pointer-events:none; transition:opacity .2s; max-width:80vw}
+#wr .wr-note.on{opacity:1}
+
+@media (max-width:900px){
+  #wr{grid-template-columns:minmax(0,1fr); grid-template-rows:56px auto minmax(0,1fr)}
+  #wr .wr-side{grid-row:2; flex-direction:row; padding:6px 8px; overflow-x:auto; gap:4px}
+  #wr .wr-brand,#wr .wr-side .sp,#wr .wr-sep,#wr .wr-dev,#wr .wr-nav em{display:none}
+  #wr .wr-nav{width:auto; white-space:nowrap; padding:8px 10px}
+  #wr .wr-top{grid-row:1} #wr .wr-top h1,#wr .wr-chip.opt{display:none}
+  #wr .wr-main{padding:18px 16px 40px} #wr .wr-grid{grid-template-columns:minmax(0,1fr)}
+  #wr.cop .wr-body{grid-template-columns:minmax(0,1fr)} #wr.cop .wr-main{display:none}
+}
+@media (prefers-reduced-motion:reduce){#wr{transition:none}}
