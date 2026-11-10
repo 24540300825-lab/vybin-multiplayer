@@ -5,7 +5,7 @@
 import {h, dialog, btn} from './ui.js';
 
 const LS = 'vyWrAi';
-const DEFAULTS = {provider: 'ollama', base: 'http://127.0.0.1:11434', model: '', heavy: '', cloudOk: false, ctx: 16384, timeout: 180};
+const DEFAULTS = {provider: 'ollama', base: 'http://127.0.0.1:11434', model: '', heavy: '', cloudOk: false, ctx: 16384, timeout: 180, macRam: 0};
 // Danh sách gợi ý (tra tháng 11/2026 — tên model đổi nhanh, xem ollama.com/library trước khi tải; tải sai tên thì Ollama báo lỗi rõ).
 // local: chạy trên máy, miễn phí, dữ liệu không rời máy. cloud: chạy trên máy chủ Ollama Cloud qua cùng ứng dụng Ollama (cần đăng nhập Ollama; gửi nội dung lên Ollama).
 export const MODEL_GUIDE = [
@@ -18,7 +18,9 @@ export const MODEL_GUIDE = [
   {tag: 'glm-5.3:cloud', where: 'cloud', size: 'không tải về', need: 'Mọi máy · cần đăng nhập Ollama', note: 'Mạnh, phản hồi nhanh, làm theo hướng dẫn tốt.'},
 ];
 export const isCloud = tag => /[:-]cloud$/.test(String(tag || ''));
-export function detectMachine() {
+// Mac dùng RAM chung cho CPU và GPU, và trình duyệt không đọc được dung lượng RAM thật → để người dùng tự chọn RAM của Mac.
+export const MAC_RAM = [[8, 'gemma4:e4b'], [16, 'gemma4:12b'], [24, 'gemma4:12b'], [32, 'qwen3.8:27b'], [64, 'qwen3.8:27b']];
+export function detectMachine(macRam = 0) {
   let gpu = ''; try { const c = document.createElement('canvas').getContext('webgl'), e = c && c.getExtension('WEBGL_debug_renderer_info'); gpu = e ? String(c.getParameter(e.UNMASKED_RENDERER_WEBGL)) : ''; } catch (e) {}
   const short = (gpu.match(/(RTX|GTX|RX|Arc|Iris|UHD|Radeon|Apple M\d)[^,)]*/i) || [gpu])[0].replace(/\s+Direct3D.*$/, '').trim();
   const ram = navigator.deviceMemory || 0;
@@ -27,7 +29,9 @@ export function detectMachine() {
   if (/RTX\s*(20|30|40|50)[67]0|RX\s*[67]\d{3}|Apple M\d/i.test(gpu)) { pick = 'qwen3.5:9b'; tier = '8 GB'; }
   if (/RTX\s*(40|50)[67]0\s*Ti|RTX\s*(30|40|50)80|RX\s*7[89]00|Apple M\d (Pro|Max)/i.test(gpu)) { pick = 'gemma4:12b'; tier = '12–16 GB'; }
   if (/RTX\s*(3090|4090|5090)|RTX\s*A[56]000|Apple M\d (Max|Ultra)/i.test(gpu)) { pick = 'qwen3.8:27b'; tier = '24 GB'; }
-  return {gpu: short || 'không đọc được', ram: ram ? (ram >= 8 ? '8 GB trở lên' : ram + ' GB') : 'không đọc được', os: /Win/.test(navigator.platform) ? 'windows' : /Mac/.test(navigator.platform) ? 'mac' : 'other', pick, tier};
+  const os = /Win/.test(navigator.platform) ? 'windows' : /Mac/.test(navigator.platform) ? 'mac' : 'other';
+  if (os === 'mac') { const hit = MAC_RAM.find(r => r[0] === macRam); pick = hit ? hit[1] : 'gemma4:e4b'; tier = hit ? 'Mac ' + macRam + ' GB' : 'Mac (chưa chọn RAM)'; }
+  return {gpu: short || 'không đọc được', ram: ram ? (ram >= 8 ? '8 GB trở lên' : ram + ' GB') : 'không đọc được', os, pick, tier};
 }
 // Chrome coi 127.0.0.1 là "mạng nội bộ": trang HTTPS gọi tới sẽ hỏi quyền 1 lần. Đánh dấu rõ đích là máy này; trình duyệt cũ không hiểu thì gọi kiểu thường.
 async function localFetch(url, init = {}) {

@@ -6,11 +6,13 @@ AI chạy trên **máy của Vy** (máy mở Workroom). Không tốn phí, khôn
 1. Cài Ollama: https://ollama.com/download (đã cài thì bỏ qua).
 2. Cho phép trang Workroom gọi Ollama — Windows (PowerShell, không cần admin):
    `setx OLLAMA_ORIGINS "<địa chỉ trang Workroom>"` (Workroom hiện sẵn lệnh có đúng địa chỉ, có nút Sao chép).
-   macOS: `launchctl setenv OLLAMA_ORIGINS "<địa chỉ>"`.
+   macOS (Terminal): `launchctl setenv OLLAMA_ORIGINS "<địa chỉ>"` — lệnh này mất khi Mac khởi động lại; Workroom (trên Mac) hiện thêm lệnh tạo LaunchAgent `~/Library/LaunchAgents/vy.ollama.origins.plist` để giữ vĩnh viễn.
    Muốn dùng cả bản test và bản chính: ghi 2 địa chỉ cách nhau bằng dấu phẩy, không dấu cách.
-3. Thoát hẳn Ollama (khay hệ thống → Quit) rồi mở lại.
+3. Thoát hẳn Ollama (Windows: khay hệ thống → Quit; Mac: biểu tượng trên thanh menu → Quit Ollama) rồi mở lại.
 4. Workroom → Cài đặt & Kết nối → **Kiểm tra kết nối**. Lần đầu Chrome hỏi cho phép truy cập thiết bị trên máy → Cho phép.
 5. Bấm **Tải** model phù hợp trong bảng (Workroom hỏi xác nhận, hiện tiến độ).
+
+**Mac:** RAM dùng chung cho AI và trình duyệt không đọc được dung lượng thật, nên Workroom có ô "RAM của Mac" (Cài đặt & Kết nối): 8 GB → gemma4:e4b; 16–24 GB → gemma4:12b; 32 GB trở lên → qwen3.8:27b. Chrome/Edge/Safari đều dùng được.
 
 **An toàn:** Ollama mặc định chỉ nghe `127.0.0.1`. **Không** đặt `OLLAMA_HOST=0.0.0.0`. `OLLAMA_ORIGINS` chỉ chứa địa chỉ trang Workroom, không dùng `*`.
 

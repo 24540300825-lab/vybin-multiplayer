@@ -123,7 +123,7 @@ function activity(ctx) {
 const sha = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('vy-workroom:' + s)))].map(b => b.toString(16).padStart(2, '0')).join('');
 export const pinOk = async (store, pin) => !store.settings.pin_hash || await sha(pin) === store.settings.pin_hash;
 function settings(ctx) {
-  const S = ctx.store, AI = ctx.ai, G = ctx.g, U = ctx.ui.settings ||= {}, err = errBox(), st = AI.state, M = U.machine ||= detectMachine(), stats = AI.stats(), origin = location.origin;
+  const S = ctx.store, AI = ctx.ai, G = ctx.g, U = ctx.ui.settings ||= {}, err = errBox(), st = AI.state, M = U.machine ||= detectMachine(ctx.ai.cfg.macRam), stats = AI.stats(), origin = location.origin;
   const row = (name, c, note) => h('div', {class: 'wr-row'}, h('span', {class: 't wrap'}, name), note && h('span', {class: 'm'}, note), c);
   const aiChip = st.status === 'online' ? (AI.ready ? chip('ok', 'Đang chạy') : chip('warn', AI.cfg.model ? 'Chưa dùng được model ' + AI.cfg.model : 'Chưa có model')) : st.status === 'origin' ? chip('bad', 'Bị chặn (OLLAMA_ORIGINS)') : st.status === 'offline' ? chip('bad', 'Không kết nối được') : chip('', 'Chưa kiểm tra');
   const out = h('p', {class: 'wr-empty'}, U.test || '');
@@ -146,6 +146,8 @@ function settings(ctx) {
         : btn(cloud ? 'Thêm' : 'Tải', async () => { if (cloud || await confirmBox('Tải model', `Tải ${g.tag} (${g.size}) về máy này qua Ollama? Cần ổ đĩa trống tương ứng và mạng ổn định.`, 'Tải về')) pull(g.tag, cloud ? 'heavy' : 'model')(); }, {ghost: true, icon: 'down', disabled: st.status !== 'online' || !!U.pull})))); };
   const table = list => h('div', {class: 'wr-tablewrap', style: 'margin-top:8px'}, h('table', {class: 'wr-table'}, h('thead', {}, h('tr', {}, ['Model', 'Tải về', 'Phù hợp với', 'Ghi chú', ''].map(t => h('th', {}, t)))), h('tbody', {}, list.map(guideRow))));
   const cmdWin = `setx OLLAMA_ORIGINS "${origin}"`, cmdMac = `launchctl setenv OLLAMA_ORIGINS "${origin}"`;
+  // giữ cài đặt sau khi khởi động lại Mac: LaunchAgent của riêng người dùng, chạy lại lệnh trên mỗi lần đăng nhập
+  const cmdMacKeep = `mkdir -p ~/Library/LaunchAgents && printf '%s\\n' '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>Label</key><string>vy.ollama.origins</string><key>ProgramArguments</key><array><string>/bin/launchctl</string><string>setenv</string><string>OLLAMA_ORIGINS</string><string>${origin}</string></array><key>RunAtLoad</key><true/></dict></plist>' > ~/Library/LaunchAgents/vy.ollama.origins.plist && launchctl load ~/Library/LaunchAgents/vy.ollama.origins.plist`;
   const copy = t => btn('Sao chép', () => navigator.clipboard.writeText(t).then(() => ctx.note('Đã sao chép lệnh.')), {ghost: true, icon: 'copy'});
   const gs = G.status, backup = run(err, async () => { download(new Blob([JSON.stringify(await S.exportAll(), null, 2)], {type: 'application/json'}), 'workroom-' + new Date().toISOString().slice(0, 10) + '.json'); ctx.note('Đã tải file sao lưu về máy.'); });
   const restore = run(err, async () => { const f = await pickFile('.json'); if (!f) return; let d; try { d = JSON.parse(await f.text()); } catch (e) { throw new Error('File không đọc được.'); }
@@ -168,7 +170,11 @@ function settings(ctx) {
           AI.cfg.heavy && btn('Thử model mạnh', test('heavy'), {ghost: true, disabled: !AI.ready || !AI.has(AI.cfg.heavy)}), AI.state.busy > 0 && btn('Dừng tác vụ đang chạy', () => AI.stop(), {danger: true, icon: 'stop'})), out,
         AI.cfg.heavy && isCloud(AI.cfg.heavy) && !AI.cfg.cloudOk && h('p', {class: 'wr-err'}, 'Model mạnh đang chọn là model đám mây nhưng chưa được cho phép — việc nặng tạm dùng model hằng ngày.'),
         row('Thống kê', null, `${stats.n} lượt xử lý · trung bình ${stats.avg} giây · ${stats.errors} lỗi`),
-        row('Máy này', null, `Card đồ hoạ: ${M.gpu} (ước lượng nhóm ${M.tier}) · RAM trình duyệt báo: ${M.ram}`),
+        M.os === 'mac'
+          ? row('Máy này (Mac)', h('select', {class: 'wr-in', 'aria-label': 'RAM của Mac', title: 'Apple menu → Giới thiệu về máy Mac → Bộ nhớ', onchange: e => { AI.setCfg({macRam: +e.target.value}); U.machine = null; ctx.render(); }},
+              h('option', {value: 0, selected: !AI.cfg.macRam}, '— chọn RAM của Mac —'), [8, 16, 24, 32, 64].map(v => h('option', {value: v, selected: v === AI.cfg.macRam}, v + (v === 64 ? ' GB trở lên' : ' GB') + ' RAM'))),
+              `Mac dùng chung RAM cho AI nên model gợi ý theo RAM (Apple menu → Giới thiệu về máy Mac). Gợi ý: ${M.pick}`)
+          : row('Máy này', null, `Card đồ hoạ: ${M.gpu} (ước lượng nhóm ${M.tier}) · RAM trình duyệt báo: ${M.ram}`),
         h('h4', {class: 'wr-sub'}, 'Chạy trên máy này — miễn phí, dữ liệu không rời máy'), table(MODEL_GUIDE.filter(g => g.where === 'local')),
         h('h4', {class: 'wr-sub'}, 'Đám mây (Ollama Cloud) — model mạnh nhất, máy yếu vẫn dùng được, cần đăng nhập Ollama, gửi nội dung lên Ollama'), table(MODEL_GUIDE.filter(g => g.where === 'cloud')),
         U.pull && h('div', {class: 'wr-form'}, h('span', {class: 'wr-chip warn'}, h('i'), h('span', {class: 'wr-pull'}, `Đang tải ${U.pull.tag}: ${U.pull.text}`)), btn('Dừng tải', () => AI.stop(), {ghost: true})),
@@ -177,7 +183,8 @@ function settings(ctx) {
         h('details', {class: 'wr-guide', open: st.status !== 'online'}, h('summary', {}, 'Cách bật AI (làm 1 lần)'),
           h('ol', {class: 'wr-list'}, h('li', {}, 'Cài Ollama từ ', h('a', {href: 'https://ollama.com/download', target: '_blank', rel: 'noopener'}, 'ollama.com/download'), ' (nếu đã cài thì cập nhật bản mới nhất).'),
             h('li', {}, 'Cho phép trang này gọi Ollama. ', M.os === 'mac' ? 'Mở Terminal, chạy:' : 'Mở PowerShell (không cần quyền admin), chạy:', h('div', {class: 'wr-form'}, h('code', {class: 'wr-code'}, M.os === 'mac' ? cmdMac : cmdWin), copy(M.os === 'mac' ? cmdMac : cmdWin))),
-            h('li', {}, 'Thoát hẳn Ollama (bấm phải biểu tượng Ollama ở khay hệ thống → Quit) rồi mở lại để nhận cài đặt.'),
+            M.os === 'mac' && h('li', {}, 'Lệnh trên chỉ có tác dụng đến khi Mac khởi động lại. Muốn giữ vĩnh viễn, dán thêm lệnh này vào Terminal (chạy 1 lần):', h('div', {class: 'wr-form'}, h('code', {class: 'wr-code'}, cmdMacKeep), copy(cmdMacKeep))),
+            h('li', {}, M.os === 'mac' ? 'Thoát hẳn Ollama (bấm biểu tượng Ollama trên thanh menu phía trên → Quit Ollama) rồi mở lại từ Launchpad/Applications để nhận cài đặt.' : 'Thoát hẳn Ollama (bấm phải biểu tượng Ollama ở khay hệ thống → Quit) rồi mở lại để nhận cài đặt.'),
             h('li', {}, 'Quay lại đây bấm "Kiểm tra kết nối". Lần đầu, trình duyệt sẽ hỏi cho phép trang truy cập thiết bị/ứng dụng trên máy — chọn Cho phép.'),
             h('li', {}, 'Bấm "Tải" ở model "Gợi ý cho máy này" → chọn làm model hằng ngày.'),
             h('li', {}, 'Muốn chất lượng cao nhất cho viết & biên tập: mở ứng dụng Ollama → Sign in (hoặc chạy ', h('code', {class: 'wr-code'}, 'ollama signin'), '), rồi bấm "Thêm" ở một model đám mây → nó thành model mạnh.')),
