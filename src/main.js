@@ -199,7 +199,26 @@ async function boot() {
         heapMB: m ? Math.round(m.usedJSHeapSize / 1048576) : null, scene: v && v.scene ? v.scene.children.length : null,
         hs: window.__hide && window.__hide.state && window.__hide.state(), hp: window.__potato && window.__potato.state && window.__potato.state(),
         mode: v && v.local && v.local.P && v.local.P.mode, wx: v && v.WC && v.WC.type, vis: document.visibilityState}; };
-    setInterval(() => { try { const o = snap(); maxFrame = 0; frames = 0; localStorage.setItem(BK, JSON.stringify(o)); } catch (e) {} }, 1000);
+    // Worker canh luồng chính: không nhận được nhịp > 5 s (khi tab đang hiện) → ghi vào IndexedDB "bị treo lúc nào + trạng thái cuối"; nhịp trở lại thì ghi thêm treo bao lâu. (Worker vẫn sống khi luồng chính kẹt vòng lặp.)
+    let wd = null;
+    try {
+      const src = `let last=Date.now(),snap=null,hid=false,hung=0,db=null;
+const open=()=>new Promise(r=>{try{const q=indexedDB.open('vyf-bb',1);q.onupgradeneeded=()=>q.result.createObjectStore('k');q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)}catch(e){r(null)}});
+const put=async(k,v)=>{db=db||await open();if(!db)return;try{db.transaction('k','readwrite').objectStore('k').put(v,k)}catch(e){}};
+onmessage=e=>{const m=e.data;if(m.beat){last=Date.now();snap=m.snap;hid=!!m.hid;if(hung){put('hang',{at:hung,lenMs:Date.now()-hung,recovered:1,snap:snap});hung=0}}};
+setInterval(()=>{if(hid)return;const age=Date.now()-last;if(age>5000&&!hung){hung=last;put('hang',{at:hung,lenMs:age,recovered:0,snap:snap})}else if(hung&&age>5000){put('hang',{at:hung,lenMs:Date.now()-hung,recovered:0,snap:snap})}},1000);`;
+      wd = new Worker(URL.createObjectURL(new Blob([src], {type: 'text/javascript'})));
+      const q = indexedDB.open('vyf-bb', 1); q.onupgradeneeded = () => q.result.createObjectStore('k');
+      q.onsuccess = () => { try { const g = q.result.transaction('k').objectStore('k').get('hang'); g.onsuccess = () => { const h = g.result; if (h && Date.now() - h.at < 7 * 86400e3) { window.__lastHang = h; console.warn('[watchdog] lần trước luồng chính bị treo', h);
+        if (h.lenMs > 8000) import('./ui/mp-ui.js').then(m => setTimeout(() => m.toast('⚠️ Lần trước web bị treo ' + Math.round(h.lenMs / 1000) + ' s' + (h.recovered ? '' : ' (không tự hết)') + ' — đã ghi lại để chẩn đoán'), 3500)).catch(() => {});
+        try { const w = q.result.transaction('k', 'readwrite').objectStore('k'); w.delete('hang'); } catch (e) {} } }; } catch (e) {} };
+    } catch (e) { console.warn('[watchdog]', e); }
+    // đối phương im lặng > 8 s trong khi vẫn "có mặt": máy họ có thể đang đứng
+    let peerLast = Date.now(), peerWarn = 0;
+    if (sess) sess.on('msg', m => { if (m.k === 's') { peerLast = Date.now(); peerWarn = 0; } });
+    setInterval(() => { try { if (!sess || !sess.peer || document.hidden) return; const age = Date.now() - peerLast; window.__peerQuiet = age;
+      if (age > 8000 && !peerWarn) { peerWarn = 1; import('./ui/mp-ui.js').then(m => m.toast('⚠️ ' + (slot === 'bin' ? 'Vy' : 'Bin') + ' không gửi tín hiệu hơn 8 s — máy họ có thể đang đứng/mất mạng. Nhờ họ tải lại trang (F5).')).catch(() => {}); } } catch (e) {} }, 2000);
+    setInterval(() => { try { const o = snap(); maxFrame = 0; frames = 0; localStorage.setItem(BK, JSON.stringify(o)); if (wd) wd.postMessage({beat: 1, snap: o, hid: document.hidden}); } catch (e) {} }, 1000);
     addEventListener('pagehide', () => { try { const o = snap(); o.run = 0; localStorage.setItem(BK, JSON.stringify(o)); } catch (e) {} });
   } catch (e) { console.warn('[blackbox]', e); }
   LB(100, 'Xong!');

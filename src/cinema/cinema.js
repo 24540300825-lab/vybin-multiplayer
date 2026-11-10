@@ -179,12 +179,22 @@ export function mountCinema({api, sess, voice, slot, other, toast, music}) {
   let quietUntil = 0;
   let lastSt = 0, stk = {t: -1, at: 0, stage: 0};
   // Đồng bộ lại: bên khách xin host gửi lại trạng thái, rồi dựng lại trình phát tại đúng điểm hiện tại (dùng khi phim đứng 1 bên mà host không hề biết)
-  function resync(hard = true) {
-    if (!S || me.st === 'off') return;
-    if (!isHost()) send({t: 'hi'});
-    if (hard) { if (player) { try { player.destroy(); } catch (e) {} player = null; } playerKey = ''; loadingKey = ''; el.tap.hidden = true; }
-    quiet(1500); ensurePlayer().then(() => { if (player && player.sync) { quiet(1500); player.seek(posNow()); S.playing ? player.play() : player.pause(); } });
-    stk = {t: -1, at: now(), stage: 0};
+  let resyncing = false;
+  async function resync(hard = true) {
+    if (!S || me.st === 'off' || resyncing) return;
+    resyncing = true;
+    try {
+      // 1) nối lại KÊNH mạng trước (máy bị kẹt thường là do kênh realtime chết ngầm) rồi xin host gửi lại trạng thái
+      if (sess && sess._revive) { try { await Promise.race([sess._revive('cinema-resync', true), new Promise(r => setTimeout(r, 9000))]); } catch (e) {} }
+      if (!isHost() && sess) { const t0 = lastSt; for (let i = 0; i < 4 && lastSt === t0; i++) { send({t: 'hi'}); await new Promise(r => setTimeout(r, 900)); } }
+      // 2) dựng lại trình phát; nếu không dựng được (đen màn hình) thì thử lại 1 lần nữa, không để màn hình trống
+      for (let k = 0; k < 2; k++) {
+        if (hard || k) { if (player) { try { player.destroy(); } catch (e) {} player = null; } playerKey = ''; loadingKey = ''; el.tap.hidden = true; el.pl.innerHTML = ''; }
+        quiet(2500); await Promise.race([ensurePlayer(), new Promise(r => setTimeout(r, 7000))]); loadingKey = '';
+        if (player) { quiet(1500); try { player.seek(posNow()); S.playing ? player.play() : player.pause(); } catch (e) {} break; }
+      }
+      if (!player && S.src && S.src.type !== 'stream') toast('Chưa dựng lại được phim — nhờ ' + NAME[S.host] + ' bấm tua 1 cái hoặc thử lại');
+    } finally { resyncing = false; stk = {t: -1, at: now(), stage: 0}; }
   }
   $('cnResync').onclick = () => { resync(true); toast('Đang đồng bộ lại…'); };
   // Tự phát hiện đứng hình: đang phát mà đồng hồ trình phát không nhúc nhích ≥4 s → thử tua+phát lại; vẫn đứng 5 s nữa → dựng lại trình phát. Khách quá 12 s không nghe host → hỏi lại trạng thái.
