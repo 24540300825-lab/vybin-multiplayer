@@ -37,7 +37,7 @@ export async function runReview(ctx, art, onStage = () => {}) {
   if (ctx.ai.ready) {
     onStage('AI đang đọc bài như một độc giả chưa dự sự kiện…');
     const cut = text.slice(0, 7000), rules = guidelines(S);
-    const o = await ctx.ai.json({task: 'Biên tập bài', system: `Bạn là biên tập viên tiếng Việt, KHÔNG có mặt tại sự kiện và chỉ biết những gì ghi trong NGUỒN.
+    const o = await ctx.ai.json({heavy: true, task: 'Biên tập bài', system: `Bạn là biên tập viên tiếng Việt, KHÔNG có mặt tại sự kiện và chỉ biết những gì ghi trong NGUỒN.
 Việc 1 — đọc như độc giả: độc giả có hiểu chuyện gì diễn ra, mục đích là gì, các đoạn có liền mạch không, bài có liệt kê hoạt động mà không nói ý nghĩa không? Chỗ nào không hiểu thì trích nguyên văn (quote) và đặt câu hỏi cho tác giả (question).
 Việc 2 — liệt kê đề xuất, mỗi đề xuất 1 mục:
 - error: lỗi chính tả, ngữ pháp, dấu câu. style: lặp từ, suồng sã, rườm rà. clarity: câu khó hiểu. structure: thứ tự/tách gộp đoạn.
@@ -63,7 +63,7 @@ Tuyệt đối không thêm chi tiết, không đổi ý phát biểu, không đ
       unclear: (Array.isArray(r.unclear) ? r.unclear : []).filter(u => u && T.includes(norm(u.quote))).slice(0, 8).map(u => ({quote: norm(u.quote), question: norm(u.question).slice(0, 300)}))};
   } else note = 'AI trên máy chưa sẵn sàng: chỉ chạy các kiểm tra tự động (thiếu thông tin, đối chiếu tên người, ngày, lặp từ, câu quá dài).';
   reader.note = note;
-  return S.add('reviews', {article_id: art.id, reader, items, model: ctx.ai.ready ? ctx.ai.cfg.model : null}, {log: `Biên tập "${art.title.slice(0, 60)}": ${items.length} mục`});
+  return S.add('reviews', {article_id: art.id, reader, items, model: ctx.ai.ready ? ctx.ai.modelFor(true) : null}, {log: `Biên tập "${art.title.slice(0, 60)}": ${items.length} mục`});
 }
 // thay đúng 1 chỗ trong HTML của bài; trả null nếu không tìm được (đoạn trích vắt qua chỗ in đậm/xuống dòng)
 function applyToHtml(html, quote, sug) {

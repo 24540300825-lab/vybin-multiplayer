@@ -103,7 +103,7 @@ const SCHEMA = {type: 'object', required: ['pillars', 'items'], properties: {pil
   properties: {phase: {type: 'string', enum: ['truoc', 'trong', 'sau']}, content: {type: 'string'}, format: {type: 'string'}, channel: {type: 'string'}, publish_at: {type: 'string'}, deadline: {type: 'string'}, note: {type: 'string'}}}}}};
 export async function generateTimeline(ctx, ev, {goal = '', count = 12} = {}) {
   const S = ctx.store, tpl = S.knowledge.find(d => d.category === 'timeline_template' && d.status === 'official'), have = itemsOf(S, ev);
-  const o = await ctx.ai.json({task: 'Lập timeline truyền thông', temperature: 0.5,
+  const o = await ctx.ai.json({heavy: true, task: 'Lập timeline truyền thông', temperature: 0.5,
     system: `Bạn lập kế hoạch truyền thông cho một sự kiện. Chia nội dung theo 3 giai đoạn: truoc (trước sự kiện), trong (trong sự kiện), sau (sau sự kiện). Mỗi mục: content (tên nội dung/góc khai thác), format (ví dụ: Tin bài, Tin ảnh, Thiết kế, Clip, Ema, Gửi báo), channel (ví dụ: Web + Facebook), publish_at và deadline viết dạng ngày/tháng dựa trên ngày sự kiện, note (gợi ý ngắn, có thể rỗng). pillars: 3–5 trụ nội dung chính.
 Không ghi tên người phụ trách. Không bịa tên khách mời, số liệu. Không trùng ý với các mục đã có.`,
     prompt: `SỰ KIỆN:\n${eventFacts(ev)}\n\n${goal ? 'MỤC TIÊU / ĐỐI TƯỢNG / KÊNH: ' + goal + '\n\n' : ''}${have.length ? 'CÁC MỤC ĐÃ CÓ (không lặp lại):\n' + have.map(i => '- ' + i.content).join('\n') + '\n\n' : ''}${tpl ? 'TIMELINE MẪU ĐÃ DÙNG TRƯỚC ĐÂY (học cách đặt tên nội dung, hình thức, nhịp đăng — không chép tên người):\n' + tpl.content.slice(0, 3500) + '\n\n' : ''}Đề xuất khoảng ${count} mục.`}, SCHEMA,

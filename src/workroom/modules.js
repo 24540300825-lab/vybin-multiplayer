@@ -2,7 +2,7 @@
 // Thêm module mới: viết 1 file m-xxx.js xuất hàm render(ctx) rồi thêm 1 dòng vào MODULES.
 import {STAGES, stageName} from './store.js';
 import {h, icon, head, card, chip, btn, run, errBox, fmtD, fmtDT, dialog, confirmBox, download, pickFile} from './ui.js';
-import {MODEL_GUIDE, detectMachine} from './ai.js';
+import {MODEL_GUIDE, detectMachine, isCloud} from './ai.js';
 import {assistant} from './m-assistant.js';
 import {content, A_STATUS} from './m-content.js';
 import {editorial} from './m-editorial.js';
@@ -28,7 +28,7 @@ function taskRow(ctx, t, err) {
 const X_SCHEMA = {type: 'object', properties: {name: {type: 'string'}, date: {type: 'string'}, time: {type: 'string'}, venue: {type: 'string'}, organizer: {type: 'string'}, attendees: {type: 'string'}, objectives: {type: 'string'}, activities: {type: 'string'}}};
 async function extractBrief(ctx, ev, err) {
   const S = ctx.store, brief = ev.brief || ''; if (brief.trim().length < 40) throw new Error('Brief còn quá ngắn để trích thông tin.');
-  const o = await ctx.ai.json({task: 'Trích thông tin từ brief', system: 'Trích thông tin sự kiện từ brief. Chỉ lấy điều CÓ GHI trong brief; không có thì để chuỗi rỗng, không suy đoán. date dạng YYYY-MM-DD, time như trong brief (vd 8h00). attendees: thành phần tham dự/khách mời, giữ nguyên họ tên và chức danh.',
+  const o = await ctx.ai.json({heavy: true, task: 'Trích thông tin từ brief', system: 'Trích thông tin sự kiện từ brief. Chỉ lấy điều CÓ GHI trong brief; không có thì để chuỗi rỗng, không suy đoán. date dạng YYYY-MM-DD, time như trong brief (vd 8h00). attendees: thành phần tham dự/khách mời, giữ nguyên họ tên và chức danh.',
     prompt: 'BRIEF:\n' + brief.slice(0, 7000)}, X_SCHEMA, o => { if (!o || typeof o !== 'object') throw new Error('không phải object'); return o; });
   const nz = s => String(s || '').replace(/\s+/g, ' ').trim(), B = nz(brief).toLowerCase();
   const F = [['name', 'Tên sự kiện', nz(o.name)], ['event_date', 'Ngày', /^\d{4}-\d{2}-\d{2}$/.test(o.date || '') ? o.date : ''], ['event_time', 'Giờ', nz(o.time)], ['venue', 'Địa điểm', nz(o.venue)], ['organizer', 'Đơn vị tổ chức', nz(o.organizer)], ['attendees', 'Thành phần', nz(o.attendees)], ['note', 'Mục tiêu / hoạt động', [nz(o.objectives), nz(o.activities)].filter(Boolean).join(' · ')]]
@@ -53,7 +53,7 @@ function overview(ctx) {
   const nm = h('input', {class: 'grow', placeholder: 'Tên sự kiện / dự án mới…', maxLength: 200, required: true, 'aria-label': 'Tên sự kiện'}), dt = h('input', {type: 'date', 'aria-label': 'Ngày diễn ra'});
   const setup = [
     [ctx.g.status === 'connected', 'Kết nối Google Workspace', 'Drive, Docs, Sheets là nơi lưu và soạn tài liệu.', 'settings'],
-    [ctx.ai.ready, 'Bật AI trên máy (Ollama)', 'Trợ lý chạy ngay trên máy này, không tốn phí.', 'settings'],
+    [ctx.ai.ready, 'Bật trợ lý AI (Ollama)', 'Model chạy trên máy (miễn phí, riêng tư) và tuỳ chọn model đám mây mạnh nhất cho viết & biên tập.', 'settings'],
     [S.knowledge.some(d => d.status === 'official'), 'Xác nhận tài liệu mẫu chính thức', 'Xem các bài mẫu trong Knowledge Hub và đánh dấu "Chính thức" để AI viết đúng quy chuẩn.', 'knowledge'],
     [events.length > 0, 'Tạo sự kiện đầu tiên', 'Mọi bài viết, timeline, phân công và việc cần làm đều gắn vào một sự kiện.', null]];
   const fld = (k, label, type = 'text', w = '') => h('label', {class: 'wr-fld' + (w ? ' ' + w : '')}, h('span', {}, label), h('input', {class: 'wr-in', type, value: cur[k] || '', 'aria-label': label, onchange: run(err, e => S.updateEvent(cur.id, {[k]: e.target.value.trim() || null}))}));
@@ -125,10 +125,26 @@ export const pinOk = async (store, pin) => !store.settings.pin_hash || await sha
 function settings(ctx) {
   const S = ctx.store, AI = ctx.ai, G = ctx.g, U = ctx.ui.settings ||= {}, err = errBox(), st = AI.state, M = U.machine ||= detectMachine(), stats = AI.stats(), origin = location.origin;
   const row = (name, c, note) => h('div', {class: 'wr-row'}, h('span', {class: 't wrap'}, name), note && h('span', {class: 'm'}, note), c);
-  const aiChip = st.status === 'online' ? (AI.ready ? chip('ok', 'Đang chạy · ' + AI.cfg.model) : chip('warn', AI.cfg.model ? 'Thiếu model ' + AI.cfg.model : 'Chưa có model')) : st.status === 'origin' ? chip('bad', 'Bị chặn (OLLAMA_ORIGINS)') : st.status === 'offline' ? chip('bad', 'Không kết nối được') : chip('', 'Chưa kiểm tra');
+  const aiChip = st.status === 'online' ? (AI.ready ? chip('ok', 'Đang chạy') : chip('warn', AI.cfg.model ? 'Chưa dùng được model ' + AI.cfg.model : 'Chưa có model')) : st.status === 'origin' ? chip('bad', 'Bị chặn (OLLAMA_ORIGINS)') : st.status === 'offline' ? chip('bad', 'Không kết nối được') : chip('', 'Chưa kiểm tra');
   const out = h('p', {class: 'wr-empty'}, U.test || '');
-  const test = run(err, async () => { U.test = 'Đang chờ model trả lời…'; ctx.render(); const t0 = performance.now(); try { const r = await AI.chat({task: 'Thử kết nối', prompt: 'Trả lời đúng một câu tiếng Việt ngắn: chào Vy và nói bạn đã sẵn sàng làm việc.', maxTokens: 80}); U.test = `Model trả lời sau ${((performance.now() - t0) / 1000).toFixed(1)} giây: “${r.text.trim().slice(0, 200)}”`; } catch (e) { U.test = ''; throw e; } finally { ctx.render(); } });
-  const pull = tag => run(err, async () => { U.pull = {tag, text: 'Bắt đầu tải…'}; ctx.render(); try { await AI.pull(tag, p => { U.pull.text = `${p.status || ''}${p.pct != null ? ' ' + p.pct + '%' : ''}`; const el = document.querySelector('#wr .wr-pull'); if (el) el.textContent = `Đang tải ${tag}: ${U.pull.text}`; }); AI.setCfg({model: tag}); ctx.note('Đã tải xong ' + tag); } finally { U.pull = null; ctx.render(); } });
+  const test = which => run(err, async () => { U.test = 'Đang chờ model trả lời…'; ctx.render(); const t0 = performance.now(); try { const r = await AI.chat({heavy: which === 'heavy', task: 'Thử kết nối', prompt: 'Trả lời đúng một câu tiếng Việt ngắn: chào Vy và nói bạn đã sẵn sàng làm việc.', maxTokens: 80}); U.test = `${r.model} trả lời sau ${((performance.now() - t0) / 1000).toFixed(1)} giây: “${r.text.trim().slice(0, 200)}”`; } catch (e) { U.test = ''; throw e; } finally { ctx.render(); } });
+  // bật model đám mây: hỏi rõ trước, vì nội dung công việc sẽ được gửi lên máy chủ Ollama
+  const allowCloud = async () => { if (AI.cfg.cloudOk) return true;
+    const ok = await dialog({title: 'Dùng model đám mây (Ollama Cloud)?', body: h('div', {class: 'wr-stack'},
+      h('p', {}, 'Model đám mây chạy trên máy chủ của Ollama, không chạy trên máy này. Khi dùng, nội dung Vy đưa cho AI (brief, bài viết, danh sách nhân sự…) sẽ được gửi lên máy chủ đó để xử lý.'),
+      h('p', {}, 'Theo Ollama: không lưu và không dùng dữ liệu này để huấn luyện. Cần đăng nhập tài khoản Ollama; gói miễn phí có ít lượt dùng, dùng nhiều cần gói trả phí của Ollama (Workroom không tự mua hay tự trả phí).'),
+      h('p', {class: 'wr-empty'}, 'Có thể tắt lại bất cứ lúc nào. Workroom không bao giờ tự chuyển sang đám mây khi model trên máy lỗi.')), buttons: [['Không', null], ['Cho phép dùng model đám mây', true, 'primary']]});
+    if (!ok) return false; AI.setCfg({cloudOk: true}); await S.log('ai.cloud', 'Cho phép dùng model đám mây (Ollama Cloud)'); return true; };
+  const choose = (slot, tag) => async () => { if (isCloud(tag) && !await allowCloud()) return ctx.render(); AI.setCfg({[slot]: tag}); ctx.render(); };
+  const pull = (tag, slot) => run(err, async () => { if (isCloud(tag) && !await allowCloud()) return; U.pull = {tag, text: 'Bắt đầu…'}; ctx.render();
+    try { await AI.pull(tag, p => { U.pull.text = `${p.status || ''}${p.pct != null ? ' ' + p.pct + '%' : ''}`; const el = document.querySelector('#wr .wr-pull'); if (el) el.textContent = `Đang tải ${tag}: ${U.pull.text}`; }); AI.setCfg({[slot]: tag}); ctx.note('Đã sẵn sàng ' + tag); } finally { U.pull = null; ctx.render(); } });
+  const opts = cur => [!AI.has(cur) && h('option', {value: cur}, cur ? cur + ' (chưa có trên máy)' : '— chưa chọn —'), ...st.models.map(m => h('option', {value: m.name, selected: m.name === cur}, `${m.name}${isCloud(m.name) ? ' ☁ đám mây' : m.size ? ' · ' + (m.size / 1e9).toFixed(1) + ' GB' : ''}`))];
+  const pickSel = (slot, label) => h('select', {class: 'wr-in', 'aria-label': label, onchange: e => choose(slot, e.target.value)()}, slot === 'heavy' && h('option', {value: '', selected: !AI.cfg.heavy}, '— dùng model hằng ngày —'), opts(AI.cfg[slot]));
+  const guideRow = g => { const have = AI.has(g.tag), cloud = g.where === 'cloud', rec = cloud ? g.tag === 'kimi-k3:cloud' : g.tag === M.pick;
+    return h('tr', {}, h('td', {}, h('b', {}, g.tag), rec && h('span', {class: 'wr-tag ok'}, cloud ? 'Mạnh nhất' : 'Gợi ý cho máy này')), h('td', {}, g.size), h('td', {}, g.need), h('td', {}, g.note),
+      h('td', {}, h('div', {class: 'wr-form'}, have ? [btn('Dùng hằng ngày', choose('model', g.tag), {ghost: true, disabled: AI.cfg.model === g.tag}), btn('Dùng cho việc nặng', choose('heavy', g.tag), {ghost: true, disabled: AI.cfg.heavy === g.tag})]
+        : btn(cloud ? 'Thêm' : 'Tải', async () => { if (cloud || await confirmBox('Tải model', `Tải ${g.tag} (${g.size}) về máy này qua Ollama? Cần ổ đĩa trống tương ứng và mạng ổn định.`, 'Tải về')) pull(g.tag, cloud ? 'heavy' : 'model')(); }, {ghost: true, icon: 'down', disabled: st.status !== 'online' || !!U.pull})))); };
+  const table = list => h('div', {class: 'wr-tablewrap', style: 'margin-top:8px'}, h('table', {class: 'wr-table'}, h('thead', {}, h('tr', {}, ['Model', 'Tải về', 'Phù hợp với', 'Ghi chú', ''].map(t => h('th', {}, t)))), h('tbody', {}, list.map(guideRow))));
   const cmdWin = `setx OLLAMA_ORIGINS "${origin}"`, cmdMac = `launchctl setenv OLLAMA_ORIGINS "${origin}"`;
   const copy = t => btn('Sao chép', () => navigator.clipboard.writeText(t).then(() => ctx.note('Đã sao chép lệnh.')), {ghost: true, icon: 'copy'});
   const gs = G.status, backup = run(err, async () => { download(new Blob([JSON.stringify(await S.exportAll(), null, 2)], {type: 'application/json'}), 'workroom-' + new Date().toISOString().slice(0, 10) + '.json'); ctx.note('Đã tải file sao lưu về máy.'); });
@@ -139,27 +155,35 @@ function settings(ctx) {
     if (v == null) return; if (v.length < 4 || v.length > 12) throw new Error('Mã khoá cần 4–12 ký tự.'); const hsh = await sha(v); sessionStorage.setItem('vyWrUnlocked', '1'); await S.setSetting('pin_hash', hsh); ctx.note('Đã đặt mã khoá.'); });
   return h('div', {class: 'wr-wrap'}, head('Cài đặt & Kết nối'), err,
     h('div', {class: 'wr-grid'},
-      h('section', {class: 'wr-card span'}, h('h3', {}, 'AI trên máy (Ollama)', 'Chạy trên máy này · không tính phí'),
+      h('section', {class: 'wr-card span'}, h('h3', {}, 'Trợ lý AI (qua Ollama)', h('span', {}, 'Không gọi API trả phí')),
         row('Trạng thái', aiChip, st.version ? 'Ollama ' + st.version : ''), st.error && st.status !== 'online' && h('p', {class: 'wr-err'}, st.error),
-        h('div', {class: 'wr-form', style: 'margin:10px 0'}, h('label', {}, 'Model '), h('select', {class: 'wr-in', 'aria-label': 'Model đang dùng', onchange: e => { AI.setCfg({model: e.target.value}); ctx.render(); }}, !st.models.some(m => m.name === AI.cfg.model) && h('option', {value: AI.cfg.model}, AI.cfg.model ? AI.cfg.model + ' (chưa có trên máy)' : '— chưa chọn —'), st.models.map(m => h('option', {value: m.name, selected: m.name === AI.cfg.model}, `${m.name}${m.size ? ' · ' + (m.size / 1e9).toFixed(1) + ' GB' : ''}`))),
-          h('label', {}, 'Bộ nhớ ngữ cảnh '), h('select', {class: 'wr-in', 'aria-label': 'Bộ nhớ ngữ cảnh', title: 'Lớn hơn = đọc được bài dài hơn nhưng tốn RAM/VRAM hơn', onchange: e => AI.setCfg({ctx: +e.target.value})}, [4096, 8192, 16384, 32768].map(v => h('option', {value: v, selected: v === AI.cfg.ctx}, v / 1024 + 'k'))),
-          h('label', {}, 'Chờ tối đa '), h('select', {class: 'wr-in', 'aria-label': 'Thời gian chờ', onchange: e => AI.setCfg({timeout: +e.target.value})}, [60, 120, 240, 600].map(v => h('option', {value: v, selected: v === AI.cfg.timeout}, v + ' giây'))),
-          btn('Kiểm tra kết nối', run(err, async () => { await AI.probe(); ctx.render(); }), {ghost: true, icon: 'refresh'}), btn('Thử trả lời', test, {ghost: true, disabled: !AI.ready}), AI.state.busy > 0 && btn('Dừng tác vụ đang chạy', () => AI.stop(), {danger: true, icon: 'stop'})), out,
+        h('div', {class: 'wr-fields', style: 'margin:10px 0'},
+          h('label', {class: 'wr-fld w2'}, h('span', {}, 'Model hằng ngày — trò chuyện, tóm tắt, trả lời nhanh'), pickSel('model', 'Model hằng ngày')),
+          h('label', {class: 'wr-fld'}, h('span', {}, 'Model mạnh — viết bài, biên tập, timeline, phân công'), pickSel('heavy', 'Model mạnh')),
+          h('label', {class: 'wr-fld'}, h('span', {}, 'Bộ nhớ ngữ cảnh (model trên máy)'), h('select', {class: 'wr-in', 'aria-label': 'Bộ nhớ ngữ cảnh', title: 'Lớn hơn = đọc được bài dài hơn nhưng tốn bộ nhớ card đồ hoạ hơn', onchange: e => AI.setCfg({ctx: +e.target.value})}, [8192, 16384, 32768, 65536].map(v => h('option', {value: v, selected: v === AI.cfg.ctx}, v / 1024 + 'k')))),
+          h('label', {class: 'wr-fld'}, h('span', {}, 'Chờ tối đa'), h('select', {class: 'wr-in', 'aria-label': 'Thời gian chờ', onchange: e => AI.setCfg({timeout: +e.target.value})}, [60, 120, 180, 300, 600].map(v => h('option', {value: v, selected: v === AI.cfg.timeout}, v + ' giây')))),
+          h('label', {class: 'wr-fld'}, h('span', {}, 'Model đám mây'), h('div', {class: 'wr-form'}, AI.cfg.cloudOk ? chip('warn', 'Đang cho phép') : chip('', 'Đang tắt'),
+            AI.cfg.cloudOk ? btn('Tắt', run(err, async () => { AI.setCfg({cloudOk: false}); await S.log('ai.cloud', 'Tắt model đám mây'); ctx.render(); }), {ghost: true}) : btn('Cho phép…', run(err, async () => { await allowCloud(); ctx.render(); }), {ghost: true})))),
+        h('div', {class: 'wr-form'}, btn('Kiểm tra kết nối', run(err, async () => { await AI.probe(); ctx.render(); }), {ghost: true, icon: 'refresh'}), btn('Thử model hằng ngày', test('model'), {ghost: true, disabled: !AI.ready}),
+          AI.cfg.heavy && btn('Thử model mạnh', test('heavy'), {ghost: true, disabled: !AI.ready || !AI.has(AI.cfg.heavy)}), AI.state.busy > 0 && btn('Dừng tác vụ đang chạy', () => AI.stop(), {danger: true, icon: 'stop'})), out,
+        AI.cfg.heavy && isCloud(AI.cfg.heavy) && !AI.cfg.cloudOk && h('p', {class: 'wr-err'}, 'Model mạnh đang chọn là model đám mây nhưng chưa được cho phép — việc nặng tạm dùng model hằng ngày.'),
         row('Thống kê', null, `${stats.n} lượt xử lý · trung bình ${stats.avg} giây · ${stats.errors} lỗi`),
-        row('Máy này', null, `Card đồ hoạ: ${M.gpu} · RAM trình duyệt báo: ${M.ram}`),
-        h('div', {class: 'wr-tablewrap', style: 'margin-top:10px'}, h('table', {class: 'wr-table'}, h('thead', {}, h('tr', {}, ['Model', 'Tải về', 'Phù hợp với', 'Ghi chú', ''].map(t => h('th', {}, t)))), h('tbody', {}, MODEL_GUIDE.map(g => { const have = st.models.some(m => m.name === g.tag);
-          return h('tr', {}, h('td', {}, h('b', {}, g.tag), g.tag === M.pick && h('span', {class: 'wr-tag ok'}, 'Gợi ý cho máy này')), h('td', {}, g.size), h('td', {}, g.need), h('td', {}, g.note), h('td', {}, have ? btn('Dùng', () => { AI.setCfg({model: g.tag}); ctx.render(); }, {ghost: true, disabled: AI.cfg.model === g.tag}) : btn('Tải', async () => { if (await confirmBox('Tải model', `Tải ${g.tag} (${g.size}) về máy này qua Ollama? Cần ổ đĩa trống tương ứng và mạng ổn định.`, 'Tải về')) pull(g.tag)(); }, {ghost: true, icon: 'down', disabled: st.status !== 'online' || !!U.pull}))); })))),
+        row('Máy này', null, `Card đồ hoạ: ${M.gpu} (ước lượng nhóm ${M.tier}) · RAM trình duyệt báo: ${M.ram}`),
+        h('h4', {class: 'wr-sub'}, 'Chạy trên máy này — miễn phí, dữ liệu không rời máy'), table(MODEL_GUIDE.filter(g => g.where === 'local')),
+        h('h4', {class: 'wr-sub'}, 'Đám mây (Ollama Cloud) — model mạnh nhất, máy yếu vẫn dùng được, cần đăng nhập Ollama, gửi nội dung lên Ollama'), table(MODEL_GUIDE.filter(g => g.where === 'cloud')),
         U.pull && h('div', {class: 'wr-form'}, h('span', {class: 'wr-chip warn'}, h('i'), h('span', {class: 'wr-pull'}, `Đang tải ${U.pull.tag}: ${U.pull.text}`)), btn('Dừng tải', () => AI.stop(), {ghost: true})),
-        h('p', {class: 'wr-empty'}, 'Gợi ý model dựa trên tên card đồ hoạ trình duyệt đọc được — chỉ để tham khảo. Dung lượng là số gần đúng.'),
-        h('details', {class: 'wr-guide', open: st.status !== 'online'}, h('summary', {}, 'Cách bật AI trên máy này (làm 1 lần)'),
-          h('ol', {class: 'wr-list'}, h('li', {}, 'Cài Ollama từ ', h('a', {href: 'https://ollama.com/download', target: '_blank', rel: 'noopener'}, 'ollama.com/download'), ' (nếu đã cài thì bỏ qua).'),
+        h('form', {class: 'wr-form', style: 'margin-top:10px', onsubmit: e => { e.preventDefault(); const t = e.target.tag.value.trim(); if (t) pull(t, isCloud(t) ? 'heavy' : 'model')(); }}, h('input', {class: 'wr-in grow', name: 'tag', placeholder: 'Tên model khác trên ollama.com/library (vd: qwen3.8:27b, glm-5.3:cloud)…', 'aria-label': 'Tên model'}), btn('Tải / thêm model này', null, {type: 'submit', ghost: true, disabled: st.status !== 'online' || !!U.pull})),
+        h('p', {class: 'wr-empty'}, 'Danh sách gợi ý tra tháng 11/2026 — model mới ra liên tục; gợi ý theo tên card đồ hoạ chỉ để tham khảo. Nên dùng "Thử model…" với một đoạn tiếng Việt thật trước khi chọn cố định.'),
+        h('details', {class: 'wr-guide', open: st.status !== 'online'}, h('summary', {}, 'Cách bật AI (làm 1 lần)'),
+          h('ol', {class: 'wr-list'}, h('li', {}, 'Cài Ollama từ ', h('a', {href: 'https://ollama.com/download', target: '_blank', rel: 'noopener'}, 'ollama.com/download'), ' (nếu đã cài thì cập nhật bản mới nhất).'),
             h('li', {}, 'Cho phép trang này gọi Ollama. ', M.os === 'mac' ? 'Mở Terminal, chạy:' : 'Mở PowerShell (không cần quyền admin), chạy:', h('div', {class: 'wr-form'}, h('code', {class: 'wr-code'}, M.os === 'mac' ? cmdMac : cmdWin), copy(M.os === 'mac' ? cmdMac : cmdWin))),
             h('li', {}, 'Thoát hẳn Ollama (bấm phải biểu tượng Ollama ở khay hệ thống → Quit) rồi mở lại để nhận cài đặt.'),
             h('li', {}, 'Quay lại đây bấm "Kiểm tra kết nối". Lần đầu, trình duyệt sẽ hỏi cho phép trang truy cập thiết bị/ứng dụng trên máy — chọn Cho phép.'),
-            h('li', {}, 'Bấm "Tải" ở model phù hợp trong bảng trên.')),
-          h('p', {class: 'wr-empty'}, 'An toàn: Ollama chỉ nghe trên máy này (127.0.0.1) và chỉ nhận lệnh từ đúng địa chỉ trang này. Không đổi OLLAMA_HOST thành 0.0.0.0. Nên dùng Chrome hoặc Edge trên máy tính; điện thoại không chạy được AI trên máy.'))),
-      h('section', {class: 'wr-card span'}, h('h3', {}, 'AI ngoài (ChatGPT / Gemini)', 'Chỉ khi bạn chủ động chọn'),
-        h('p', {}, 'Workroom không gọi API trả phí nào. Ở những chỗ có nút "Dùng AI ngoài…", Workroom soạn sẵn yêu cầu, bạn tự dán vào ChatGPT/Gemini ở tab mới rồi dán kết quả về.')),
+            h('li', {}, 'Bấm "Tải" ở model "Gợi ý cho máy này" → chọn làm model hằng ngày.'),
+            h('li', {}, 'Muốn chất lượng cao nhất cho viết & biên tập: mở ứng dụng Ollama → Sign in (hoặc chạy ', h('code', {class: 'wr-code'}, 'ollama signin'), '), rồi bấm "Thêm" ở một model đám mây → nó thành model mạnh.')),
+          h('p', {class: 'wr-empty'}, 'An toàn: Ollama chỉ nghe trên máy này (127.0.0.1) và chỉ nhận lệnh từ đúng địa chỉ trang này. Không đổi OLLAMA_HOST thành 0.0.0.0. Nên dùng Chrome hoặc Edge trên máy tính.'))),
+      h('section', {class: 'wr-card span'}, h('h3', {}, 'AI ngoài (ChatGPT / Gemini)', h('span', {}, 'Chỉ khi bạn chủ động chọn')),
+        h('p', {}, 'Ở những chỗ có nút "Dùng AI ngoài…", Workroom soạn sẵn yêu cầu, bạn tự dán vào ChatGPT/Gemini ở tab mới rồi dán kết quả về.')),
       h('section', {class: 'wr-card span'}, h('h3', {}, 'Google Workspace'),
         row('Trạng thái', gs === 'connected' ? chip('ok', 'Đã kết nối') : gs === 'expired' ? chip('warn', 'Cần kết nối lại') : chip('', 'Chưa kết nối'), S.local ? 'Bản thử không kết nối Google được' : S.account),
         row('Drive · Docs · Sheets', G.has('drive') ? chip('ok', 'Đã cấp quyền') : chip('', 'Chưa cấp'), 'Đọc thư mục mẫu, tạo bản sao mẫu, tạo và cập nhật Docs/Sheets'),

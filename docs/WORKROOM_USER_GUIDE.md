@@ -6,7 +6,7 @@ Vào phòng Vy → đi tới bàn → bấm ghim **START WORKING** (hoặc nút 
 
 ## Lần đầu (Overview có thẻ "Bắt đầu sử dụng")
 1. **Cài đặt & Kết nối → CONNECT GOOGLE WORKSPACE** → chọn đúng Gmail của Vy → cho phép. (Muốn đưa lịch lên Google Calendar hay lưu thư nháp Gmail thì bấm thêm quyền tương ứng.)
-2. **Cài đặt & Kết nối → AI trên máy**: làm theo 5 bước hướng dẫn, tải model được gợi ý.
+2. **Cài đặt & Kết nối → Trợ lý AI**: làm theo hướng dẫn, tải model "Gợi ý cho máy này" làm model hằng ngày. Muốn bài viết và biên tập tốt nhất: đăng nhập ứng dụng Ollama rồi thêm `kimi-k3:cloud` làm model mạnh (xem lưu ý về gửi dữ liệu trong WORKROOM_AI_SETUP.md).
 3. **Knowledge Hub → Nạp từ thư mục Google Drive** → dán link thư mục mẫu → chọn file → Nhập. Sau đó xem từng tài liệu và chuyển sang **Chính thức** những gì là chuẩn (bài đã duyệt, mẫu timeline…). AI chỉ học theo tài liệu Chính thức.
 4. (Tuỳ chọn) Đặt mã khoá Workroom.
 

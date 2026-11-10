@@ -38,7 +38,7 @@ Nếu người dùng nhờ THỰC HIỆN việc gì trong Workroom (tạo việc
     bot.stage = 'Đang suy nghĩ…'; ui.draw();
     // (2) TRẢ LỜI — stream
     const res = await ctx.ai.chat({task: 'Trò chuyện', system, messages: [...history, {role: 'user', content: (context ? `NGỮ CẢNH:\n${context}\n\n———\n\n` : '') + `YÊU CẦU: ${text}`}], onToken: (c, all) => { bot.content = all; bot.stage = ''; ui.stream(all); }});
-    bot.content = res.text.trim(); bot.model = ctx.ai.cfg.model;
+    bot.content = res.text.trim(); bot.model = res.model;
     // (3) HÀNH ĐỘNG — chỉ khi yêu cầu có vẻ nhờ làm việc; AI đề xuất, mã kiểm tra
     if (WANT.test(text)) {
       bot.stage = 'Đang xem có việc cần thực hiện…'; ui.draw();

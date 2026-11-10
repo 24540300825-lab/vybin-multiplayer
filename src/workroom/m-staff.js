@@ -51,7 +51,7 @@ export async function suggestAssign(ctx, events) {
   const S = ctx.store, staff = S.staff.filter(s => s.active);
   if (!staff.length) throw new Error('Danh bạ nhân sự đang trống — thêm nhân sự (vai trò, lịch bận) trước khi nhờ AI đề xuất. AI không được tự nghĩ ra người hay lịch rảnh.');
   const names = new Set(staff.map(s => s.name.trim().toLowerCase()));
-  const o = await ctx.ai.json({task: 'Đề xuất phân công', system: `Bạn hỗ trợ phân công nhân sự truyền thông. Mỗi sự kiện cần: content (viết tin/kịch bản), media (chụp/quay/dựng), editor (biên tập), backup (dự phòng).
+  const o = await ctx.ai.json({heavy: true, task: 'Đề xuất phân công', system: `Bạn hỗ trợ phân công nhân sự truyền thông. Mỗi sự kiện cần: content (viết tin/kịch bản), media (chụp/quay/dựng), editor (biên tập), backup (dự phòng).
 CHỈ dùng đúng tên trong DANH BẠ. Chỉ giao vai trò mà người đó có. Không giao người đang bận vào giờ đó. Tránh để một người nhận quá nhiều việc hoặc hai sự kiện trùng giờ. Thiếu người phù hợp thì để trống và nói lý do — không bịa.`,
     prompt: `DANH BẠ:\n${staff.map(s => `- ${s.name} | vai trò: ${s.roles.join(', ') || 'chưa ghi'}${s.skills ? ' | kỹ năng: ' + s.skills : ''}${(s.busy || []).length ? ' | bận: ' + s.busy.map(b => `${b.date} ${b.from || ''}-${b.to || ''}`).join('; ') : ''}`).join('\n')}\n\nSỰ KIỆN CẦN PHÂN CÔNG:\n${events.map(e => `- ${e.code} | ${e.name} | ${e.event_date} ${e.event_time || '(chưa có giờ)'} | ${e.venue || ''}${e.assign && e.assign.content ? ' | đã có content: ' + e.assign.content : ''}`).join('\n')}`}, SCHEMA,
     o => { if (!Array.isArray(o.assignments)) throw new Error('thiếu assignments'); return o; });

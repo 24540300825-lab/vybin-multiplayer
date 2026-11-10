@@ -233,3 +233,4 @@
   #wr .wr-top .lbl{display:none} #wr .wr-exit{padding:8px 10px} #wr .wr-exit::after{content:'Về phòng'; font:800 12px/1 'Nunito',sans-serif}
   #wr .wr-ib{padding:7px 8px}
 }
+#wr .wr-sub{font:800 14px/1.3 'Nunito',sans-serif; margin:16px 0 0}

@@ -29,7 +29,7 @@ export async function generateArticle(ctx, {ev, kind = 'news', notes = '', onTok
     samples.length ? `BÀI MẪU ĐÃ DUYỆT — chỉ học CẤU TRÚC và GIỌNG VĂN (cách đặt tiêu đề, mở bài, chú thích ảnh, phần ghi người thực hiện cuối bài). KHÔNG lấy bất kỳ tên người, số liệu, sự việc nào từ bài mẫu:\n${samples[0].content.slice(0, 3200)}` : null,
     `Hãy viết ${kindName(kind).toLowerCase()} cho sự kiện trên.`,
   ].filter(Boolean).join('\n\n———\n\n');
-  const res = await ctx.ai.chat({task: 'Viết ' + kindName(kind).toLowerCase(), system, prompt, temperature: 0.5, onToken});
+  const res = await ctx.ai.chat({heavy: true, task: 'Viết ' + kindName(kind).toLowerCase(), system, prompt, temperature: 0.5, onToken});
   const lines = res.text.replace(/^\s*(\*\*|#+\s*)/, '').trim().split('\n'), title = (lines.shift() || ev.name).replace(/^\*+|\*+$/g, '').replace(/^(Tiêu đề|TIÊU ĐỀ)\s*:\s*/, '').trim();
   const body = textToHtml(lines.join('\n').replace(/\*\*/g, ''));
   const sources = [{name: `Dữ kiện sự kiện ${ev.code}`, status: 'official', category: 'event'}, ...found.map(f => ({...f, excerpt: undefined, score: undefined})), ...samples.map(s => ({...srcRef(s), use: 'mẫu cấu trúc'}))];
@@ -40,7 +40,7 @@ export async function generateArticle(ctx, {ev, kind = 'news', notes = '', onTok
 // AI sửa 1 đoạn được chọn. Trả {text, warn}: warn = những tên/số AI thêm vào mà đoạn gốc không có.
 export async function aiEdit(ctx, mode, text, art) {
   const ask = {rewrite: 'Viết lại đoạn sau cho mạch lạc, rõ ý hơn.', shorten: 'Rút gọn đoạn sau còn khoảng một nửa, giữ ý chính.', expand: 'Diễn đạt đoạn sau đầy đủ, rõ hơn — KHÔNG thêm dữ kiện mới, chỉ làm rõ điều đã có.'}[mode];
-  const res = await ctx.ai.chat({task: 'Sửa đoạn văn', temperature: 0.4,
+  const res = await ctx.ai.chat({heavy: true, task: 'Sửa đoạn văn', temperature: 0.4,
     system: 'Bạn là biên tập viên tiếng Việt. Giữ NGUYÊN mọi tên người, chức danh, đơn vị, con số, ngày giờ, địa điểm và lời trích dẫn. Không thêm thông tin mới. Chỉ trả về đoạn đã sửa, không giải thích.',
     prompt: `${ask}\n\nBài: "${art.title}"\n\nĐOẠN CẦN SỬA:\n${text}`});
   const out = res.text.trim().replace(/^["“]|["”]$/g, ''), nums = s => new Set(String(s).match(/\d[\d.,/:]*/g) || []);
@@ -168,7 +168,7 @@ function editor(ctx, art, U) {
   const headline = run(err, async () => {
     propBox.replaceChildren(h('p', {class: 'wr-empty'}, 'AI đang gợi ý tiêu đề…'));
     try {
-      const o = await ctx.ai.json({task: 'Gợi ý tiêu đề', prompt: `Đề xuất 3 tiêu đề tiếng Việt cho bài sau. Không thêm dữ kiện ngoài bài.\n\nTiêu đề hiện tại: ${title.value}\n\n${htmlToText(ed.innerHTML).slice(0, 5000)}`},
+      const o = await ctx.ai.json({heavy: true, task: 'Gợi ý tiêu đề', prompt: `Đề xuất 3 tiêu đề tiếng Việt cho bài sau. Không thêm dữ kiện ngoài bài.\n\nTiêu đề hiện tại: ${title.value}\n\n${htmlToText(ed.innerHTML).slice(0, 5000)}`},
         {type: 'object', properties: {titles: {type: 'array', items: {type: 'string'}}}, required: ['titles']}, o => { if (!Array.isArray(o.titles) || !o.titles.length) throw new Error('thiếu titles'); return o.titles.filter(t => typeof t === 'string' && t.trim()).slice(0, 4); });
       propBox.replaceChildren(h('div', {class: 'wr-prop'}, h('b', {}, 'Tiêu đề gợi ý'), o.map(t => h('button', {class: 'wr-pick', onclick: async () => { await snapshot('Trước khi đổi tiêu đề'); title.value = t; touch(); propBox.replaceChildren(); }}, t)), btn('Bỏ', () => propBox.replaceChildren(), {ghost: true})));
     } catch (e) { propBox.replaceChildren(); throw e; }
