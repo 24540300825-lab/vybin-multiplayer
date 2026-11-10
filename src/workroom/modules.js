@@ -145,9 +145,8 @@ function settings(ctx) {
       h('td', {}, h('div', {class: 'wr-form'}, have ? [btn('Dùng hằng ngày', choose('model', g.tag), {ghost: true, disabled: AI.cfg.model === g.tag}), btn('Dùng cho việc nặng', choose('heavy', g.tag), {ghost: true, disabled: AI.cfg.heavy === g.tag})]
         : btn(cloud ? 'Thêm' : 'Tải', async () => { if (cloud || await confirmBox('Tải model', `Tải ${g.tag} (${g.size}) về máy này qua Ollama? Cần ổ đĩa trống tương ứng và mạng ổn định.`, 'Tải về')) pull(g.tag, cloud ? 'heavy' : 'model')(); }, {ghost: true, icon: 'down', disabled: st.status !== 'online' || !!U.pull})))); };
   const table = list => h('div', {class: 'wr-tablewrap', style: 'margin-top:8px'}, h('table', {class: 'wr-table'}, h('thead', {}, h('tr', {}, ['Model', 'Tải về', 'Phù hợp với', 'Ghi chú', ''].map(t => h('th', {}, t)))), h('tbody', {}, list.map(guideRow))));
+  const cmdMacAuto = 'curl -fsSL https://vybin-multiplayer.vercel.app/vy-ai.sh | bash';
   const cmdWin = `setx OLLAMA_ORIGINS "${origin}"`, cmdMac = `launchctl setenv OLLAMA_ORIGINS "${origin}"`;
-  // giữ cài đặt sau khi khởi động lại Mac: LaunchAgent của riêng người dùng, chạy lại lệnh trên mỗi lần đăng nhập
-  const cmdMacKeep = `mkdir -p ~/Library/LaunchAgents && printf '%s\\n' '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>Label</key><string>vy.ollama.origins</string><key>ProgramArguments</key><array><string>/bin/launchctl</string><string>setenv</string><string>OLLAMA_ORIGINS</string><string>${origin}</string></array><key>RunAtLoad</key><true/></dict></plist>' > ~/Library/LaunchAgents/vy.ollama.origins.plist && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/vy.ollama.origins.plist 2>/dev/null; true`;
   const copy = t => btn('Sao chép', () => navigator.clipboard.writeText(t).then(() => ctx.note('Đã sao chép lệnh.')), {ghost: true, icon: 'copy'});
   const gs = G.status, backup = run(err, async () => { download(new Blob([JSON.stringify(await S.exportAll(), null, 2)], {type: 'application/json'}), 'workroom-' + new Date().toISOString().slice(0, 10) + '.json'); ctx.note('Đã tải file sao lưu về máy.'); });
   const restore = run(err, async () => { const f = await pickFile('.json'); if (!f) return; let d; try { d = JSON.parse(await f.text()); } catch (e) { throw new Error('File không đọc được.'); }
@@ -181,9 +180,13 @@ function settings(ctx) {
         h('form', {class: 'wr-form', style: 'margin-top:10px', onsubmit: e => { e.preventDefault(); const t = e.target.tag.value.trim(); if (t) pull(t, isCloud(t) ? 'heavy' : 'model')(); }}, h('input', {class: 'wr-in grow', name: 'tag', placeholder: 'Tên model khác trên ollama.com/library (vd: qwen3.8:27b, glm-5.3:cloud)…', 'aria-label': 'Tên model'}), btn('Tải / thêm model này', null, {type: 'submit', ghost: true, disabled: st.status !== 'online' || !!U.pull})),
         h('p', {class: 'wr-empty'}, 'Danh sách gợi ý tra tháng 11/2026 — model mới ra liên tục; gợi ý theo tên card đồ hoạ chỉ để tham khảo. Nên dùng "Thử model…" với một đoạn tiếng Việt thật trước khi chọn cố định.'),
         h('details', {class: 'wr-guide', open: st.status !== 'online'}, h('summary', {}, 'Cách bật AI (làm 1 lần)'),
-          h('ol', {class: 'wr-list'}, h('li', {}, 'Cài Ollama từ ', h('a', {href: 'https://ollama.com/download', target: '_blank', rel: 'noopener'}, 'ollama.com/download'), ' (nếu đã cài thì cập nhật bản mới nhất).'),
+          M.os === 'mac' ? h('ol', {class: 'wr-list'},
+            h('li', {}, 'Bấm Sao chép dòng dưới đây.', h('div', {class: 'wr-form'}, h('code', {class: 'wr-code'}, cmdMacAuto), copy(cmdMacAuto))),
+            h('li', {}, 'Mở Terminal (bấm ⌘ + Space, gõ Terminal, Enter) → bấm ⌘ + V → Enter.'),
+            h('li', {}, 'Máy tự làm hết: cài/khởi động lại Ollama, cho phép trang này, kiểm tra kết nối, tải model hợp với RAM của máy. Chỉ cần gõ Y (hoặc Enter) khi được hỏi. Không cần mật khẩu.'),
+            h('li', {}, 'Xong thì quay lại đây bấm "Kiểm tra kết nối" → trình duyệt hỏi quyền truy cập thiết bị trên máy → Cho phép.'))
+          : h('ol', {class: 'wr-list'}, h('li', {}, 'Cài Ollama từ ', h('a', {href: 'https://ollama.com/download', target: '_blank', rel: 'noopener'}, 'ollama.com/download'), ' (nếu đã cài thì cập nhật bản mới nhất).'),
             h('li', {}, 'Cho phép trang này gọi Ollama. ', M.os === 'mac' ? 'Mở Terminal, chạy:' : 'Mở PowerShell (không cần quyền admin), chạy:', h('div', {class: 'wr-form'}, h('code', {class: 'wr-code'}, M.os === 'mac' ? cmdMac : cmdWin), copy(M.os === 'mac' ? cmdMac : cmdWin))),
-            M.os === 'mac' && h('li', {}, 'Lệnh trên chỉ có tác dụng đến khi Mac khởi động lại. Muốn giữ vĩnh viễn, dán thêm lệnh này vào Terminal (chạy 1 lần):', h('div', {class: 'wr-form'}, h('code', {class: 'wr-code'}, cmdMacKeep), copy(cmdMacKeep))),
             h('li', {}, M.os === 'mac' ? 'Thoát hẳn Ollama (bấm biểu tượng Ollama trên thanh menu phía trên → Quit Ollama) rồi mở lại từ Launchpad/Applications để nhận cài đặt.' : 'Thoát hẳn Ollama (bấm phải biểu tượng Ollama ở khay hệ thống → Quit) rồi mở lại để nhận cài đặt.'),
             h('li', {}, 'Quay lại đây bấm "Kiểm tra kết nối". Lần đầu, trình duyệt sẽ hỏi cho phép trang truy cập thiết bị/ứng dụng trên máy — chọn Cho phép.'),
             h('li', {}, 'Bấm "Tải" ở model "Gợi ý cho máy này" → chọn làm model hằng ngày.'),
