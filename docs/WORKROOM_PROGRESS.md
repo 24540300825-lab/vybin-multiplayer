@@ -1,6 +1,6 @@
 # PHÒNG VY — WORKROOM · Tiến độ
 
-Cập nhật: 10/11/2026 · nhánh `workroom-m1` (bản test). **Chưa lên bản chính.**
+Cập nhật: 10/11/2026 · **đã lên bản chính** (`main`), nhánh `workroom-m1` giữ lịch sử.
 
 | Milestone | Trạng thái |
 |---|---|
@@ -16,7 +16,8 @@ Cập nhật: 10/11/2026 · nhánh `workroom-m1` (bản test). **Chưa lên bả
 
 ## Kiểm thử đã chạy (Chromium headless)
 - Workroom độc lập (`dev/workroom.html`, kho cục bộ) + **Ollama giả** đúng hình dạng API + **Google API giả** ở tầng mạng: 110 kiểm tra, đạt hết (nền, AI online/offline/thiếu model/lỗi model/hết giờ/dừng/tải model, Intake, Action Engine, Knowledge, docx/xlsx ghi–đọc, Content, Editorial, Timeline ghi đúng cột mẫu thật, đồng bộ Sheet/Docs có xung đột, Staff xung đột, phụ thuộc dữ liệu, Gmail chỉ nháp, khoá, sao lưu/khôi phục, màn 390px/820px).
-- Trong game 3D (backend giả lập 2 người): Bin không thấy gì; Vy bấm ghim → đi tới ghế → ngồi gõ phím → Work Mode; đủ 10 module; BACK TO ROOM về đúng chỗ, game vẽ lại; đứng dậy như cũ.
+- Trong game 3D (backend giả lập 2 người): Bin không thấy ghim/mã Workroom; Vy bấm ghim → đi tới ghế → ngồi gõ phím → Work Mode mở, game giảm vẽ. Bước BACK TO ROOM trong game đã đạt ở bản M1; sau khi viết lại M2–M8 chưa chạy lại trọn trong game (máy kiểm thử đồ hoạ giả lập quá chậm), phần đóng/mở khung đã kiểm ở trang thử độc lập.
+- Sửa trong lúc kiểm: bỏ giới hạn 30 giây khi chờ Vy ngồi xuống (đường đi dài thì Work Mode không mở).
 - Supabase THẬT: Bin đọc 0 dòng ở cả 12 bảng `wr_*`, bị chặn ghi; Vy đọc/ghi được.
 
 ## CHƯA kiểm chứng
