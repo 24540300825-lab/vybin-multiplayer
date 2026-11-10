@@ -17,10 +17,25 @@ BAD() { printf '  \033[31m✗ %s\033[0m\n' "$1"; }
 ASK() { local a; printf '\033[1m%s [Y/n] \033[0m' "$1"; read -r a </dev/tty || a=n; case "$a" in ""|y|Y|c|C|co|có) return 0;; *) return 1;; esac; }
 probe() { curl -s -o /dev/null -w '%{http_code}' -m 3 -H "Origin: $SITE" http://127.0.0.1:11434/api/version 2>/dev/null; }
 wait_up() { local i; for i in $(seq 1 30); do c=$(probe); [ "$c" = "200" ] || [ "$c" = "403" ] && { echo "$c"; return; }; sleep 1; done; echo "000"; }
+listener() { lsof -nP -iTCP:11434 -sTCP:LISTEN -t 2>/dev/null | head -1; }
 stop_all() {
   osascript -e 'quit app "Ollama"' >/dev/null 2>&1
   launchctl bootout "gui/$UIDN" "$SRV_PL" >/dev/null 2>&1
-  sleep 2; pkill -x Ollama >/dev/null 2>&1; pkill -f 'ollama serve' >/dev/null 2>&1; pkill -x ollama >/dev/null 2>&1; sleep 1
+  # dịch vụ Ollama cài qua Homebrew hoặc job launchd khác tự bật lại Ollama KHÔNG có quyền → tạm dừng chúng
+  command -v brew >/dev/null 2>&1 && brew services stop ollama >/dev/null 2>&1
+  for j in $(launchctl list 2>/dev/null | awk 'tolower($3) ~ /ollama/ && $3 !~ /^vy\.ollama/ {print $3}'); do launchctl bootout "gui/$UIDN/$j" >/dev/null 2>&1 && echo "  (đã dừng dịch vụ $j)"; done
+  sleep 2; pkill -x Ollama >/dev/null 2>&1; pkill -f 'ollama serve' >/dev/null 2>&1; pkill -x ollama >/dev/null 2>&1
+  local i; for i in 1 2 3 4 5 6 7 8 9 10; do [ -z "$(listener)" ] && return; sleep 1; done
+  kill -9 $(listener) >/dev/null 2>&1; sleep 1
+}
+diag() {
+  echo "  ── Thông tin để gửi Bin ──"
+  echo "  macOS $(sw_vers -productVersion) · $(uname -m) · Ollama: $("$BIN" -v 2>/dev/null | tail -1)"
+  local pid; pid=$(listener); echo "  Cổng 11434: ${pid:-không có gì} $( [ -n "$pid" ] && ps -o comm= -p "$pid")"
+  [ -n "$pid" ] && { ps eww -p "$pid" 2>/dev/null | grep -o 'OLLAMA_ORIGINS=[^ ]*' || echo "  tiến trình KHÔNG có OLLAMA_ORIGINS"; }
+  echo "  launchctl: $(launchctl getenv OLLAMA_ORIGINS)"
+  launchctl list 2>/dev/null | grep -i ollama | sed 's/^/  job: /'
+  tail -5 /tmp/vy-ollama.log 2>/dev/null | sed 's/^/  log: /'
 }
 
 clear 2>/dev/null
@@ -65,30 +80,32 @@ EOF
 launchctl bootout "gui/$UIDN" "$ENV_PL" >/dev/null 2>&1; launchctl bootstrap "gui/$UIDN" "$ENV_PL" >/dev/null 2>&1
 OK "Đã đặt quyền (giữ cả sau khi khởi động lại máy)"
 
-# 3) Mở lại Ollama và kiểm tra; nếu ứng dụng không nhận quyền → chạy Ollama nền với quyền gắn sẵn
-P "3/4 · Khởi động lại Ollama và kiểm tra"
-[ -n "$APP" ] && open -a "$APP" 2>/dev/null || ("$BIN" serve >/dev/null 2>&1 &)
-C=$(wait_up)
-if [ "$C" != "200" ]; then
-  echo "  Ứng dụng Ollama chưa nhận quyền (mã $C) → chuyển sang chạy Ollama nền có quyền gắn sẵn…"
-  stop_all
-  [ -z "$BIN" ] && BIN="$APP/Contents/Resources/ollama"
-  cat > "$SRV_PL" <<EOF
+# 3) Chạy Ollama nền có quyền gắn sẵn (không phụ thuộc ứng dụng Ollama có đọc cài đặt hay không)
+P "3/4 · Khởi động Ollama có quyền và kiểm tra"
+[ -z "$BIN" ] && BIN="$APP/Contents/Resources/ollama"
+stop_all
+cat > "$SRV_PL" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>Label</key><string>vy.ollama.serve</string>
 <key>ProgramArguments</key><array><string>$BIN</string><string>serve</string></array>
-<key>EnvironmentVariables</key><dict><key>OLLAMA_ORIGINS</key><string>$ORIGINS</string><key>OLLAMA_HOST</key><string>127.0.0.1:11434</string></dict>
+<key>EnvironmentVariables</key><dict><key>OLLAMA_ORIGINS</key><string>$ORIGINS</string><key>OLLAMA_HOST</key><string>127.0.0.1:11434</string><key>HOME</key><string>$HOME</string></dict>
 <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
-<key>StandardErrorPath</key><string>/tmp/vy-ollama.log</string>
+<key>StandardOutPath</key><string>/tmp/vy-ollama.log</string><key>StandardErrorPath</key><string>/tmp/vy-ollama.log</string>
 </dict></plist>
 EOF
-  launchctl bootstrap "gui/$UIDN" "$SRV_PL" >/dev/null 2>&1
-  C=$(wait_up)
+: > /tmp/vy-ollama.log
+launchctl bootstrap "gui/$UIDN" "$SRV_PL" >/dev/null 2>&1 || launchctl load -w "$SRV_PL" >/dev/null 2>&1
+C=$(wait_up)
+if [ "$C" != "200" ]; then
+  # cách cuối: chạy trực tiếp từ Terminal này với quyền gắn sẵn
+  launchctl bootout "gui/$UIDN" "$SRV_PL" >/dev/null 2>&1; stop_all
+  OLLAMA_ORIGINS="$ORIGINS" OLLAMA_HOST=127.0.0.1:11434 nohup "$BIN" serve >>/tmp/vy-ollama.log 2>&1 &
+  C=$(wait_up); [ "$C" = "200" ] && echo "  (Ollama đang chạy từ Terminal này — đừng đóng cửa sổ Terminal khi dùng AI)"
 fi
-if [ "$C" = "200" ]; then OK "Kết nối OK — trang game đã dùng được Ollama"
-else BAD "Vẫn chưa kết nối được (mã $C). Chụp màn hình này gửi Bin."; exit 1; fi
+if [ "$C" = "200" ]; then OK "Kết nối OK — trang game đã dùng được Ollama (không cần mở ứng dụng Ollama nữa)"
+else BAD "Vẫn chưa kết nối được (mã $C). Chụp màn hình phần dưới gửi Bin."; diag; exit 1; fi
 
 # 4) Model AI theo RAM của máy
 P "4/4 · Model AI"
