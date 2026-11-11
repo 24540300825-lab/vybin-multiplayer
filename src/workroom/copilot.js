@@ -148,12 +148,13 @@ export function createCopilot(ctx) {
   const md = t => String(t || '').replace(/^(\s*)[*-] /gm, '$1• ').split(/(\*\*[^*\n]+\*\*|`[^`\n]+`|\*[^*\n]+\*)/g).filter(Boolean)
     .map(x => /^\*\*.+\*\*$/.test(x) ? h('b', {}, x.slice(2, -2)) : /^`.+`$/.test(x) ? h('code', {}, x.slice(1, -1)) : /^\*.+\*$/.test(x) ? h('i', {}, x.slice(1, -1)) : x);
   function msgEl(x) {
-    return h('div', {class: 'wr-msg ' + x.role + (x.busy ? ' busy' : '')}, ...(x.role === 'model' ? md(x.text) : [x.text]),
+    return h('div', {class: 'wr-msg ' + x.role + (x.busy ? ' busy' : '')}, ...(x.role === 'model' ? md(x.text) : [x.text]), x.busy && !x.text && AI.state.note ? h('small', {class: 'wr-mute'}, AI.state.note) : null,
       (x.did || []).length ? h('div', {class: 'acts'}, x.did.map(d => [h('span', {class: 'did'}, '✓ ' + d.t),
         d.open && btn('Mở', () => ctx.go({screen: 'doc', id: d.open}), {ghost: true, sm: 1}), d.prog && btn('Mở', () => ctx.go({screen: 'program', id: d.prog}), {ghost: true, sm: 1}),
         d.url && h('a', {class: 'wr-btn ghost sm', href: d.url, target: '_blank', rel: 'noopener'}, 'Mở Drive'), d.undo != null && C.undo[d.undo] && btn('Hoàn tác', () => C.undoAt(d.undo), {ghost: true, sm: 1})])) : null);
   }
   let liveRaf = 0;
+  AI.on(() => { const m = C.msgs[C.msgs.length - 1]; if (m && m.busy && !m.text) livePaint(); });
   const livePaint = () => { if (liveRaf) return; liveRaf = requestAnimationFrame(() => { liveRaf = 0;   // chỉ vẽ lại tin nhắn cuối (nhanh, không giật)
     const last = list && list.lastElementChild; if (!last) return; const m = C.msgs[C.msgs.length - 1]; const el = msgEl(m); last.replaceWith(el); list.scrollTop = list.scrollHeight; }); };
   function paint() {

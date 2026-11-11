@@ -112,6 +112,7 @@ export function createAI(store) {
           buf += dec.decode(value, {stream: true}); let i;
           while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (!line.startsWith('data:')) continue;
             try { take(JSON.parse(line.slice(5))); } catch (e) { continue; }
+            if (opt._alive) opt._alive();
             const t = parts.filter(p => p.text && !p.thought).map(p => p.text).join(''); if (t) opt.onText(t); }
         }
       } else take(await http(`${GAPI}/models/${model}:generateContent`, init, signal, 'gemini'));
@@ -192,7 +193,11 @@ export function createAI(store) {
   // chuỗi model sẽ thử, theo thứ tự
   function chain(opt) {
     const L = [];
-    if (cfg.key) { const g = [A.model, ...A.state.models.map(m => m.name)].filter((x, i, a) => x && a.indexOf(x) === i).slice(0, 3); g.forEach(m => L.push({prov: 'gemini', model: m})); }
+    if (cfg.key) {
+      let g = [A.model, ...A.state.models.map(m => m.name)].filter((x, i, a) => x && a.indexOf(x) === i);
+      if (opt.fast) { const fl = A.state.models.filter(m => /-flash/.test(m.name)).map(m => m.name); g = [...fl.filter(n => !/lite/.test(n)).slice(0, 1), ...fl.filter(n => /lite/.test(n)).slice(0, 1)]; if (!g.length) g = [A.model || 'gemini-flash-latest']; }   // chat: luôn model nhanh, bỏ qua model nặng đã chọn
+      g.slice(0, 3).forEach(m => L.push({prov: 'gemini', model: m}));
+    }
     for (const p of BACKUPS) if (cfg.keys[p]) { const m = cfg.models[p] || ((A.state.extra[p] || {}).models || [])[0]; if (m) L.push({prov: p, model: m.name || m}); }
     if (opt.prefer) { const i = L.findIndex(c => c.prov === opt.prefer.prov && c.model === opt.prefer.model); if (i > 0) L.unshift(...L.splice(i, 1)); }
     return L;
@@ -217,12 +222,14 @@ export function createAI(store) {
       for (let round = 0; round < 3; round++) {
         let retryable = false;
         for (let ci = 0; ci < L.length; ci++) {
-          const c = L[ci], last = ci === L.length - 1, maxTry = last ? 3 : 2;
+          const c = L[ci], last = ci === L.length - 1, maxTry = opt.fast ? (last ? 2 : 1) : last ? 3 : 2;
           if (ci > 0 || round > 0) note(`Đang dùng ${ci > 0 ? 'dự phòng: ' : ''}${PROVIDERS[c.prov].name} · ${c.model.replace(/:free$/, '')}`);
           for (let attempt = 0; attempt < maxTry; attempt++) {
             if (ac.signal.aborted) throw new AIError('aborted', 'Đã dừng.');
             const one = new AbortController(), kill = () => one.abort(); ac.signal.addEventListener('abort', kill);
-            const timer = setTimeout(() => one.abort('timeout'), cfg.timeout * 1000);
+            // chat: không có chữ nào trong 15 giây → bỏ, chuyển AI khác; việc nặng: tối đa cfg.timeout
+            const lim = (opt.fast ? 15 : cfg.timeout) * 1000; let timer = setTimeout(() => one.abort('timeout'), lim);
+            opt._alive = () => { clearTimeout(timer); timer = setTimeout(() => one.abort('timeout'), lim); };
             try {
               if (opt.onText && (ci || attempt || round)) opt.onText('');   // thử lại bằng model khác → xoá chữ dở
             const res = c.prov === 'gemini' ? await callGemini(c.model, opt, one.signal) : await callOpen(c.prov, c.model, opt, one.signal);
@@ -235,15 +242,16 @@ export function createAI(store) {
               if (ac.signal.aborted) throw new AIError('aborted', 'Đã dừng.');
               if (e.code === 'safety') throw e;
               tried.push(`${PROVIDERS[c.prov].name} ${c.model.replace(/:free$/, '')}: ${e.message}`);
+              if (opt.fast && e.code === 'timeout') break;   // chat: model treo → sang model khác ngay, không chờ lại
               if (e.transient || e.perMinute) retryable = true;
-              if (e.transient && attempt < maxTry - 1) { note(`${PROVIDERS[c.prov].name} đang bận — thử lại…`); await sleep(last ? 2000 * (attempt + 1) ** 2 : 1000); continue; }
-              if (e.perMinute && last && attempt < maxTry - 1) { note('Đã chạm giới hạn mỗi phút — đợi rồi chạy tiếp…'); await sleep(20000); continue; }
+              if (e.transient && attempt < maxTry - 1) { note(`${PROVIDERS[c.prov].name} đang bận — thử lại…`); await sleep(opt.fast ? 800 : last ? 2000 * (attempt + 1) ** 2 : 1000); continue; }
+              if (e.perMinute && last && attempt < maxTry - 1 && !opt.fast) { note('Đã chạm giới hạn mỗi phút — đợi rồi chạy tiếp…'); await sleep(20000); continue; }
               break;
             } finally { clearTimeout(timer); ac.signal.removeEventListener('abort', kill); }
           }
         }
-        if (!retryable || round === 2) break;
-        note('Mọi AI đang bận — đợi giây lát rồi tự chạy lại…'); await sleep(8000 * (round + 1));
+        if (!retryable || round === (opt.fast ? 1 : 2)) break;
+        note('Mọi AI đang bận — đợi giây lát rồi tự chạy lại…'); await sleep(opt.fast ? 3000 : 8000 * (round + 1));
       }
       throw new AIError('all', 'Tất cả model AI đang bận hoặc hết lượt. Workroom đã thử: ' + tried.slice(-4).join(' · ') + (BACKUPS.some(p => cfg.keys[p]) ? '' : '. Thêm AI dự phòng miễn phí ở Cài đặt → AI để không bị gián đoạn.'));
     } catch (e) { if (e.code !== 'aborted') log(opt.task, t0, false, e.message, null, null); throw e; }
