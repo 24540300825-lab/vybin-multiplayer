@@ -8,7 +8,8 @@ export default {
   async init(ctx) {
     if (ctx.mapId !== 'vy') return;
     let WR = null; try { WR = window.parent !== window && window.parent.VYSHELL && window.parent.VYSHELL.workroom; } catch (e) {}
-    if (!WR || !(await WR.access())) return;
+    if (!WR) return;
+    if (!(await WR.access())) { console.info('[workroom] tài khoản này chưa được cấp quyền vào Workroom'); return; }
     const api = ctx.api, L = api.local;
     let want = 0, opening = false;
     const seated = () => L.P.mode === 'sit' || L.P.mode === 'type';
@@ -28,8 +29,8 @@ export default {
     }
     const start = () => { if (seated()) return open(); want = performance.now(); L.cmdSit('type'); };
     api.chairPin = {label: 'START WORKING', act: start};
-    // chỉ mở khi Vy ngồi xuống theo lệnh START WORKING (tư thế gõ phím); ngồi thường bằng phím E không mở. Đổi ý (đi chỗ khác) → lệnh ngồi bị huỷ, không mở.
-    api.onChairSeated = () => { if (want && L.P.mode === 'type') open(); want = 0; };
+    // ngồi vào ghế bàn làm việc bằng BẤT KỲ cách nào (ghim START WORKING, phím E, bấm ghế) → mở Workroom
+    api.onChairSeated = () => { want = 0; open(); };
     api.onChairLeft = () => { want = 0; };
     ctx.ui.addButton({icon: '💼', label: '', title: 'Workroom — ngồi vào bàn làm việc', onClick: start});
     // vừa quay lại từ trang cấp quyền Google (trang phải tải lại) → tự ngồi vào bàn và mở lại Workroom
