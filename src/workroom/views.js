@@ -131,14 +131,14 @@ export function group(ctx, gid) {
   const TABS = G.tabs || G.kinds.filter(k => !KINDS[k].hidden).map(k => [k, KINDS[k].short, [k]]);
   const all = S.docs.filter(d => G.kinds.includes(d.kind) && !d.event_id), list = all.filter(d => U.f === 'all' || ((TABS.find(t => t[0] === U.f) || [])[2] || [U.f]).includes(d.kind));
   if (gid === 'schedule') {
-    const tab = ctx.ui.ph || 'docs', guide = () => tour(S, 'team', TEAM_TOUR(ctx), {force: true});
-    if (!tourDone(S, 'team') && !ctx.ui.tourTeam && (ctx.ui.tourTeam = 1)) setTimeout(() => { if (document.querySelector('.wr-ph-tabs')) { ctx.ui.ph = 'team'; ctx.render(); setTimeout(() => tour(S, 'team', TEAM_TOUR(ctx)), 120); } }, 350);
+    const tab = ctx.ui.ph || 'docs', guide = () => tour(S, 'team2', TEAM_TOUR(ctx), {force: true});
+    if (!tourDone(S, 'team2') && !ctx.ui.tourTeam && (ctx.ui.tourTeam = 1)) setTimeout(() => { if (document.querySelector('.wr-ph-tabs')) { ctx.ui.ph = 'team'; ctx.render(); setTimeout(() => tour(S, 'team2', TEAM_TOUR(ctx)), 120); } }, 350);
     return h('div', {class: 'wr-wrap wide'},
       h('div', {class: 'wr-h'}, h('h2', {}, G.name), h('div', {class: 'wr-tabs wr-ph-tabs', role: 'tablist', style: 'margin:0 0 0 14px'},
           [['docs', 'Lịch tuần', all.length], ['team', 'Đội ngũ', (S.staff || []).filter(p => p.active !== false).length]].map(([k, l, n]) => h('button', {role: 'tab', 'aria-selected': String(tab === k), class: tab === k ? 'on' : '', onclick: () => { ctx.ui.ph = k; ctx.render(); }}, l, h('em', {}, n)))),
         h('span', {class: 'sp'}), btn('Hướng dẫn', guide, {ghost: true, sm: 1, icon: 'book', title: 'Xem lại hướng dẫn mục Phân công'}),
         tab === 'docs' && btn('+ Tạo lịch tuần', () => newDocFlow(ctx, gid))),
-      tab === 'team' ? teamView(ctx) : list.length ? list.map(d => docItem(ctx, d)) : h('div', {class: 'wr-empty'}, 'Chưa có lịch tuần. Bấm “+ Tạo lịch tuần” — dán lịch nhận được, AI dựng đúng mẫu rồi bấm “Chia người”.'));
+      tab === 'team' ? teamView(ctx) : list.length ? list.map(d => docItem(ctx, d)) : h('div', {class: 'wr-empty'}, 'Chưa có lịch tuần. Bấm “+ Tạo lịch tuần” — dán lịch nhận được, AI dựng đúng mẫu rồi bấm “Chia lịch”.'));
   }
   return h('div', {class: 'wr-wrap'},
     h('div', {class: 'wr-h'}, h('h2', {}, G.name), h('span', {class: 'sp'}), btn('+ Tạo ' + (gid === 'script' ? 'kịch bản' : G.name.toLowerCase()), () => newDocFlow(ctx, gid))),
@@ -173,11 +173,11 @@ export function editor(ctx, id) {
   Object.assign(ctx.ui, {undo: () => step(-1), redo: () => step(1), exportMenu: () => exportDialog(ctx, doc), handoff: () => handoffDialog(ctx, doc), aiWrite: () => aiWrite(ctx, doc),
     download: () => exportDoc(ctx, doc, 'download'), toDrive: run(err, async () => { const u = await saveGoogle(ctx, doc); if (u) ctx.note('Đã cập nhật bản Google'); }), pdf: run(err, () => savePdf(ctx, doc))});
   paint();
-  if (doc.kind === 'schedule' && !tourDone(S, 'assign') && !ctx.ui.tourAssign && (ctx.ui.tourAssign = 1)) setTimeout(() => document.querySelector('.wr-t-assign') && tour(S, 'assign', ASSIGN_TOUR), 400);
+  if (doc.kind === 'schedule' && !tourDone(S, 'assign2') && !ctx.ui.tourAssign && (ctx.ui.tourAssign = 1)) setTimeout(() => document.querySelector('.wr-t-assign') && tour(S, 'assign2', ASSIGN_TOUR), 400);
   const ev = doc.event_id && S.eventOf(doc.event_id);
   const acts = h('div', {class: 'wr-row wr-toolbar'},
     btn('✨ AI viết', () => aiWrite(ctx, doc), {title: 'AI viết / sửa (⌘⇧A)'}), doc.kind === 'caption' && btn('3 phương án', () => capVariants(ctx, doc), {ghost: true}),
-    doc.kind === 'schedule' && btn('Chia người', run(err, () => assignDialog(ctx, S.doc(doc.id) || doc, {apply: (data, label) => applyData(ctx, doc, data, label), aiApply: instr => aiApply(ctx, doc, instr)})), {ghost: true, icon: 'users', cls: 'wr-t-assign', title: 'Tự điền Content / Media / Biên tập cho mọi sự kiện'}),
+    doc.kind === 'schedule' && btn('Chia lịch', run(err, () => assignDialog(ctx, S.doc(doc.id) || doc, {apply: (data, label) => applyData(ctx, doc, data, label)})), {ghost: true, icon: 'users', cls: 'wr-t-assign', title: 'Bốc ngẫu nhiên người trong từng bộ phận cho mọi sự kiện'}),
     h('button', {class: 'wr-x', title: 'Hoàn tác (⌘Z)', 'aria-label': 'Hoàn tác', disabled: !Hs.canUndo(), onclick: () => step(-1)}, icon('undo')),
     h('button', {class: 'wr-x', title: 'Làm lại (⌘⇧Z)', 'aria-label': 'Làm lại', disabled: !Hs.canRedo(), onclick: () => step(1)}, icon('redo')),
     h('select', {class: 'wr-in wr-status st-' + doc.status, style: 'width:auto', 'aria-label': 'Trạng thái', onchange: run(err, async e => { await S.saveDoc(doc.id, {status: e.target.value}); })}, STATUS.map(([k, l]) => h('option', {value: k, selected: doc.status === k}, l))),
