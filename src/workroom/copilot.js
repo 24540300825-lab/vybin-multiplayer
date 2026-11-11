@@ -35,7 +35,7 @@ export function createCopilot(ctx) {
   let chat = null;
   const load = () => { chat = S.chats[0] || null; C.msgs = chat ? (chat.messages || []).slice(-40) : []; };
   const persist = async () => {
-    const messages = C.msgs.slice(-40).map(m => ({role: m.role, text: m.text, did: m.did || []}));
+    const messages = C.msgs.slice(-40).map(m => ({role: m.role, text: m.text, did: m.did || [], foot: m.foot || ''}));
     try { if (chat) chat = await S.set('chats', chat.id, {messages}, {silent: true}); else chat = await S.add('chats', {title: 'Trợ lý', messages}, {silent: true}); } catch (e) { console.warn('[workroom] lưu chat', e); }
   };
   const docBrief = d => ({id: d.id, loai: KINDS[d.kind].name, kind: d.kind, ten: docTitle(d), chuong_trinh: d.event_id ? (S.eventOf(d.event_id) || {}).name : null, trang_thai: statusName(d.status), han: d.handoff && d.handoff.deadline || null, google: d.gdoc && d.gdoc.url || null, sua_luc: d.updated_at});
@@ -108,6 +108,7 @@ export function createCopilot(ctx) {
       for (let round = 0; round < 8; round++) {
         const r = await AI.generate({task: 'Trợ lý', system: system(), contents, tools: TOOLS, temperature: 0.5, prefer: via, fast: true,
           signal: ac.signal, onText: t => { if (live()) { m.text = t; livePaint(); } }}); via = r.via;
+        m.foot = (r.via.prov === 'gemini' ? r.via.model.replace(/^gemini-/, 'Gemini ').replace(/-/g, ' ') : r.via.model) + (r.fell ? ' · vì ' + r.fell.replace(/^[^:]+:\s*/, '').replace(/\.$/, '') : '');
         if (!live()) break;   // chữ hiện dần; giữ cùng model trong 1 lượt nhiều bước
         contents.push(r.content);
         if (!r.calls.length) { m.text = r.text || (m.did.length ? 'Xong.' : '…'); break; }
@@ -148,7 +149,7 @@ export function createCopilot(ctx) {
   const md = t => String(t || '').replace(/^(\s*)[*-] /gm, '$1• ').split(/(\*\*[^*\n]+\*\*|`[^`\n]+`|\*[^*\n]+\*)/g).filter(Boolean)
     .map(x => /^\*\*.+\*\*$/.test(x) ? h('b', {}, x.slice(2, -2)) : /^`.+`$/.test(x) ? h('code', {}, x.slice(1, -1)) : /^\*.+\*$/.test(x) ? h('i', {}, x.slice(1, -1)) : x);
   function msgEl(x) {
-    return h('div', {class: 'wr-msg ' + x.role + (x.busy ? ' busy' : '')}, ...(x.role === 'model' ? md(x.text) : [x.text]), x.busy && !x.text && AI.state.note ? h('small', {class: 'wr-mute'}, AI.state.note) : null,
+    return h('div', {class: 'wr-msg ' + x.role + (x.busy ? ' busy' : '')}, ...(x.role === 'model' ? md(x.text) : [x.text]), x.busy && !x.text && AI.state.note ? h('small', {class: 'wr-mute'}, AI.state.note) : null, !x.busy && x.foot ? h('small', {class: 'wr-msg-foot'}, x.foot) : null,
       (x.did || []).length ? h('div', {class: 'acts'}, x.did.map(d => [h('span', {class: 'did'}, '✓ ' + d.t),
         d.open && btn('Mở', () => ctx.go({screen: 'doc', id: d.open}), {ghost: true, sm: 1}), d.prog && btn('Mở', () => ctx.go({screen: 'program', id: d.prog}), {ghost: true, sm: 1}),
         d.url && h('a', {class: 'wr-btn ghost sm', href: d.url, target: '_blank', rel: 'noopener'}, 'Mở Drive'), d.undo != null && C.undo[d.undo] && btn('Hoàn tác', () => C.undoAt(d.undo), {ghost: true, sm: 1})])) : null);

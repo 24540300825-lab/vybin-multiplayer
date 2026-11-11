@@ -6,7 +6,7 @@ import {STATUS, statusTag, exportDialog, handoffDialog, saveGoogle, saveDrive, s
 import {sourceBox, srcSummary} from './sources.js';
 import {plain} from './fmt.js';
 import {writeDoc, captionVariants, extractProgram} from './gen.js';
-import {askKey, keyGuide, PROVIDERS, BACKUPS} from './ai.js';
+import {askKey, keyGuide, PROVIDERS, BACKUPS, EFFORTS} from './ai.js';
 import {teamView, assignDialog, TEAM_TOUR, ASSIGN_TOUR, tour, tourDone} from './team.js';
 
 const S_ = v => String(v == null ? '' : v);
@@ -455,8 +455,20 @@ export function settings(ctx) {
       Box(h('span', {}, 'AI chính — Google Gemini ', aiStatus),
         !A.cfg.key ? keyGuide() : null,
         h('div', {class: 'wr-row'}, btn(A.cfg.key ? 'Đổi khoá' : 'Dán khoá', run(err, async () => { await askKey(A); ctx.render(); })), A.cfg.key && btn('Kiểm tra', run(err, async () => { await A.probe('gemini'); ctx.render(); }), {ghost: true}),
-          st.models.length > 1 && h('select', {class: 'wr-in', style: 'width:auto', 'aria-label': 'Model Gemini', onchange: e => { A.setCfg({model: e.target.value}); ctx.render(); }}, st.models.map(m => h('option', {value: m.name, selected: m.name === A.model}, m.label + (m === st.models[0] ? ' (mới nhất)' : '')))),
+          null,
           A.cfg.key && btn('Gỡ khoá', () => { A.setKey('gemini', ''); A.probe('gemini'); ctx.render(); }, {ghost: true})),
+        A.cfg.key && st.models.length ? (() => {
+          const M = (val, set, auto) => h('select', {class: 'wr-in', style: 'width:auto', onchange: e => { set(e.target.value); ctx.render(); }, 'aria-label': auto},
+            h('option', {value: '', selected: !val}, auto), st.models.map(m => h('option', {value: m.name, selected: m.name === val}, m.name.replace(/^gemini-/, 'Gemini ').replace(/-/g, ' '))));
+          const E = (val, set, withAuto) => h('div', {class: 'wr-seg', role: 'radiogroup'}, [...(withAuto ? [['auto', 'Mặc định']] : []), ...EFFORTS].map(([k, l]) => h('button', {class: val === k ? 'on' : '', role: 'radio', 'aria-checked': String(val === k), onclick: () => { set(k); ctx.render(); }}, l)));
+          const topFlash = (st.models.find(m => /-flash$/.test(m.name)) || st.models[0]).name;
+          return h('div', {class: 'wr-aimodes'},
+            h('div', {class: 'wr-aimode'}, h('b', {}, '💬 Trò chuyện'), M(A.cfg.chatModel, v => A.setCfg({chatModel: v}), 'Tự động — ' + topFlash.replace(/^gemini-/, 'Gemini ').replace(/-/g, ' ')),
+              E(A.cfg.chatEffort || 'fast', v => A.setCfg({chatEffort: v}))),
+            h('div', {class: 'wr-aimode'}, h('b', {}, '📝 Viết tài liệu'), M(A.cfg.model, v => A.setCfg({model: v}), 'Tự động — ' + st.models[0].name.replace(/^gemini-/, 'Gemini ').replace(/-/g, ' ')),
+              E(A.cfg.docEffort || 'auto', v => A.setCfg({docEffort: v}), true)),
+            h('p', {class: 'wr-mute'}, 'Chọn model + mức suy nghĩ. Nhanh: trả lời gần như tức thì, hợp hỏi đáp. Cân bằng: nghĩ thêm chút cho câu khó. Kỹ: suy luận sâu, chậm hơn. Model mới nhất vẫn nhanh khi để mức Nhanh — chậm chủ yếu do mức suy nghĩ cao hoặc hết lượt miễn phí (khi đó Workroom tạm dùng Flash-Lite và ghi rõ lý do dưới câu trả lời).'));
+        })() : null,
         h('p', {class: 'wr-mute'}, PROVIDERS.gemini.note + '. Khoá chỉ lưu trên trình duyệt máy này.')),
       Box('AI dự phòng — để không bao giờ bị gián đoạn (miễn phí, khuyên thêm ít nhất 1)',
         h('p', {class: 'wr-mute'}, 'Khi Gemini quá tải hoặc hết lượt, Workroom tự chuyển sang dịch vụ kế tiếp và làm tiếp — bạn không phải làm gì. Thứ tự: Gemini → ' + BACKUPS.map(p => PROVIDERS[p].name).join(' → ') + '.'),

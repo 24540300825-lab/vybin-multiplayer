@@ -15,7 +15,8 @@ export const PROVIDERS = {
   cerebras: {name: 'Cerebras', base: 'https://api.cerebras.ai/v1', keyUrl: 'https://cloud.cerebras.ai/', note: 'Dự phòng · rất nhanh · miễn phí ~1 triệu token/ngày'},
 };
 export const BACKUPS = ['groq', 'openrouter', 'cerebras'];
-const DEFAULTS = {provider: 'gemini', key: '', model: '', keys: {}, models: {}, timeout: 150};
+const DEFAULTS = {provider: 'gemini', key: '', model: '', keys: {}, models: {}, timeout: 150, chatModel: '', chatEffort: 'fast', docEffort: 'auto'};
+export const EFFORTS = [['fast', 'Nhanh'], ['balanced', 'Cân bằng'], ['deep', 'Kỹ']];
 class AIError extends Error { constructor(code, msg, o = {}) { super(msg); this.code = code; Object.assign(this, o); } }
 export {AIError};
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -62,28 +63,32 @@ export function createAI(store) {
     try { r = await fetch(url, {...init, signal}); }
     catch (e) { if (signal && signal.aborted) throw e; throw new AIError('net', 'Không kết nối được tới ' + PROVIDERS[prov].name + '.', {transient: true}); }
     if (r.ok) return r;
-    let m = '', st = ''; try { const j = await r.json(); m = (j.error && (j.error.message || j.error)) || j.message || ''; st = (j.error && j.error.status) || ''; if (typeof m !== 'string') m = JSON.stringify(m); } catch (e) {}
+    let m = '', st = '', wait = 0; try { const j = await r.json(); m = (j.error && (j.error.message || j.error)) || j.message || ''; st = (j.error && j.error.status) || ''; if (typeof m !== 'string') m = JSON.stringify(m);
+      const ri = ((j.error && j.error.details) || []).find(d => d.retryDelay); if (ri) wait = parseFloat(ri.retryDelay) || 0; } catch (e) {}
+    if (!wait) wait = parseFloat(r.headers.get('retry-after') || '') || 0;
     const P = PROVIDERS[prov].name;
     if (r.status === 401 || (r.status === 400 && /API key|API_KEY|invalid.*key/i.test(m))) throw new AIError('badkey', `Khoá ${P} không đúng.`, {skip: true});
     if (r.status === 403) throw new AIError('denied', `Khoá ${P} chưa được phép dùng (${(m || st).slice(0, 120)}).`, {skip: true});
-    if (r.status === 429) throw new AIError('quota', `${P} đã hết lượt ${/day|daily|PerDay/i.test(m) ? 'hôm nay' : 'trong phút này'}.`, {skip: true, perMinute: !/day|daily|PerDay/i.test(m)});
+    if (r.status === 429) throw new AIError('quota', `${P} đã hết lượt ${/day|daily|PerDay/i.test(m) ? 'hôm nay' : 'trong phút này'}.`, {skip: true, perMinute: !/day|daily|PerDay/i.test(m), wait});
     if (r.status === 404) throw new AIError('model', `${P}: model không còn.`, {skip: true});
     if (r.status === 413) throw new AIError('big', `${P}: nội dung quá dài cho model này.`, {skip: true});
     if (r.status >= 500) throw new AIError('busy', `${P} đang quá tải.`, {transient: true});
     throw new AIError('http', `${P} báo lỗi ${r.status}${m ? ': ' + m.slice(0, 160) : ''}`, {skip: true, status: r.status, raw: m});
   }
-  // chat nhanh: bớt "suy nghĩ" của Gemini (đỡ chờ 5–20 giây cho câu hỏi thường)
-  const noThink = new Map();   // model → 'low' (không nhận minimal) | 'none' (không nhận tuỳ chọn)
-  function thinkCfg(model) {
-    const x = model.match(/gemini-(\d+(?:\.\d+)?)-(flash|pro)(-lite)?/), k = noThink.get(model); if (!x || k === 'none') return null;
-    const v = +x[1]; if (v >= 3) return {thinkingLevel: x[2] === 'flash' && !k ? 'minimal' : 'low'};
-    if (v >= 2.5) return x[2] === 'pro' ? {thinkingBudget: 128} : {thinkingBudget: 0};
-    return null;
+  // mức suy nghĩ (effort) cho Gemini: Nhanh / Cân bằng / Kỹ. Model không nhận 1 kiểu → tự hạ sang kiểu kế (nhớ lại cho lần sau)
+  const badThink = new Set();
+  function thinkOpts(model, effort) {
+    const x = model.match(/gemini-(\d+(?:\.\d+)?)-(flash|pro)(-lite)?/); if (!x || !effort || effort === 'auto') return [];
+    const v = +x[1], flash = x[2] === 'flash', T = o => [{...o, includeThoughts: true}, o];
+    if (v >= 3) return {fast: [...T({thinkingLevel: flash ? 'minimal' : 'low'}), ...T({thinkingLevel: 'low'})], balanced: [...T({thinkingLevel: flash ? 'medium' : 'low'}), ...T({thinkingLevel: 'low'})], deep: T({thinkingLevel: 'high'})}[effort] || [];
+    if (v >= 2.5) return {fast: [{thinkingBudget: flash ? 0 : 128}], balanced: T({thinkingBudget: 2048}), deep: T({thinkingBudget: -1})}[effort] || [];
+    return [];
   }
+  const thinkCfg = (model, effort) => thinkOpts(model, effort).find(o => !badThink.has(model + JSON.stringify(o))) || null;
 
   // ---------- Gemini ----------
   async function callGemini(model, opt, signal) {
-    const think = opt.fast ? thinkCfg(model) : null;
+    const think = thinkCfg(model, opt.fast ? cfg.chatEffort : cfg.docEffort);
     const body = {
       contents: opt.contents || [{role: 'user', parts: [{text: opt.prompt}, ...(opt.parts || [])]}],
       ...(opt.system ? {systemInstruction: {parts: [{text: opt.system}]}} : {}),
@@ -97,6 +102,7 @@ export function createAI(store) {
       if (j.usageMetadata) usage = {in: j.usageMetadata.promptTokenCount, out: j.usageMetadata.candidatesTokenCount};
       const c = (j.candidates || [])[0]; if (!c) return; if (c.finishReason) finish = c.finishReason;
       for (const p of (c.content && c.content.parts) || []) {
+        if (p.thought && !parts.some(q => q.text && !q.thought)) note('💭 ' + model.replace(/^gemini-/, 'Gemini ') + ' đang suy nghĩ…');
         const last = parts[parts.length - 1];
         if (p.text != null && !p.functionCall && last && last.text != null && !last.functionCall && !!last.thought === !!p.thought) { last.text += p.text; if (p.thoughtSignature) last.thoughtSignature = p.thoughtSignature; }
         else if (p.text === '' && p.thoughtSignature && !p.functionCall && last) last.thoughtSignature = p.thoughtSignature;
@@ -117,7 +123,7 @@ export function createAI(store) {
         }
       } else take(await http(`${GAPI}/models/${model}:generateContent`, init, signal, 'gemini'));
     } catch (e) {
-      if (think && e.code === 'http' && e.status === 400 && /think/i.test(e.raw || e.message)) { noThink.set(model, think.thinkingLevel === 'minimal' ? 'low' : 'none'); return callGemini(model, opt, signal); }   // model không nhận tuỳ chọn này → gọi lại bình thường
+      if (think && e.code === 'http' && e.status === 400 && /think/i.test(e.raw || e.message)) { badThink.add(model + JSON.stringify(think)); return callGemini(model, opt, signal); }   // model không nhận kiểu này → thử kiểu kế
       if (e.name === 'TypeError' && !signal.aborted) throw new AIError('net', 'Mất kết nối giữa chừng.', {transient: true});
       throw e;
     }
@@ -195,7 +201,8 @@ export function createAI(store) {
     const L = [];
     if (cfg.key) {
       let g = [A.model, ...A.state.models.map(m => m.name)].filter((x, i, a) => x && a.indexOf(x) === i);
-      if (opt.fast) { const fl = A.state.models.filter(m => /-flash/.test(m.name)).map(m => m.name); g = [...fl.filter(n => !/lite/.test(n)).slice(0, 1), ...fl.filter(n => /lite/.test(n)).slice(0, 1)]; if (!g.length) g = [A.model || 'gemini-flash-latest']; }   // chat: luôn model nhanh, bỏ qua model nặng đã chọn
+      if (opt.fast) { const fl = A.state.models.filter(m => /-flash/.test(m.name)).map(m => m.name);   // trò chuyện: model Vy chọn (mặc định Flash mới nhất), dự phòng Flash-Lite
+        g = [cfg.chatModel || fl.find(n => !/lite/.test(n)), fl.find(n => /lite/.test(n)), ...fl].filter((x, i, a) => x && a.indexOf(x) === i).slice(0, 2); if (!g.length) g = [A.model || 'gemini-flash-latest']; }
       g.slice(0, 3).forEach(m => L.push({prov: 'gemini', model: m}));
     }
     for (const p of BACKUPS) if (cfg.keys[p]) { const m = cfg.models[p] || ((A.state.extra[p] || {}).models || [])[0]; if (m) L.push({prov: p, model: m.name || m}); }
@@ -227,22 +234,23 @@ export function createAI(store) {
           for (let attempt = 0; attempt < maxTry; attempt++) {
             if (ac.signal.aborted) throw new AIError('aborted', 'Đã dừng.');
             const one = new AbortController(), kill = () => one.abort(); ac.signal.addEventListener('abort', kill);
-            // chat: không có chữ nào trong 15 giây → bỏ, chuyển AI khác; việc nặng: tối đa cfg.timeout
-            const lim = (opt.fast ? 15 : cfg.timeout) * 1000; let timer = setTimeout(() => one.abort('timeout'), lim);
+            // chat: không có tín hiệu (chữ / đang suy nghĩ) trong 25–90 giây tuỳ mức → bỏ, chuyển AI khác; việc nặng: tối đa cfg.timeout
+            const lim = (opt.fast ? ({fast: 25, balanced: 45, deep: 90}[cfg.chatEffort] || 25) : cfg.timeout) * 1000; let timer = setTimeout(() => one.abort('timeout'), lim);
             opt._alive = () => { clearTimeout(timer); timer = setTimeout(() => one.abort('timeout'), lim); };
             try {
               if (opt.onText && (ci || attempt || round)) opt.onText('');   // thử lại bằng model khác → xoá chữ dở
             const res = c.prov === 'gemini' ? await callGemini(c.model, opt, one.signal) : await callOpen(c.prov, c.model, opt, one.signal);
               if (res.truncated && opt.schema) throw new AIError('cut', 'Câu trả lời bị cắt giữa chừng.', {skip: true});
-              res.via = c; log(opt.task, t0, true, null, res, c); note(ci > 0 ? `Đã dùng dự phòng ${PROVIDERS[c.prov].name}` : '');
+              res.via = c; if (ci > 0 && tried.length) res.fell = tried[tried.length - 1]; log(opt.task, t0, true, null, res, c); note(ci > 0 ? `Đã dùng dự phòng ${PROVIDERS[c.prov].name}` : '');
               if (c.prov === 'gemini' && A.state.status !== 'ok') A.state = {...A.state, status: 'ok', error: ''};
               return res;
             } catch (e0) {
               const e = one.signal.aborted && !ac.signal.aborted ? new AIError('timeout', 'Trả lời quá chậm.', {transient: true}) : e0;
               if (ac.signal.aborted) throw new AIError('aborted', 'Đã dừng.');
               if (e.code === 'safety') throw e;
-              tried.push(`${PROVIDERS[c.prov].name} ${c.model.replace(/:free$/, '')}: ${e.message}`);
-              if (opt.fast && e.code === 'timeout') break;   // chat: model treo → sang model khác ngay, không chờ lại
+              tried.push(`${PROVIDERS[c.prov].name} ${c.model.replace(/:free$/, '')}: ${e.message}`); log(opt.task, t0, false, e.message, null, c);   // ghi cả lần hỏng để biết vì sao phải chuyển model
+              if (opt.fast && e.code === 'timeout') break;
+              if (e.perMinute && ci === 0 && !c.waited && e.wait > 0 && e.wait <= 12) { c.waited = 1; note(`${c.model.replace(/^gemini-/, 'Gemini ')}: giới hạn mỗi phút — đợi ${Math.ceil(e.wait)} giây rồi dùng tiếp…`); await sleep(e.wait * 1000 + 300); attempt--; continue; }   // đợi chút để giữ đúng model Vy chọn   // chat: model treo → sang model khác ngay, không chờ lại
               if (e.transient || e.perMinute) retryable = true;
               if (e.transient && attempt < maxTry - 1) { note(`${PROVIDERS[c.prov].name} đang bận — thử lại…`); await sleep(opt.fast ? 800 : last ? 2000 * (attempt + 1) ** 2 : 1000); continue; }
               if (e.perMinute && last && attempt < maxTry - 1 && !opt.fast) { note('Đã chạm giới hạn mỗi phút — đợi rồi chạy tiếp…'); await sleep(20000); continue; }
