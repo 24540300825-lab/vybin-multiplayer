@@ -83,7 +83,9 @@ export function createCopilot(ctx) {
   function system() {
     const v = ctx.view, cur = v.screen === 'doc' && S.doc(v.id), prog = v.screen === 'program' && S.eventOf(v.id);
     return [RULES, '',
-      'Bạn là TRỢ LÝ trong Workroom của Vy. Bạn THAO TÁC TRỰC TIẾP bằng công cụ: khi Vy nhờ tạo/viết/sửa/đổi bất cứ gì → gọi công cụ làm luôn, không chỉ hướng dẫn, không hỏi lại những gì đã đủ rõ.',
+      'Bạn là TRỢ LÝ trong Workroom của Vy — vừa là đồng nghiệp để trò chuyện, hỏi đáp, góp ý, vừa thao tác được mọi thứ.',
+      'Khi Vy hỏi hoặc nói chuyện bình thường (kiến thức, ý tưởng, cách viết, góp ý, tâm sự…) → trả lời ngay, tự nhiên, thân thiện, súc tích như một đồng nghiệp giỏi; KHÔNG gọi công cụ nếu không cần.',
+      'Khi Vy nhờ tạo/viết/sửa/đổi bất cứ gì trong Workroom → gọi công cụ làm luôn, không chỉ hướng dẫn, không hỏi lại những gì đã đủ rõ.',
       'Sửa nhỏ (một câu, một tên, một giờ) → edit_fields (đọc read_doc trước nếu chưa biết đường dẫn). Sửa lớn / viết lại → rewrite_doc. Tạo mới → create_doc (đưa hết thông tin Vy cung cấp vào info).',
       'Không có công cụ xoá tài liệu hay gửi email — nếu được nhờ, nói Vy tự làm. Trả lời ngắn gọn bằng tiếng Việt, nói rõ đã làm gì; không bịa là đã làm khi chưa gọi công cụ.',
       'Các loại tài liệu: ' + Object.entries(KINDS).map(([k, K]) => `${k} = ${K.name}`).join('; ') + '.',
@@ -98,17 +100,21 @@ export function createCopilot(ctx) {
     if (!AI.hasAny && !await askKey(AI)) { ctx.render(); return; }
     ctx.attach = C.attach.splice(0); paintAtt();
     if (ctx.attach.length) text += '\n[Vy gửi kèm ' + ctx.attach.length + ' nguồn: ' + ctx.attach.map(s => s.name).join(', ') + ' — dùng khi tạo/sửa tài liệu.]';
-    C.msgs.push({role: 'user', text}); const m = {role: 'model', text: '', did: [], busy: true}; C.msgs.push(m); C.busy = true; paint();
+    C.msgs.push({role: 'user', text}); const m = {role: 'model', text: '', did: [], busy: true}; C.msgs.push(m); C.busy = true;
+    const turn = ++C.turn, ac = C.ac = new AbortController(), live = () => turn === C.turn && !ac.signal.aborted; paint();
     const contents = C.msgs.slice(0, -1).slice(-14).filter(x => x.text).map(x => ({role: x.role, parts: [{text: x.text + (x.did && x.did.length ? '\n[đã làm: ' + x.did.map(d => d.t).join('; ') + ']' : '')}]}));
     let via = null;
     try {
       for (let round = 0; round < 8; round++) {
-        const r = await AI.generate({task: 'Trợ lý', system: system(), contents, tools: TOOLS, temperature: 0.4, prefer: via}); via = r.via;   // giữ cùng model trong 1 lượt nhiều bước
+        const r = await AI.generate({task: 'Trợ lý', system: system(), contents, tools: TOOLS, temperature: 0.5, prefer: via, fast: true,
+          signal: ac.signal, onText: t => { if (live()) { m.text = t; livePaint(); } }}); via = r.via;
+        if (!live()) break;   // chữ hiện dần; giữ cùng model trong 1 lượt nhiều bước
         contents.push(r.content);
         if (!r.calls.length) { m.text = r.text || (m.did.length ? 'Xong.' : '…'); break; }
         if (r.text) m.text = r.text;
         const resp = [];
         for (const c of r.calls) {
+          if (!live()) break;
           m.text = '⏳ ' + ({create_doc: 'Đang tạo và viết theo mẫu…', rewrite_doc: 'Đang viết lại…', edit_fields: 'Đang sửa…', save_to_drive: 'Đang lưu lên Drive…'}[c.name] || 'Đang xử lý…'); paint();
           let out; try { out = await exec(c.name, c.args, m.did); } catch (e) { out = {error: e.message}; }
           resp.push({functionResponse: {name: c.name, id: c.id, response: {result: out}}});
@@ -116,17 +122,21 @@ export function createCopilot(ctx) {
         contents.push({role: 'user', parts: resp});
         if (round === 7) m.text = 'Đã làm xong các bước trên.';
       }
-    } catch (e) { m.text = '⚠️ ' + e.message; }
-    m.busy = false; C.busy = false; paint(); persist();
+    } catch (e) { if (e.code === 'aborted' || ac.signal.aborted) { if (!m.text) m.text = '(đã dừng)'; } else m.text = '⚠️ ' + e.message; }
+    m.busy = false;
+    if (turn !== C.turn) return;   // đã bấm Mới: lượt cũ không được động vào khung chat mới
+    C.busy = false; C.ac = null; paint(); persist();
   };
   C.undoAt = async i => {
     const u = C.undo[i]; if (!u) return; const d = S.doc(u.id); if (!d) return;
     await applyData(ctx, d, u.data, 'Hoàn tác'); C.undo[i] = null; ctx.note('Đã hoàn tác'); paint();
   };
-  C.reset = async () => { C.msgs = []; C.undo = []; chat = null; paint(); };
+  C.turn = 0; C.ac = null;
+  C.stop = () => { if (C.ac) C.ac.abort('stop'); };
+  C.reset = async () => { C.turn++; if (C.ac) C.ac.abort('stop'); C.ac = null; C.busy = false; C.msgs = []; C.undo = []; chat = null; paint(); if (ta) ta.focus(); };
 
   // ---------- giao diện ----------
-  let el = null, list = null, ta = null, attEl = null;
+  let el = null, list = null, ta = null, attEl = null, sendBtn = null;
   const paintAtt = () => { if (attEl) attEl.replaceChildren(...C.attach.map((s, i) => h('span', {class: 'wr-src'}, s.type === 'image' ? h('img', {src: 'data:' + s.mime + ';base64,' + s.data, alt: ''}) : icon('doc'), h('span', {}, s.name), h('button', {class: 'wr-x del', 'aria-label': 'Bỏ ' + s.name, onclick: () => { C.attach.splice(i, 1); paintAtt(); }}, icon('x'))))); };
   const attachFiles = async files => { const {ingestFile} = await import('./sources.js'); for (const f of files) { try { C.attach.push(await ingestFile(ctx, f)); } catch (e) { ctx.note(e.message); } } paintAtt(); };
   const SUGG = {
@@ -134,23 +144,29 @@ export function createCopilot(ctx) {
     doc: ['Rút gọn phần mở đầu', 'Kiểm tra lỗi chính tả, câu chữ', 'Còn chỗ nào thiếu dữ kiện?'],
     program: ['Tạo bộ caption + tin bài + timeline cho chương trình này', 'Tóm tắt chương trình này'],
   };
+  // markdown tối giản: **đậm**, *nghiêng*, `mã`, gạch đầu dòng "* " → "• "
+  const md = t => String(t || '').replace(/^(\s*)[*-] /gm, '$1• ').split(/(\*\*[^*\n]+\*\*|`[^`\n]+`|\*[^*\n]+\*)/g).filter(Boolean)
+    .map(x => /^\*\*.+\*\*$/.test(x) ? h('b', {}, x.slice(2, -2)) : /^`.+`$/.test(x) ? h('code', {}, x.slice(1, -1)) : /^\*.+\*$/.test(x) ? h('i', {}, x.slice(1, -1)) : x);
   function msgEl(x) {
-    return h('div', {class: 'wr-msg ' + x.role + (x.busy ? ' busy' : '')}, x.text,
+    return h('div', {class: 'wr-msg ' + x.role + (x.busy ? ' busy' : '')}, ...(x.role === 'model' ? md(x.text) : [x.text]),
       (x.did || []).length ? h('div', {class: 'acts'}, x.did.map(d => [h('span', {class: 'did'}, '✓ ' + d.t),
         d.open && btn('Mở', () => ctx.go({screen: 'doc', id: d.open}), {ghost: true, sm: 1}), d.prog && btn('Mở', () => ctx.go({screen: 'program', id: d.prog}), {ghost: true, sm: 1}),
         d.url && h('a', {class: 'wr-btn ghost sm', href: d.url, target: '_blank', rel: 'noopener'}, 'Mở Drive'), d.undo != null && C.undo[d.undo] && btn('Hoàn tác', () => C.undoAt(d.undo), {ghost: true, sm: 1})])) : null);
   }
+  let liveRaf = 0;
+  const livePaint = () => { if (liveRaf) return; liveRaf = requestAnimationFrame(() => { liveRaf = 0;   // chỉ vẽ lại tin nhắn cuối (nhanh, không giật)
+    const last = list && list.lastElementChild; if (!last) return; const m = C.msgs[C.msgs.length - 1]; const el = msgEl(m); last.replaceWith(el); list.scrollTop = list.scrollHeight; }); };
   function paint() {
     if (!list) return;
     list.replaceChildren(...(C.msgs.length ? C.msgs.map(msgEl) : [h('div', {class: 'wr-msg model'}, 'Chào bạn! Mình viết, sửa, tạo mọi thứ trong Workroom theo đúng mẫu của phòng. Cứ nói việc cần làm — ví dụ “viết caption cho lễ ký kết MOU sáng mai ở A.905”.')]));
     list.scrollTop = list.scrollHeight;
-    if (ta) ta.disabled = C.busy;
+    if (sendBtn) { sendBtn.replaceChildren(icon(C.busy ? 'stop' : 'send')); sendBtn.setAttribute('aria-label', C.busy ? 'Dừng trả lời' : 'Gửi'); sendBtn.title = C.busy ? 'Dừng trả lời' : 'Gửi (Enter)'; }
   }
   C.panel = () => {
     if (!chat && S.chats.length && !C.msgs.length) load();
     const v = ctx.view, cur = v.screen === 'doc' && S.doc(v.id);
     list = h('div', {class: 'wr-msgs', 'aria-live': 'polite'});
-    ta = h('textarea', {class: 'wr-in', rows: 2, placeholder: 'Nhờ trợ lý làm gì… (kéo thả file vào đây)', onpaste: e => { const fs = [...(e.clipboardData && e.clipboardData.files || [])]; if (fs.length) { e.preventDefault(); attachFiles(fs); } }, 'aria-label': 'Nhắn trợ lý', onkeydown: e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const t = ta.value; ta.value = ''; C.send(t); } }});
+    ta = h('textarea', {class: 'wr-in', rows: 2, placeholder: 'Nhờ trợ lý làm gì… (kéo thả file vào đây)', onpaste: e => { const fs = [...(e.clipboardData && e.clipboardData.files || [])]; if (fs.length) { e.preventDefault(); attachFiles(fs); } }, 'aria-label': 'Nhắn trợ lý', onkeydown: e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (C.busy) return;   /* đang trả lời: giữ nguyên chữ đã gõ */ const t = ta.value; ta.value = ''; C.send(t); } }});
     const sugg = SUGG[v.screen] || SUGG.home;
     el = h('div', {style: 'display:contents'},
       h('header', {}, icon('spark'), 'Trợ lý AI', h('span', {class: 'sp'}), btn('Mới', () => C.reset(), {ghost: true, sm: 1}), h('button', {class: 'wr-x', 'aria-label': 'Đóng trợ lý', onclick: () => ctx.toggleCop(false)}, icon('x'))),
@@ -158,7 +174,7 @@ export function createCopilot(ctx) {
       list, !C.msgs.length && h('div', {class: 'wr-sugg'}, sugg.map(s => h('button', {onclick: () => C.send(s)}, s))),
       attEl = h('div', {class: 'wr-chips', style: 'padding:0 12px'}),
       h('div', {class: 'wr-composer', ondragover: e => e.preventDefault(), ondrop: e => { e.preventDefault(); attachFiles([...e.dataTransfer.files]); }}, h('label', {class: 'wr-x', title: 'Đính kèm tài liệu / ảnh', 'aria-label': 'Đính kèm'}, icon('plus'), h('input', {type: 'file', multiple: true, accept: '.docx,.xlsx,.csv,.txt,.pdf,image/*', style: 'display:none', onchange: e => { attachFiles([...e.target.files]); e.target.value = ''; }})),
-        ta, h('button', {class: 'wr-btn', 'aria-label': 'Gửi', onclick: () => { const t = ta.value; ta.value = ''; C.send(t); }}, icon('send'))));
+        ta, sendBtn = h('button', {class: 'wr-btn', 'aria-label': 'Gửi', onclick: () => { if (C.busy) return C.stop(); const t = ta.value; ta.value = ''; C.send(t); }}, icon('send'))));
     paintAtt();
     paint(); return el;
   };

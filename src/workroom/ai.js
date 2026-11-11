@@ -56,11 +56,12 @@ export function createAI(store) {
   const note = t => { A.state = {...A.state, note: t || ''}; emit(); };
 
   // ---------- gọi HTTP, phân loại lỗi ----------
-  async function http(url, init, signal, prov) {
+  async function http(url, init, signal, prov) { return (await req(url, init, signal, prov)).json(); }
+  async function req(url, init, signal, prov) {
     let r;
     try { r = await fetch(url, {...init, signal}); }
     catch (e) { if (signal && signal.aborted) throw e; throw new AIError('net', 'Không kết nối được tới ' + PROVIDERS[prov].name + '.', {transient: true}); }
-    if (r.ok) return r.json();
+    if (r.ok) return r;
     let m = '', st = ''; try { const j = await r.json(); m = (j.error && (j.error.message || j.error)) || j.message || ''; st = (j.error && j.error.status) || ''; if (typeof m !== 'string') m = JSON.stringify(m); } catch (e) {}
     const P = PROVIDERS[prov].name;
     if (r.status === 401 || (r.status === 400 && /API key|API_KEY|invalid.*key/i.test(m))) throw new AIError('badkey', `Khoá ${P} không đúng.`, {skip: true});
@@ -69,27 +70,63 @@ export function createAI(store) {
     if (r.status === 404) throw new AIError('model', `${P}: model không còn.`, {skip: true});
     if (r.status === 413) throw new AIError('big', `${P}: nội dung quá dài cho model này.`, {skip: true});
     if (r.status >= 500) throw new AIError('busy', `${P} đang quá tải.`, {transient: true});
-    throw new AIError('http', `${P} báo lỗi ${r.status}${m ? ': ' + m.slice(0, 160) : ''}`, {skip: true, status: r.status});
+    throw new AIError('http', `${P} báo lỗi ${r.status}${m ? ': ' + m.slice(0, 160) : ''}`, {skip: true, status: r.status, raw: m});
+  }
+  // chat nhanh: bớt "suy nghĩ" của Gemini (đỡ chờ 5–20 giây cho câu hỏi thường)
+  const noThink = new Map();   // model → 'low' (không nhận minimal) | 'none' (không nhận tuỳ chọn)
+  function thinkCfg(model) {
+    const x = model.match(/gemini-(\d+(?:\.\d+)?)-(flash|pro)(-lite)?/), k = noThink.get(model); if (!x || k === 'none') return null;
+    const v = +x[1]; if (v >= 3) return {thinkingLevel: x[2] === 'flash' && !k ? 'minimal' : 'low'};
+    if (v >= 2.5) return x[2] === 'pro' ? {thinkingBudget: 128} : {thinkingBudget: 0};
+    return null;
   }
 
   // ---------- Gemini ----------
   async function callGemini(model, opt, signal) {
+    const think = opt.fast ? thinkCfg(model) : null;
     const body = {
       contents: opt.contents || [{role: 'user', parts: [{text: opt.prompt}, ...(opt.parts || [])]}],
       ...(opt.system ? {systemInstruction: {parts: [{text: opt.system}]}} : {}),
       ...(opt.tools ? {tools: [{functionDeclarations: opt.tools}], toolConfig: {functionCallingConfig: {mode: 'AUTO'}}} : {}),
-      generationConfig: {temperature: opt.temperature ?? 0.6, maxOutputTokens: opt.maxTokens || (opt.schema ? 32768 : 8192), ...(opt.schema ? {responseMimeType: 'application/json', responseSchema: opt.schema} : {})},
+      generationConfig: {temperature: opt.temperature ?? 0.6, maxOutputTokens: opt.maxTokens || (opt.schema ? 32768 : 8192), ...(opt.schema ? {responseMimeType: 'application/json', responseSchema: opt.schema} : {}), ...(think ? {thinkingConfig: think} : {})},
     };
-    const j = await http(`${GAPI}/models/${model}:generateContent`, {method: 'POST', headers: {'x-goog-api-key': cfg.key, 'Content-Type': 'application/json'}, body: JSON.stringify(body)}, signal, 'gemini');
-    const cand = (j.candidates || [])[0];
-    if (!cand || !cand.content) {
-      const why = (j.promptFeedback && j.promptFeedback.blockReason) || (cand && cand.finishReason) || '';
+    const init = {method: 'POST', headers: {'x-goog-api-key': cfg.key, 'Content-Type': 'application/json'}, body: JSON.stringify(body)};
+    let parts = [], finish = '', block = '', usage = {};
+    const take = j => {
+      if (j.promptFeedback && j.promptFeedback.blockReason) block = j.promptFeedback.blockReason;
+      if (j.usageMetadata) usage = {in: j.usageMetadata.promptTokenCount, out: j.usageMetadata.candidatesTokenCount};
+      const c = (j.candidates || [])[0]; if (!c) return; if (c.finishReason) finish = c.finishReason;
+      for (const p of (c.content && c.content.parts) || []) {
+        const last = parts[parts.length - 1];
+        if (p.text != null && !p.functionCall && last && last.text != null && !last.functionCall && !!last.thought === !!p.thought) { last.text += p.text; if (p.thoughtSignature) last.thoughtSignature = p.thoughtSignature; }
+        else if (p.text === '' && p.thoughtSignature && !p.functionCall && last) last.thoughtSignature = p.thoughtSignature;
+        else parts.push({...p});
+      }
+    };
+    try {
+      if (opt.onText) {   // trả lời dần từng chữ (SSE)
+        const r = await req(`${GAPI}/models/${model}:streamGenerateContent?alt=sse`, init, signal, 'gemini');
+        const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+        for (;;) {
+          const {value, done} = await rd.read(); if (done) break;
+          buf += dec.decode(value, {stream: true}); let i;
+          while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (!line.startsWith('data:')) continue;
+            try { take(JSON.parse(line.slice(5))); } catch (e) { continue; }
+            const t = parts.filter(p => p.text && !p.thought).map(p => p.text).join(''); if (t) opt.onText(t); }
+        }
+      } else take(await http(`${GAPI}/models/${model}:generateContent`, init, signal, 'gemini'));
+    } catch (e) {
+      if (think && e.code === 'http' && e.status === 400 && /think/i.test(e.raw || e.message)) { noThink.set(model, think.thinkingLevel === 'minimal' ? 'low' : 'none'); return callGemini(model, opt, signal); }   // model không nhận tuỳ chọn này → gọi lại bình thường
+      if (e.name === 'TypeError' && !signal.aborted) throw new AIError('net', 'Mất kết nối giữa chừng.', {transient: true});
+      throw e;
+    }
+    if (!parts.length) {
+      const why = block || finish;
       if (why === 'SAFETY' || /BLOCK|PROHIBITED/.test(why)) throw new AIError('safety', 'Google AI từ chối nội dung này (bộ lọc an toàn).', {skip: true});
       throw new AIError('empty', 'Gemini không trả lời.', {transient: true});
     }
-    const parts = cand.content.parts || [];
     return {text: parts.filter(p => p.text && !p.thought).map(p => p.text).join(''), calls: parts.filter(p => p.functionCall).map((p, i) => ({name: p.functionCall.name, args: p.functionCall.args || {}, id: p.functionCall.id || 'call_' + i})),
-      content: {role: 'model', parts}, usage: {in: j.usageMetadata && j.usageMetadata.promptTokenCount, out: j.usageMetadata && j.usageMetadata.candidatesTokenCount}, truncated: cand.finishReason === 'MAX_TOKENS'};
+      content: {role: 'model', parts}, usage, truncated: finish === 'MAX_TOKENS'};
   }
   // ---------- dịch vụ kiểu OpenAI (Groq, OpenRouter, Cerebras) ----------
   function toMessages(opt, vision) {
@@ -130,6 +167,7 @@ export function createAI(store) {
     let text = msg.content || '';
     if (opt.schema) { const m = text.match(/```(?:json)?\s*([\s\S]*?)```/); if (m) text = m[1]; const a = text.indexOf('{'), b = text.lastIndexOf('}'); if (a >= 0 && b > a) text = text.slice(a, b + 1); }
     const calls = (msg.tool_calls || []).map(tc => { let args = {}; try { args = JSON.parse(tc.function.arguments || '{}'); } catch (e) {} return {name: tc.function.name, args, id: tc.id}; });
+    if (opt.onText && text) opt.onText(text);
     return {text, calls, content: {role: 'model', parts: [...(msg.content ? [{text: msg.content}] : []), ...calls.map(c => ({functionCall: {name: c.name, args: c.args, id: c.id}}))]},
       usage: {in: j.usage && j.usage.prompt_tokens, out: j.usage && j.usage.completion_tokens}, truncated: j.choices[0].finish_reason === 'length'};
   }
@@ -167,7 +205,9 @@ export function createAI(store) {
   A.generate = async opt => {
     if (!A.hasAny) throw new AIError('nokey', 'Chưa có khoá AI. Vào Cài đặt → AI để dán khoá Gemini (miễn phí, làm 1 lần).');
     if (A.state.status === 'unknown' || (BACKUPS.some(p => cfg.keys[p] && !A.state.extra[p]))) await A.probe();
+    if (opt.signal && opt.signal.aborted) throw new AIError('aborted', 'Đã dừng.');
     const ac = new AbortController(), t0 = performance.now(); running.add(ac);
+    if (opt.signal) opt.signal.addEventListener('abort', () => ac.abort('stop'), {once: true});   // dừng riêng lượt này (vd trợ lý bấm Mới / Dừng)
     A.state = {...A.state, busy: running.size, task: opt.task || ''}; emit();
     const tried = [];
     try {
@@ -184,7 +224,8 @@ export function createAI(store) {
             const one = new AbortController(), kill = () => one.abort(); ac.signal.addEventListener('abort', kill);
             const timer = setTimeout(() => one.abort('timeout'), cfg.timeout * 1000);
             try {
-              const res = c.prov === 'gemini' ? await callGemini(c.model, opt, one.signal) : await callOpen(c.prov, c.model, opt, one.signal);
+              if (opt.onText && (ci || attempt || round)) opt.onText('');   // thử lại bằng model khác → xoá chữ dở
+            const res = c.prov === 'gemini' ? await callGemini(c.model, opt, one.signal) : await callOpen(c.prov, c.model, opt, one.signal);
               if (res.truncated && opt.schema) throw new AIError('cut', 'Câu trả lời bị cắt giữa chừng.', {skip: true});
               res.via = c; log(opt.task, t0, true, null, res, c); note(ci > 0 ? `Đã dùng dự phòng ${PROVIDERS[c.prov].name}` : '');
               if (c.prov === 'gemini' && A.state.status !== 'ok') A.state = {...A.state, status: 'ok', error: ''};

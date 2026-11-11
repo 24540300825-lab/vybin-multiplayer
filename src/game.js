@@ -726,7 +726,7 @@ ${FRAG_COLOR}
       footPh=ph;}
     else footPh=0;
     const ty=P.mode==='type';
-    if(ty!==wasType){wasType=ty;const d=hearD();SFX.typing(DEF.id,ty,Math.max(0,1-d/12)**2)}
+    if(ty!==wasType){wasType=ty;}   // đã bỏ tiếng gõ phím (ồn)
   }
   let idleDone=false,nextIdleAt=5+Math.random()*5;
   mixer.addEventListener('finished',e=>{if(DEF.idleBurst&&e.action===acts[K.IDLE])idleDone=true});
