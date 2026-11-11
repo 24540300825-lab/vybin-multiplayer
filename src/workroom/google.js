@@ -78,17 +78,23 @@ export function createGoogle(SH, store) {
     updateDoc(id, html, name) { return upload('PATCH', `https://www.googleapis.com/upload/drive/v3/files/${id}?${q({uploadType: 'multipart', fields: FIELDS})}`, name ? {name} : {}, html); },
   };
   // tải file .docx/.xlsx lên Drive (giữ nguyên định dạng file như mẫu). id có sẵn → ghi phiên bản mới cho đúng file đó (Drive giữ lịch sử phiên bản)
-  G.drive.putFile = (blob, {name, mime, parent, id}) => {
-    const b = 'wr' + Math.random().toString(36).slice(2), meta = id ? {name} : {name, mimeType: mime, ...(parent ? {parents: [parent]} : {})};
+  // convertTo: MIME.doc / MIME.sheet → Google tự chuyển .docx/.xlsx thành Google Docs/Sheets (sửa và góp ý ngay trên Google)
+  G.drive.putFile = (blob, {name, mime, parent, id, convertTo}) => {
+    const b = 'wr' + Math.random().toString(36).slice(2), meta = id ? {name} : {name, mimeType: convertTo || mime, ...(parent ? {parents: [parent]} : {})};
     const body = new Blob([`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: ${mime}\r\n\r\n`, blob, `\r\n--${b}--`]);
     return api(id ? `https://www.googleapis.com/upload/drive/v3/files/${id}?${q({uploadType: 'multipart', fields: FIELDS})}` : `https://www.googleapis.com/upload/drive/v3/files?${q({uploadType: 'multipart', fields: FIELDS})}`,
       {method: id ? 'PATCH' : 'POST', headers: {'Content-Type': 'multipart/related; boundary=' + b}, body});
   };
+  // chia sẻ cho người nhận (Google tự gửi email báo — chỉ chạy khi Vy bấm và xác nhận)
+  G.drive.share = (id, email, role = 'commenter', message = '') => api(`${D}/files/${id}/permissions?${q({sendNotificationEmail: 'true', ...(message ? {emailMessage: message} : {})})}`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({type: 'user', role, emailAddress: email})});
+  // góp ý (bình luận) trên Google Docs/Sheets
+  G.drive.comments = id => api(`${D}/files/${id}/comments?${q({fields: 'comments(id,content,resolved,createdTime,author(displayName,emailAddress),quotedFileContent(value),replies(content,author(displayName)))', pageSize: 100, includeDeleted: 'false'})}`).then(r => r.comments || []);
   // thư mục con theo tên (tạo nếu chưa có), nhớ id trong cài đặt
-  G.folderPath = async names => {
-    const key = names.join(' / '), map = {...(store.settings.drive_dirs || {})};
+  G.folderPath = async (names, base = null) => {
+    const key = (base ? base.id + ':' : '') + names.join(' / '), map = {...(store.settings.drive_dirs || {})};
+    if (!names.length && base) return base;
     if (map[key]) { try { await G.drive.meta(map[key].id); return map[key]; } catch (e) { if (e.code !== 'http') throw e; } }
-    let parent = (await G.workFolder()).id, f = null;
+    let parent = base ? base.id : (await G.workFolder()).id, f = null;
     for (const n of names) {
       const found = await api(`${D}/files?${q({q: `'${parent}' in parents and trashed = false and mimeType = '${MIME.folder}' and name = '${n.replace(/['\\]/g, ' ')}'`, fields: `files(${FIELDS})`, includeItemsFromAllDrives: 'true'})}`);
       f = (found.files || [])[0] || await G.drive.createFolder(n, parent); parent = f.id;

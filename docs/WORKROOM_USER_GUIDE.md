@@ -18,3 +18,12 @@
 
 ## Trợ lý AI (một chỗ duy nhất)
 Bấm **✨ Trợ lý AI** ở góc trên. Nói việc cần làm, trợ lý tự làm trên màn hình đang mở: “viết caption cho lễ ký kết sáng mai”, “đổi giờ tin 2 thành 14h”, “tạo lịch công tác tuần này từ thông báo sau…”. Mỗi lần sửa có nút **Hoàn tác**.
+
+## v3.1 — Nguồn, Xuất, Bàn giao, Phím tắt
+- **Nguồn:** khi tạo mới (và trong mục “Nguồn” của mỗi tài liệu) thả Word/Excel/PDF/ảnh, dán chữ hoặc link Google Docs → **✨ Phân tích & dựng khung**. Tin bài: ảnh thả vào được AI gắn đúng chỗ và **chèn thẳng vào file Word**.
+- **Kịch bản:** 1 nút “+ Tạo kịch bản” → chọn **Bản tin thời sự** (ULAW TV / ULAW Tiếng Anh) hoặc **Video (storyboard)**.
+- **Xuất (⌘⇧E):** Word/Excel đúng mẫu · PDF · .txt · **Mở bằng Google Docs/Sheets** (1 link cố định, cập nhật lại vẫn cùng link) · file gốc lên Drive · **sao chép để gửi/đăng** theo từng loại (caption FB, lời dẫn MC, lời VO, bảng cảnh cho dựng, nội dung DES, tin nhắn Zalo lịch tuần, phân việc theo người…).
+- **Bàn giao (⌘⇧B):** chọn người nhận (danh bạ ở Cài đặt), hạn nộp, lời nhắn → chia sẻ quyền **góp ý** trên Google Docs / tạo **thư nháp** Gmail / sao chép lời nhắn Zalo. **Lấy góp ý từ Google Docs** hoặc dán góp ý → **✨ AI sửa theo góp ý**.
+- **Trạng thái:** Nháp → Gửi duyệt → Cần sửa → Đã duyệt → Đã đăng; mục “Xuất & bàn giao” theo dõi tất cả + hạn nộp.
+- **Phím tắt:** ⌘Z / ⌘⇧Z hoàn tác–làm lại (cả thay đổi do AI) · ⌘S lưu · ⌘⇧A AI viết · ⌘J Trợ lý · ⌘⇧E xuất · ⌘⇧S cập nhật Google · ⌘⇧D tải về · ⌘P PDF · ⌘⇧B bàn giao · ⌘/ bảng phím tắt.
+- **Nơi lưu trên Drive:** Cài đặt → dán link thư mục chung của phòng cho từng mục.

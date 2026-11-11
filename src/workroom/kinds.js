@@ -123,10 +123,11 @@ const CAPTION_GUIDE = `Caption Facebook: title VIẾT HOA, đặt giữa 2 emoji
 des (Nội dung DES cho thiết kế ấn phẩm, chỉ khi được yêu cầu): dãy khối ngắn theo thứ tự: center (dòng tiêu đề lớn, VIẾT HOA), head (tên mục VIẾT HOA như THÔNG ĐIỆP, MỤC TIÊU), quote (khẩu hiệu trong ngoặc kép, VIẾT HOA), body (1–2 câu), bullet (các ý ngắn), end (câu kết).`;
 
 // ===================== TIN BÀI =====================
-function articleLayout(d) {
+function articleLayout(d, srcs = []) {
   const L = [{p: 'title', t: S(d.title)}, {p: 'lead', t: S(d.lead)}];
   arr(d.blocks).forEach(b => {
-    if (b.type === 'img') { L.push({p: 'img', t: `[Chèn ảnh${S(b.text) ? ': ' + S(b.text) : ''}]`}); if (S(b.caption)) L.push({p: 'imgCap', t: S(b.caption)}); }
+    if (b.type === 'img') { const im = b.src && srcs.find(x => x.id === b.src && x.type === 'image');
+      L.push(im ? {p: 'img', t: '', image: im} : {p: 'img', t: `[Chèn ảnh${S(b.text) ? ': ' + S(b.text) : ''}]`}); if (S(b.caption)) L.push({p: 'imgCap', t: S(b.caption)}); }
     else if (S(b.text)) L.push({p: b.type === 'sub' ? 'sub' : 'body', t: S(b.text)});
   });
   const cr = d.credits || {};
@@ -134,8 +135,8 @@ function articleLayout(d) {
   return {id: 'article', layout: L};
 }
 const ARTICLE_SCHEMA = {type: 'OBJECT', properties: {title: {type: 'STRING'}, lead: {type: 'STRING'},
-  blocks: {type: 'ARRAY', items: {type: 'OBJECT', properties: {type: {type: 'STRING', enum: ['p', 'sub', 'img']}, text: {type: 'STRING'}, caption: {type: 'STRING'}}, required: ['type']}}}, required: ['title', 'lead', 'blocks']};
-const ARTICLE_GUIDE = `Tin bài website/Facebook của Trường: title VIẾT HOA. lead = đoạn sapo in đậm mở bằng thời gian, địa điểm ("Ngày dd/mm/yyyy, Trường Đại học Luật TP. Hồ Chí Minh …"). blocks theo trình tự sự kiện: p = đoạn thân (3–5 câu), sub = tiêu đề phần (vd "Phiên tham luận 1 - “…”"), img = vị trí ảnh: text mô tả ảnh cần chèn, caption = chú thích ảnh (vd "Toàn cảnh toạ đàm tại …", "PGS.TS. … phát biểu khai mạc"). Xen 1 ảnh sau mỗi 1–2 đoạn. Ghi đúng học hàm học vị, chức vụ như dữ kiện.`;
+  blocks: {type: 'ARRAY', items: {type: 'OBJECT', properties: {type: {type: 'STRING', enum: ['p', 'sub', 'img']}, text: {type: 'STRING'}, caption: {type: 'STRING'}, src: {type: 'STRING', description: 'mã ảnh nguồn S… nếu có ảnh phù hợp'}}, required: ['type']}}}, required: ['title', 'lead', 'blocks']};
+const ARTICLE_GUIDE = `Tin bài website/Facebook của Trường: title VIẾT HOA. lead = đoạn sapo in đậm mở bằng thời gian, địa điểm ("Ngày dd/mm/yyyy, Trường Đại học Luật TP. Hồ Chí Minh …"). blocks theo trình tự sự kiện: p = đoạn thân (3–5 câu), sub = tiêu đề phần (vd "Phiên tham luận 1 - “…”"), img = vị trí ảnh: text mô tả ảnh cần chèn, caption = chú thích ảnh (vd "Toàn cảnh toạ đàm tại …", "PGS.TS. … phát biểu khai mạc"). Xen 1 ảnh sau mỗi 1–2 đoạn. Nếu Vy gửi kèm ẢNH (mã S…): dùng chính các ảnh đó, đặt src = mã ảnh, viết chú thích theo đúng nội dung ảnh (không đoán tên người nếu ảnh không ghi). Ghi đúng học hàm học vị, chức vụ như dữ kiện.`;
 
 // ===================== LỊCH CÔNG TÁC TUẦN (phân công) =====================
 const FIELDS = [['attendees', 'Thành phần', 'field'], ['time', 'Thời gian', 'field'], ['place', 'Địa điểm', 'place'], ['content', 'Content', 'person'], ['media', 'Media', 'person'], ['editor', 'Biên tập', 'person'],
@@ -177,24 +178,53 @@ export const KINDS = {
     scenes: [{name: 'Intro', desc: '- Chạy intro của trường', vo: '', note: ''}, {name: 'Outro', desc: '', vo: '', note: ''}], withInfo: false, info: {title: '', head: '', steps: []}}), layout: videoLayout, schema: VIDEO_SCHEMA, guide: VIDEO_GUIDE, titleOf: d => d.title},
   caption: {name: 'Caption Facebook', short: 'Caption', ext: 'docx', blank: () => ({title: '', paras: [''], sign: 'Thực hiện: Phòng Truyền thông & QHDN', withDes: false, des: [], opts: {tone: 'trang trọng, truyền cảm hứng', length: 'vừa', emoji: 'mỗi đoạn 1 emoji', extra: ''}}),
     layout: captionLayout, schema: CAPTION_SCHEMA, guide: CAPTION_GUIDE, titleOf: d => d.title},
-  article: {name: 'Tin bài', short: 'Tin bài', ext: 'docx', blank: () => ({title: '', lead: '', blocks: [{type: 'p', text: ''}], credits: {content: '', image: ''}}), layout: articleLayout, schema: ARTICLE_SCHEMA, guide: ARTICLE_GUIDE, titleOf: d => d.title},
+  article: {name: 'Tin bài', short: 'Tin bài', ext: 'docx', blank: () => ({title: '', lead: '', blocks: [{type: 'p', text: ''}], credits: {content: '', image: ''}}), layout: (d, srcs) => articleLayout(d, srcs), schema: ARTICLE_SCHEMA, guide: ARTICLE_GUIDE, titleOf: d => d.title},
   schedule: {name: 'Lịch công tác tuần (phân công)', short: 'Lịch tuần', ext: 'docx', blank: () => ({week: '', from: '', to: '', days: [], wish: '💖Chúc cả nhà có một tuần học tập và làm việc thật hiệu quả!'}),
     layout: scheduleLayout, schema: SCHEDULE_SCHEMA, guide: SCHEDULE_GUIDE, titleOf: d => `LỊCH CÔNG TÁC TUẦN ${S(d.week)} (${S(d.from)} - ${S(d.to)})`},
   timeline: {name: 'Timeline truyền thông', short: 'Timeline', ext: 'xlsx', blank: () => ({title: 'TIMELINE TRUYỀN THÔNG\n', date: `Tp. Hồ Chí Minh, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}`, channel: 'TRUYỀN THÔNG KÊNH NỘI BỘ',
     phases: [{name: 'I. TRƯỚC SỰ KIỆN', items: []}, {name: 'II. TRONG SỰ KIỆN', items: []}, {name: 'III. SAU SỰ KIỆN', items: []}]}), schema: TIMELINE_SCHEMA, guide: TIMELINE_GUIDE, titleOf: d => S(d.title).replace(/\n/g, ' ')},
 };
 export const groupOf = kind => GROUPS.find(g => g.kinds.includes(kind));
+// Kịch bản: 1 mục chung, chọn loại khi tạo
+export const SCRIPT_TYPES = [
+  {id: 'news', name: 'Bản tin thời sự', desc: 'Kịch bản quay news / bản tin: MC dẫn, điểm tin, tin chi tiết, chuyên đề', variants: [['news_tv', 'ULAW TV'], ['news_en', 'ULAW Tiếng Anh']]},
+  {id: 'video', name: 'Video (storyboard)', desc: 'Kịch bản quay TVC / clip ngắn: cảnh – mô tả hình – voice off – ghi chú', variants: [['video', 'Storyboard']]},
+];
+// ===================== NỘI DUNG SAO CHÉP ĐỂ GỬI / ĐĂNG (theo từng loại việc) =====================
+const P = t => plain(String(t == null ? '' : t)).trim();
+export function copies(kind, d) {
+  d = d || {};
+  if (kind === 'caption') return [
+    {id: 'fb', label: 'Caption đăng Facebook', text: [P(d.title), '-----------------------------', ...arr(d.paras).map(P).filter(Boolean).join('\n\n').split('\n'), '-----------------------------', P(d.sign)].join('\n')},
+    ...(d.withDes && arr(d.des).length ? [{id: 'des', label: 'Nội dung DES (gửi thiết kế)', text: arr(d.des).map(x => P(x.text)).filter(Boolean).join('\n')}] : [])];
+  if (kind === 'news_tv' || kind === 'news_en') { const c = d.cap || {}, news = arr(d.news);
+    return [
+      {id: 'fb', label: 'Caption Facebook', text: [P(c.title), P(c.intro), ...news.map((n, i) => `${i + 1}. ${P(n.title)}`), P(c.outro), 'Link youtube: ' + P(c.youtube), P(c.footer)].filter(x => x !== '').join('\n')},
+      {id: 'short', label: 'Caption TikTok / YouTube', text: [P(d.short && d.short.title), 'Caption Short: ' + P(d.short && d.short.tags)].filter(Boolean).join('\n')},
+      {id: 'mc', label: 'Lời dẫn MC (gửi MC)', text: [['CHÀO ĐẦU', d.open], ...news.map((n, i) => ['Giới thiệu TIN ' + (i + 1), n.intro]), ['Góc chuyên đề', d.special && d.special.intro], ...arr(d.special && d.special.items).map(x => [P(x.title), x.intro]), ['Phần kết', d.close]].filter(x => P(x[1])).map(x => x[0] + ':\n' + P(x[1])).join('\n\n')},
+      {id: 'vo', label: 'Lời thu âm (gửi VO / dựng)', text: news.map((n, i) => `TIN ${i + 1}: ${P(n.title)}\n` + (arr(n.parts).length ? arr(n.parts).map((p, j) => `[TEXT: ${P(p.title)}]\n${P(p.detail)}`).join('\n') : P(n.detail))).join('\n\n')}]; }
+  if (kind === 'video') return [
+    {id: 'cap', label: 'Caption', text: [P(d.cap && d.cap.title), ...arr(d.cap && d.cap.paras).map(P), P(d.cap && d.cap.sign)].filter(Boolean).join('\n\n')},
+    {id: 'vo', label: 'Lời voice off (gửi VO)', text: arr(d.scenes).filter(s => P(s.vo)).map(s => `${P(s.name)}:\n${P(s.vo)}`).join('\n\n')},
+    {id: 'edit', label: 'Bảng cảnh (gửi dựng)', text: arr(d.scenes).map(s => `${P(s.name)}\n${P(s.desc)}${P(s.note) ? '\nGhi chú: ' + P(s.note) : ''}`).join('\n\n')}];
+  if (kind === 'article') return [{id: 'web', label: 'Nội dung đăng web / Facebook', text: [P(d.title), P(d.lead), ...arr(d.blocks).map(b => b.type === 'img' ? (P(b.caption) ? '[Ảnh: ' + P(b.caption) + ']' : '') : P(b.text)).filter(Boolean), 'Nội dung: ' + P(d.credits && d.credits.content), 'Hình ảnh: ' + P(d.credits && d.credits.image), SIGN].join('\n\n')}];
+  if (kind === 'schedule') return [{id: 'zalo', label: 'Tin nhắn gửi nhóm (Zalo / Messenger)', text: asText('schedule', d)}];
+  if (kind === 'timeline') { const by = {};
+    arr(d.phases).forEach(ph => arr(ph.items).forEach(it => [['a_content', 'Nội dung'], ['a_media', 'Media'], ['a_editor', 'Biên tập']].forEach(([k, role]) => String(it[k] || '').split(/,|\+/).map(x => x.replace(/\(.*?\)/g, '').trim()).filter(x => x && x.toLowerCase() !== 'x').forEach(n => (by[n] ||= []).push(`- ${P(it.content)} (${role}${P(it.format) ? ', ' + P(it.format) : ''})${P(it.deadline) ? ' — deadline ' + P(it.deadline) : ''}${P(it.publish) ? ', đăng ' + P(it.publish) : ''}`)))));
+    return [{id: 'people', label: 'Phân việc theo người (gửi nhóm)', text: [P(d.title).replace(/\n/g, ' '), '', ...Object.entries(by).map(([n, L]) => n + ':\n' + L.join('\n'))].join('\n')}]; }
+  return [];
+}
 export const DES = DES_TYPES; export const SCHED_FIELDS = FIELDS;
 
 // file + xem trước
-export async function toFile(kind, data) {
+export async function toFile(kind, data, srcs = []) {
   if (kind === 'timeline') return timelineXlsx(timelineData(data));
-  const {id, layout} = KINDS[kind].layout(data);
+  const {id, layout} = KINDS[kind].layout(data, srcs);
   return docx(id, layout, id + '.docx');
 }
-export function preview(kind, data) {
+export function preview(kind, data, srcs = []) {
   if (kind === 'timeline') return {html: timelineHtml(timelineData(data)), land: true};
-  const {id, layout} = KINDS[kind].layout(data);
+  const {id, layout} = KINDS[kind].layout(data, srcs);
   return {html: previewHtml(id, layout), land: kind === 'news_tv' || kind === 'news_en'};
 }
 export const fileName = (kind, doc) => (plain(doc.title || KINDS[kind].titleOf(doc.data || {}) || KINDS[kind].name).replace(/[\\/:*?"<>|\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || KINDS[kind].name) + '.' + KINDS[kind].ext;

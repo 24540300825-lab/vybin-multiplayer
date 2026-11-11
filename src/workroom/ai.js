@@ -67,7 +67,7 @@ export function createAI(store) {
     const timer = setTimeout(() => ac.abort('timeout'), cfg.timeout * 1000);
     A.state = {...A.state, busy: running.size, task: opt.task || ''}; emit();
     const body = {
-      contents: opt.contents || [{role: 'user', parts: [{text: opt.prompt}]}],
+      contents: opt.contents || [{role: 'user', parts: [{text: opt.prompt}, ...(opt.parts || [])]}],
       ...(opt.system ? {systemInstruction: {parts: [{text: opt.system}]}} : {}),
       ...(opt.tools ? {tools: [{functionDeclarations: opt.tools}], toolConfig: {functionCallingConfig: {mode: 'AUTO'}}} : {}),
       generationConfig: {temperature: opt.temperature ?? 0.6, ...(opt.maxTokens ? {maxOutputTokens: opt.maxTokens} : {}), ...(opt.schema ? {responseMimeType: 'application/json', responseSchema: opt.schema} : {})},

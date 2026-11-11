@@ -1,7 +1,9 @@
 // PHÒNG VY — WORKROOM · các màn hình: Hôm nay · từng loại việc · trình soạn theo mẫu · Chương trình · Xuất bản · Cài đặt.
 // Nguyên tắc giao diện: tiếng Việt, ít chữ, mỗi màn một việc; nút chính luôn ở trên cùng; xem trước = đúng file sẽ xuất.
 import {h, icon, btn, dialog, confirmBox, download, debounce, fmtDT, errBox, run, pickFile} from './ui.js';
-import {GROUPS, KINDS, groupOf, preview, toFile, fileName, DES, SCHED_FIELDS} from './kinds.js';
+import {GROUPS, KINDS, groupOf, preview, DES, SCHED_FIELDS, SCRIPT_TYPES} from './kinds.js';
+import {STATUS, statusTag, exportDialog, handoffDialog, saveGoogle, saveDrive, savePdf} from './out.js';
+import {sourceBox, srcSummary} from './sources.js';
 import {plain} from './fmt.js';
 import {writeDoc, captionVariants, extractProgram} from './gen.js';
 import {askKey, keyGuide} from './ai.js';
@@ -17,47 +19,57 @@ export function setP(o, p, v) { const ks = keys(p); let a = o; ks.slice(0, -1).f
 
 // ===================== VIỆC CHUNG: tạo, AI, xuất =====================
 async function needAI(ctx) { if (ctx.ai.cfg.key) return true; const ok = await askKey(ctx.ai); ctx.render(); return ok; }
-export async function newDocFlow(ctx, kind, o = {}) {
-  const K = KINDS[kind], ev = o.event_id ? ctx.store.eventOf(o.event_id) : null;
-  const ta = h('textarea', {class: 'wr-in', rows: 7, placeholder: kind === 'schedule' ? 'Dán lịch/thông báo các sự kiện trong tuần (tên, giờ, địa điểm, thành phần)…' : 'Dán thông tin có sẵn: thông báo, kế hoạch, ghi chú, số liệu… (không bắt buộc)', 'aria-label': 'Thông tin cho AI'});
-  const sel = h('select', {class: 'wr-in', 'aria-label': 'Thuộc chương trình'}, h('option', {value: ''}, 'Việc thường ngày (không thuộc chương trình)'), ctx.store.events.filter(e => !e.archived).map(e => h('option', {value: e.id, selected: e.id === o.event_id}, 'Chương trình: ' + e.name)));
-  const v = await dialog({title: 'Tạo ' + K.name, body: h('div', {class: 'wr-stack'}, ev ? h('p', {class: 'wr-mute'}, 'Thông tin chương trình “' + ev.name + '” sẽ được đưa cho AI.') : sel, ta),
-    buttons: [['Huỷ', null], ['Tạo trống', 'blank'], ['✨ AI viết luôn', 'ai', 'primary']]});
+// tạo mới theo MỤC (gid): chọn loại (nếu mục có nhiều loại) → thả nguồn → AI phân tích & dựng khung đúng mẫu
+export async function newDocFlow(ctx, gid, o = {}) {
+  const G = GROUPS.find(g => g.id === gid) || GROUPS.find(g => g.kinds.includes(gid)), S = ctx.store, ev = o.event_id ? S.eventOf(o.event_id) : null;
+  let kind = G.kinds.includes(gid) ? gid : (o.kind || G.kinds[0]);
+  const list = [], box = sourceBox(ctx, list, null, {rows: 3});
+  const req = h('input', {class: 'wr-in', placeholder: 'Yêu cầu thêm (không bắt buộc) — vd “giọng sôi nổi”, “nhấn mạnh hạn đăng ký”', 'aria-label': 'Yêu cầu thêm'});
+  const sel = h('select', {class: 'wr-in', 'aria-label': 'Thuộc chương trình'}, h('option', {value: ''}, 'Việc thường ngày'), S.events.filter(e => !e.archived).map(e => h('option', {value: e.id, selected: e.id === o.event_id}, 'Chương trình: ' + e.name)));
+  const typeEl = gid === 'script' || G.id === 'script' ? (() => { const wrap = h('div', {class: 'wr-types'});
+    const paintT = () => wrap.replaceChildren(...SCRIPT_TYPES.map(t => { const on = t.variants.some(v => v[0] === kind);
+      return h('div', {class: 'wr-type' + (on ? ' on' : ''), role: 'button', tabIndex: 0, onclick: () => { if (!on) { kind = t.variants[0][0]; paintT(); } }}, h('b', {}, t.name), h('small', {}, t.desc),
+        on && t.variants.length > 1 ? h('div', {class: 'wr-seg'}, t.variants.map(([k, l]) => h('button', {class: kind === k ? 'on' : '', onclick: e => { e.stopPropagation(); kind = k; paintT(); }}, l))) : null); }));
+    paintT(); return wrap; })() : null;
+  const v = await dialog({title: 'Tạo ' + (G.id === 'script' ? 'kịch bản' : KINDS[kind].name.toLowerCase()), wide: true, body: h('div', {class: 'wr-stack'}, typeEl,
+      h('div', {class: 'wr-f'}, h('span', {}, 'Nguồn — AI đọc và dựng khung đúng mẫu cho bạn'), box), req, ev ? h('p', {class: 'wr-mute'}, 'Kèm thông tin chương trình “' + ev.name + '”.') : sel),
+    buttons: [['Huỷ', null], ['Tạo trống', 'blank'], ['✨ Phân tích & dựng khung', 'ai', 'primary']]});
   if (!v) return null;
-  const event_id = ev ? ev.id : sel.value || null, prog = event_id ? ctx.store.eventOf(event_id) : null;
+  box.flushText(); await new Promise(r => setTimeout(r, 30));
+  const K = KINDS[kind], event_id = ev ? ev.id : sel.value || null, prog = event_id ? S.eventOf(event_id) : null;
   let data = K.blank();
   if (v === 'ai') {
     if (!await needAI(ctx)) return null;
-    ctx.busy('AI đang viết ' + K.short.toLowerCase() + ' theo mẫu…');
-    try { data = await writeDoc(ctx, kind, {brief: ta.value.trim(), program: prog, current: data}); } catch (e) { ctx.busy(null); ctx.note(e.message); if (!await confirmBox('AI chưa viết được', e.message + '\n\nVẫn tạo bản trống?', 'Tạo bản trống')) return null; }
-    ctx.busy(null);
+    if (!list.length && !prog && !req.value.trim()) { ctx.note('Chưa có nguồn — tạo bản trống để bạn điền.'); }
+    else {
+      ctx.busy('AI đang đọc nguồn và dựng ' + K.short.toLowerCase() + ' theo mẫu…');
+      try { data = await writeDoc(ctx, kind, {sources: list, program: prog, instruction: req.value.trim(), current: data}); }
+      catch (e) { ctx.busy(null); if (!await confirmBox('AI chưa dựng được', e.message + '\n\nVẫn tạo bản trống (giữ nguồn)?', 'Tạo bản trống')) return null; }
+      ctx.busy(null);
+    }
   }
-  const d = await ctx.store.createDoc(kind, data, {event_id, title: plain(K.titleOf(data) || ''), label: K.short});
-  if (ta.value.trim()) await ctx.store.saveDoc(d.id, {data: {...d.data, _brief: ta.value.trim()}}, {silent: true});
+  const d = await S.createDoc(kind, data, {event_id, title: plain(K.titleOf(data) || ''), label: K.short});
+  if (list.length) await S.saveDoc(d.id, {sources: list}, {silent: true});
   ctx.go({screen: 'doc', id: d.id}); return d;
 }
+// giữ cho Trợ lý: 'drive' = bản Google Docs/Sheets (để chia sẻ, góp ý); 'file' = file gốc; 'download' = tải về
 export async function exportDoc(ctx, doc, to) {
-  const blob = await toFile(doc.kind, doc.data || {}), name = fileName(doc.kind, doc);
-  if (to === 'download') { download(blob, name); return null; }
-  const G = ctx.g;
-  if (G.status !== 'connected') { if (await confirmBox('Kết nối Google Drive', 'Cần kết nối Google 1 lần trong phiên này để lưu lên Drive. Kết nối ngay?', 'Kết nối')) await G.connect(['drive']); return null; }
-  const grp = groupOf(doc.kind).name, ev = doc.event_id && ctx.store.eventOf(doc.event_id);
-  const dir = await G.folderPath(ev ? ['Chương trình', ev.name.slice(0, 100), grp] : [grp]);
-  const mime = blob.type;
-  let f; try { f = await G.drive.putFile(blob, {name, mime, parent: dir.id, id: doc.drive && doc.drive.id}); }
-  catch (e) { if (doc.drive && doc.drive.id && e.code === 'http') f = await G.drive.putFile(blob, {name, mime, parent: dir.id}); else throw e; }
-  await ctx.store.saveDoc(doc.id, {drive: {id: f.id, url: f.webViewLink, at: new Date().toISOString()}});
-  await ctx.store.log('doc.drive', `Lưu lên Drive: ${name}`, doc.event_id || null, {id: doc.id});
-  return f.webViewLink;
+  if (to === 'download') { const {toFile, fileName} = await import('./kinds.js'); download(await toFile(doc.kind, doc.data || {}, doc.sources || []), fileName(doc.kind, doc)); return null; }
+  return to === 'file' ? saveDrive(ctx, doc) : saveGoogle(ctx, doc);
 }
 
 // ===================== HÔM NAY =====================
+const TILE = {script: 'Bản tin thời sự hoặc video', caption: 'Đăng Facebook + nội dung DES', article: 'Tin bài web / Facebook', schedule: 'Lịch công tác tuần, phân người', timeline: 'Kế hoạch truyền thông (Excel)'};
+const dueTag = d => { const t = d.handoff && d.handoff.deadline; if (!t) return null; const ms = new Date(t) - Date.now(), late = ms < 0;
+  return h('span', {class: 'wr-tag ' + (late ? 'late' : ms < 864e5 ? 'warn' : '')}, (late ? 'Quá hạn ' : 'Hạn ') + new Date(t).toLocaleString('vi-VN', {hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit'})); };
 export function home(ctx) {
   const S = ctx.store, recent = S.docs.slice(0, 6), progs = S.events.filter(e => !e.archived).slice(0, 4);
+  const due = S.docs.filter(d => d.handoff && d.handoff.deadline && !['approved', 'published'].includes(d.status)).sort((a, b) => a.handoff.deadline.localeCompare(b.handoff.deadline)).slice(0, 5);
   const setup = [!ctx.ai.cfg.key && h('div', {class: 'wr-banner'}, icon('spark'), 'Chưa bật AI. ', btn('Bật AI (1 phút)', async () => { await askKey(ctx.ai); ctx.render(); }, {sm: 1}))].filter(Boolean);
   return h('div', {class: 'wr-wrap'}, ...setup,
     h('div', {class: 'wr-h'}, h('h2', {}, 'Hôm nay làm gì?')),
-    h('div', {class: 'wr-tiles'}, Object.entries(KINDS).map(([k, K]) => h('button', {class: 'wr-tile', onclick: () => newDocFlow(ctx, k)}, icon(groupOf(k).icon), K.name, h('small', {}, '+ Tạo mới')))),
+    h('div', {class: 'wr-tiles'}, GROUPS.map(g => h('button', {class: 'wr-tile', onclick: () => newDocFlow(ctx, g.id)}, icon(g.icon), g.id === 'schedule' ? 'Phân công (lịch tuần)' : g.name, h('small', {}, TILE[g.id])))),
+    due.length ? h('div', {}, h('div', {class: 'wr-sec'}, 'Sắp đến hạn'), due.map(d => docItem(ctx, d))) : null,
     h('div', {class: 'wr-sec'}, 'Làm tiếp'),
     recent.length ? recent.map(d => docItem(ctx, d)) : h('div', {class: 'wr-empty'}, 'Chưa có tài liệu nào. Bấm một ô ở trên để bắt đầu.'),
     h('div', {class: 'wr-sec'}, 'Chương trình lớn'),
@@ -67,7 +79,7 @@ function docItem(ctx, d) {
   const ev = evName(ctx.store, d.event_id);
   return h('button', {class: 'wr-item', onclick: () => ctx.go({screen: 'doc', id: d.id})}, icon(groupOf(d.kind).icon), h('span', {class: 't'}, docTitle(d)),
     h('span', {class: 'wr-tag'}, KINDS[d.kind].short), ev && h('span', {class: 'wr-tag prog'}, ev), d.stale && h('span', {class: 'wr-tag warn'}, 'Cần xem lại'),
-    d.status === 'done' ? h('span', {class: 'wr-tag ok'}, 'Xong') : null, d.drive && d.drive.id ? h('span', {class: 'wr-tag ok'}, 'Đã lưu Drive') : null, h('span', {class: 'm'}, ago(d.updated_at)));
+    statusTag(d.status), dueTag(d), h('span', {class: 'm'}, ago(d.updated_at)));
 }
 
 // ===================== DANH SÁCH THEO LOẠI (việc thường ngày) =====================
@@ -75,7 +87,7 @@ export function group(ctx, gid) {
   const G = GROUPS.find(g => g.id === gid), S = ctx.store, U = ctx.ui[gid] ||= {f: 'all'};
   const all = S.docs.filter(d => G.kinds.includes(d.kind) && !d.event_id), list = all.filter(d => U.f === 'all' || d.kind === U.f);
   return h('div', {class: 'wr-wrap'},
-    h('div', {class: 'wr-h'}, h('h2', {}, G.name), h('span', {class: 'sp'}), ...G.kinds.map(k => btn(G.kinds.length > 1 ? '+ ' + KINDS[k].name : '+ Tạo ' + KINDS[k].name.toLowerCase(), () => newDocFlow(ctx, k)))),
+    h('div', {class: 'wr-h'}, h('h2', {}, G.name), h('span', {class: 'sp'}), btn('+ Tạo ' + (gid === 'script' ? 'kịch bản' : G.name.toLowerCase()), () => newDocFlow(ctx, gid))),
     G.kinds.length > 1 && h('div', {class: 'wr-tabs'}, [['all', 'Tất cả'], ...G.kinds.map(k => [k, KINDS[k].short])].map(([k, l]) => h('button', {class: U.f === k ? 'on' : '', onclick: () => { U.f = k; ctx.render(); }}, l))),
     list.length ? list.map(d => docItem(ctx, d)) : h('div', {class: 'wr-empty'}, 'Chưa có. Bấm nút + ở trên để tạo — AI sẽ viết theo đúng mẫu của phòng.'),
     S.docs.some(d => G.kinds.includes(d.kind) && d.event_id) && h('p', {class: 'wr-mute', style: 'margin-top:12px'}, 'Tài liệu thuộc chương trình lớn nằm trong mục Chương trình.'));
@@ -89,38 +101,50 @@ export function editor(ctx, id) {
   const pvBox = h('div', {class: 'pv'}), pvWrap = h('div', {class: 'wr-pv'}, h('div', {class: 'wr-pv-bar'}, 'Xem trước — đúng định dạng file sẽ xuất (' + K.ext + ')'), pvBox);
   // trang giấy vẽ đúng khổ thật (A4 dọc 794px / ngang 1123px, lề 2,54 cm) rồi thu nhỏ cho vừa khung
   const fit = () => { const W = pvBox.classList.contains('land') ? 1123 : 794, avail = pvWrap.clientWidth - 32; if (avail > 50) pvBox.style.zoom = Math.min(1, avail / W).toFixed(3); };
-  const paint = () => { try { const p = preview(doc.kind, D); pvBox.className = 'pv' + (p.land ? ' land' : ''); pvBox.innerHTML = p.html; fit(); } catch (e) { pvBox.textContent = 'Lỗi xem trước: ' + e.message; } };
+  const paint = () => { try { const p = preview(doc.kind, D, doc.sources || []); pvBox.className = 'pv' + (p.land ? ' land' : ''); pvBox.innerHTML = p.html; fit(); } catch (e) { pvBox.textContent = 'Lỗi xem trước: ' + e.message; } };
   new ResizeObserver(fit).observe(pvWrap);
   const persist = () => S.saveDoc(doc.id, {data: D, title: plain(K.titleOf(D) || '')}, {silent: true}).catch(e => { err.textContent = 'Chưa lưu được: ' + e.message; });
   const save = debounce(persist, 700), repaint = debounce(paint, 200);
   ctx.ui.flush = () => save.flush();
+  const Hs = hist(ctx, doc.id);
   const E = {
     D, doc,
     get: p => getP(D, p),
-    set(p, v) { setP(D, p, v); doc.title = plain(K.titleOf(D) || ''); save(); repaint(); },
-    change(fn) { fn(D); save.flush(); ctx.render(); },   // thay đổi cấu trúc (thêm/xoá/đổi chỗ) → lưu ngay + vẽ lại
+    set(p, v) { Hs.push(D, p); setP(D, p, v); doc.title = plain(K.titleOf(D) || ''); save(); repaint(); },
+    change(fn) { Hs.push(D, null); fn(D); save.flush(); ctx.render(); },   // thay đổi cấu trúc (thêm/xoá/đổi chỗ) → lưu ngay + vẽ lại
   };
+  // phím tắt của trình soạn (index.js gọi qua ctx.ui)
+  const step = dir => { const x = dir < 0 ? Hs.undo(D) : Hs.redo(D); if (!x) return ctx.note(dir < 0 ? 'Không còn gì để hoàn tác' : 'Không còn gì để làm lại'); doc.data = x; S.saveDoc(doc.id, {data: x, title: plain(K.titleOf(x) || '')}, {silent: true}); ctx.render(); };
+  Object.assign(ctx.ui, {undo: () => step(-1), redo: () => step(1), exportMenu: () => exportDialog(ctx, doc), handoff: () => handoffDialog(ctx, doc), aiWrite: () => aiWrite(ctx, doc),
+    download: () => exportDoc(ctx, doc, 'download'), toDrive: run(err, async () => { const u = await saveGoogle(ctx, doc); if (u) ctx.note('Đã cập nhật bản Google'); }), pdf: run(err, () => savePdf(ctx, doc))});
   paint();
   const ev = doc.event_id && S.eventOf(doc.event_id);
-  const acts = h('div', {class: 'wr-row'},
-    btn('✨ AI viết', () => aiWrite(ctx, doc), {}), doc.kind === 'caption' && btn('3 phương án', () => capVariants(ctx, doc), {ghost: true}),
-    h('div', {class: 'wr-seg', role: 'group', 'aria-label': 'Trạng thái'}, [['draft', 'Nháp'], ['done', 'Xong']].map(([k, l]) => h('button', {class: doc.status === k ? 'on' : '', onclick: run(err, async () => { await S.saveDoc(doc.id, {status: k}); })}, l))),
+  const acts = h('div', {class: 'wr-row wr-toolbar'},
+    btn('✨ AI viết', () => aiWrite(ctx, doc), {title: 'AI viết / sửa (⌘⇧A)'}), doc.kind === 'caption' && btn('3 phương án', () => capVariants(ctx, doc), {ghost: true}),
+    h('button', {class: 'wr-x', title: 'Hoàn tác (⌘Z)', 'aria-label': 'Hoàn tác', disabled: !Hs.canUndo(), onclick: () => step(-1)}, icon('undo')),
+    h('button', {class: 'wr-x', title: 'Làm lại (⌘⇧Z)', 'aria-label': 'Làm lại', disabled: !Hs.canRedo(), onclick: () => step(1)}, icon('redo')),
+    h('select', {class: 'wr-in wr-status st-' + doc.status, style: 'width:auto', 'aria-label': 'Trạng thái', onchange: run(err, async e => { await S.saveDoc(doc.id, {status: e.target.value}); })}, STATUS.map(([k, l]) => h('option', {value: k, selected: doc.status === k}, l))),
     h('span', {class: 'sp', style: 'flex:1'}),
-    btn('Lịch sử', () => history(ctx, doc), {ghost: true, icon: 'undo'}),
-    btn('Tải về', run(err, () => exportDoc(ctx, doc, 'download')), {ghost: true, icon: 'down'}),
-    btn(doc.drive && doc.drive.id ? 'Cập nhật Drive' : 'Lưu lên Drive', run(err, async () => { const u = await exportDoc(ctx, doc, 'drive'); if (u) ctx.note('Đã lưu lên Drive'); }), {icon: 'drive', cls: 'dark'}),
-    doc.drive && doc.drive.url && h('a', {class: 'wr-btn ghost', href: doc.drive.url, target: '_blank', rel: 'noopener'}, icon('ext'), 'Mở'));
+    btn('Lịch sử', () => history(ctx, doc), {ghost: true, icon: 'clock'}),
+    btn('Xuất', () => exportDialog(ctx, doc), {ghost: true, icon: 'down', title: 'Word, Excel, PDF, Google Docs/Sheets, sao chép để đăng (⌘⇧E)'}),
+    btn('Bàn giao', () => handoffDialog(ctx, doc), {icon: 'send', cls: 'dark', title: 'Gửi duyệt, hạn nộp, góp ý'}),
+    doc.gdoc && doc.gdoc.url && h('a', {class: 'wr-btn ghost', href: doc.gdoc.url, target: '_blank', rel: 'noopener', title: 'Mở bản Google'}, icon('ext'), doc.kind === 'timeline' ? 'Sheets' : 'Docs'));
+  const SB = (doc.sources || []).slice(), srcEl = sourceBox(ctx, SB, async L => { await S.saveDoc(doc.id, {sources: L.slice()}, {silent: true}); doc.sources = L.slice(); paint(); }, {rows: 2});
+  const srcFold = Fold('Nguồn' + (SB.length ? ' (' + SB.length + ')' : '') + ' — thả thêm tài liệu, ảnh để AI dựng / bổ sung', !SB.length && !asTextLen(doc), srcEl,
+    h('div', {class: 'wr-row'}, btn('✨ Dựng lại từ nguồn', run(err, () => aiApply(ctx, doc, 'Đọc kỹ toàn bộ NGUỒN, dựng lại tài liệu hoàn chỉnh theo đúng mẫu.', {fresh: true})), {sm: 1}),
+      btn('✨ Bổ sung từ nguồn mới', run(err, () => aiApply(ctx, doc, 'Bổ sung vào bản hiện tại những thông tin mới có trong NGUỒN; giữ nguyên phần đã có.')), {ghost: true, sm: 1})));
   const form = ({news_tv: d => formNews(E, false), news_en: d => formNews(E, true), video: formVideo, caption: formCaption, article: formArticle, schedule: formSchedule, timeline: formTimeline})[doc.kind](E);
   return h('div', {class: 'wr-wrap wide'},
     h('div', {class: 'wr-h'}, h('button', {class: 'wr-x', title: 'Quay lại', 'aria-label': 'Quay lại', onclick: () => ctx.go(ev ? {screen: 'program', id: ev.id} : {screen: 'group', id: groupOf(doc.kind).id})}, '←'),
-      h('h2', {}, docTitle(doc)), h('span', {class: 'wr-tag'}, K.name), ev && h('span', {class: 'wr-tag prog'}, ev.name)),
+      h('h2', {}, docTitle(doc)), h('span', {class: 'wr-tag'}, K.name), ev && h('span', {class: 'wr-tag prog'}, ev.name), dueTag(doc)),
     acts, err, doc.stale && h('div', {class: 'wr-banner', style: 'margin-top:12px'}, icon('warn'), 'Thông tin chương trình đã thay đổi sau khi viết bài này.',
       btn('AI cập nhật theo chương trình', run(err, () => aiApply(ctx, doc, 'Cập nhật mọi dữ kiện (tên, ngày, giờ, địa điểm, thành phần…) cho khớp THÔNG TIN CHƯƠNG TRÌNH mới; giữ nguyên phần còn lại.', {clearStale: true})), {sm: 1}),
       btn('Bỏ qua', run(err, () => S.saveDoc(doc.id, {stale: false})), {ghost: true, sm: 1})),
-    h('div', {class: 'wr-ed' + (doc.kind === 'timeline' ? ' one' : ''), style: 'margin-top:14px'}, h('div', {class: 'wr-form'}, form), pvWrap));
+    h('div', {class: 'wr-ed' + (doc.kind === 'timeline' ? ' one' : ''), style: 'margin-top:14px'}, h('div', {class: 'wr-form'}, srcFold, form), pvWrap));
 }
 // áp kết quả AI vào tài liệu: lưu phiên bản cũ trước (để Hoàn tác / Lịch sử)
 export async function applyData(ctx, doc, data, label, extra = {}) {
+  hist(ctx, doc.id).push((ctx.store.doc(doc.id) || doc).data, null, true);
   await ctx.store.snapshot(doc, 'Trước khi: ' + label);
   const K = KINDS[doc.kind];
   await ctx.store.saveDoc(doc.id, {data, title: plain(K.titleOf(data) || ''), ...extra});
@@ -129,14 +153,15 @@ export async function applyData(ctx, doc, data, label, extra = {}) {
 async function aiApply(ctx, doc, instruction, o = {}) {
   if (!await needAI(ctx)) return;
   ctx.busy('AI đang sửa…');
-  try { const data = await writeDoc(ctx, doc.kind, {current: doc.data, instruction, program: doc.event_id && ctx.store.eventOf(doc.event_id), brief: doc.data._brief || ''});
+  doc = ctx.store.doc(doc.id) || doc;
+  try { const data = await writeDoc(ctx, doc.kind, {current: o.fresh ? KINDS[doc.kind].blank() : doc.data, instruction, sources: doc.sources || [], program: doc.event_id && ctx.store.eventOf(doc.event_id), brief: doc.data._brief || ''});
     await applyData(ctx, doc, data, 'AI sửa', o.clearStale ? {stale: false} : {}); ctx.note('Đã sửa. Muốn quay lại: bấm Lịch sử.'); }
   finally { ctx.busy(null); }
 }
 async function aiWrite(ctx, doc) {
   if (!await needAI(ctx)) return;
   const K = KINDS[doc.kind], ta = h('textarea', {class: 'wr-in', rows: 6, placeholder: 'Ví dụ: “viết lại phần mở đầu gọn hơn”, “thêm tin về lễ ký kết MOU hôm 5/11”, hoặc dán thêm tư liệu…', 'aria-label': 'Yêu cầu cho AI'});
-  const src = h('textarea', {class: 'wr-in', rows: 4, placeholder: 'Tư liệu gốc (thông báo, kế hoạch…) — AI chỉ dùng dữ kiện trong này', 'aria-label': 'Tư liệu'}); src.value = doc.data._brief || '';
+  const src = h('textarea', {class: 'wr-in', rows: 3, placeholder: 'Tư liệu thêm (không bắt buộc) — nguồn đã nạp (' + ((doc.sources || []).length) + ') luôn được gửi kèm', 'aria-label': 'Tư liệu'}); src.value = doc.data._brief || '';
   const opts = doc.kind === 'caption' ? capOpts(doc.data) : null;
   const v = await dialog({title: '✨ AI viết ' + K.short.toLowerCase(), wide: false, body: h('div', {class: 'wr-stack'}, h('label', {class: 'wr-f'}, h('span', {}, 'Bạn muốn AI làm gì?'), ta), h('label', {class: 'wr-f'}, h('span', {}, 'Tư liệu'), src), opts && opts.el,
     h('p', {class: 'wr-mute'}, 'AI viết đúng cấu trúc mẫu, chỗ thiếu dữ kiện sẽ ghi [CẦN BỔ SUNG]. Bản cũ được giữ trong Lịch sử.')),
@@ -145,7 +170,7 @@ async function aiWrite(ctx, doc) {
   doc.data._brief = src.value.trim();
   if (opts) doc.data.opts = opts.get();
   ctx.busy('AI đang viết theo mẫu…');
-  try { const data = await writeDoc(ctx, doc.kind, {current: doc.data, instruction: ta.value.trim(), brief: src.value.trim(), program: doc.event_id && ctx.store.eventOf(doc.event_id), opts: opts && opts.get()});
+  try { const data = await writeDoc(ctx, doc.kind, {current: doc.data, instruction: ta.value.trim(), brief: src.value.trim(), sources: doc.sources || [], program: doc.event_id && ctx.store.eventOf(doc.event_id), opts: opts && opts.get()});
     await applyData(ctx, doc, {...data, _brief: src.value.trim(), ...(opts ? {opts: opts.get()} : {})}, 'AI viết'); ctx.note('AI đã viết xong — kiểm tra các chỗ [CẦN BỔ SUNG].'); }
   catch (e) { ctx.note(e.message); } finally { ctx.busy(null); }
 }
@@ -164,7 +189,7 @@ async function capVariants(ctx, doc) {
   const opts = capOpts(doc.data), src = h('textarea', {class: 'wr-in', rows: 4, placeholder: 'Tư liệu (thông báo, nội dung chương trình…)', 'aria-label': 'Tư liệu'}); src.value = doc.data._brief || '';
   if (!await dialog({title: '3 phương án caption', body: h('div', {class: 'wr-stack'}, src, opts.el), buttons: [['Huỷ', null], ['Viết 3 phương án', true, 'primary']]})) return;
   ctx.busy('AI đang viết 3 phương án…'); let vs;
-  try { vs = await captionVariants(ctx, {current: doc.data, brief: src.value.trim(), program: doc.event_id && ctx.store.eventOf(doc.event_id), opts: opts.get()}); } catch (e) { ctx.busy(null); return ctx.note(e.message); }
+  try { vs = await captionVariants(ctx, {current: doc.data, brief: src.value.trim(), sources: doc.sources || [], program: doc.event_id && ctx.store.eventOf(doc.event_id), opts: opts.get()}); } catch (e) { ctx.busy(null); return ctx.note(e.message); }
   ctx.busy(null);
   const pick = await dialog({title: 'Chọn 1 phương án', wide: true, body: h('div', {class: 'wr-variants'}, vs.map((v, i) => { const p = preview('caption', v); return h('div', {class: 'wr-variant'}, h('b', {}, 'Phương án ' + (i + 1)), h('div', {class: 'pv', html: p.html})); })),
     buttons: [['Huỷ', null], ...vs.map((v, i) => ['Dùng phương án ' + (i + 1), i, 'primary'])]});
@@ -178,6 +203,17 @@ async function history(ctx, doc) {
   const x = v && vs.find(y => y.id === v); if (!x) return;
   await applyData(ctx, doc, x.data, 'Quay về bản cũ'); ctx.note('Đã quay về bản ' + fmtDT(x.created_at));
 }
+// ---------- hoàn tác / làm lại theo từng tài liệu (cả thay đổi tay lẫn AI) ----------
+export function hist(ctx, id) {
+  const all = ctx.ui.hist ||= {}, H = all[id] ||= {past: [], fut: [], at: 0, path: ''};
+  return {
+    push(D, path, force) { const t = Date.now(); if (!force && path && path === H.path && t - H.at < 1500) { H.at = t; return; } H.past.push(JSON.stringify(D)); if (H.past.length > 200) H.past.shift(); H.fut = []; H.at = t; H.path = path || ''; },
+    undo(D) { if (!H.past.length) return null; H.fut.push(JSON.stringify(D)); H.path = ''; return JSON.parse(H.past.pop()); },
+    redo(D) { if (!H.fut.length) return null; H.past.push(JSON.stringify(D)); H.path = ''; return JSON.parse(H.fut.pop()); },
+    canUndo: () => H.past.length > 0, canRedo: () => H.fut.length > 0,
+  };
+}
+const asTextLen = doc => JSON.stringify(doc.data || {}).replace(/[\s"{}\[\],:]|null|true|false/g, '').length > 400;
 // ---------- ô nhập gắn với dữ liệu ----------
 const rowsOf = (v, min) => Math.min(16, Math.max(min, S_(v).split('\n').length + Math.floor(S_(v).length / 70)));
 function F(E, label, path, o = {}) {
@@ -318,21 +354,22 @@ export function program(ctx, id) {
       h('div', {class: 'wr-f2'}, f('Đơn vị tổ chức', 'organizer'), f('Thành phần', 'attendees')), f('Brief / nội dung chính', 'brief', {area: 1, rows: 5}),
       h('p', {class: 'wr-mute'}, 'Sửa thông tin ở đây → các tài liệu đã viết được đánh dấu “Cần xem lại”, AI không tự sửa.'))),
     ...GROUPS.map(g => { const L = docs.filter(d => g.kinds.includes(d.kind));
-      return h('div', {}, h('div', {class: 'wr-sec'}, g.name), L.map(d => docItem(ctx, d)), h('div', {class: 'wr-row'}, g.kinds.map(k => btn('+ ' + KINDS[k].name, () => newDocFlow(ctx, k, {event_id: e.id}), {ghost: true, sm: 1})))); }));
+      return h('div', {}, h('div', {class: 'wr-sec'}, g.name), L.map(d => docItem(ctx, d)), btn('+ Tạo ' + (g.id === 'script' ? 'kịch bản' : g.name.toLowerCase()) + ' cho chương trình', () => newDocFlow(ctx, g.id, {event_id: e.id}), {ghost: true, sm: 1})); }));
 }
 
 // ===================== XUẤT BẢN =====================
 export function publish(ctx) {
-  const S = ctx.store, U = ctx.ui.pub ||= {f: 'todo'}, err = errBox();
-  const L = S.docs.filter(d => U.f === 'all' || (U.f === 'todo' ? !(d.drive && d.drive.id) || new Date(d.updated_at) - new Date(d.drive.at) > 5000 : d.drive && d.drive.id));
-  return h('div', {class: 'wr-wrap'}, h('div', {class: 'wr-h'}, h('h2', {}, 'Xuất bản'), h('p', {}, 'Lưu lên Google Drive (đúng file .docx/.xlsx như mẫu) hoặc tải về máy. Drive: thư mục “PHÒNG VY — Workroom”.')), err,
-    h('div', {class: 'wr-tabs'}, [['todo', 'Chưa lưu / có thay đổi'], ['saved', 'Đã lưu Drive'], ['all', 'Tất cả']].map(([k, l]) => h('button', {class: U.f === k ? 'on' : '', onclick: () => { U.f = k; ctx.render(); }}, l))),
-    L.length ? h('table', {class: 'wr-table'}, h('tr', {}, ['Tài liệu', 'Loại', 'Chương trình', 'Trạng thái', ''].map(x => h('th', {}, x))),
-      L.map(d => h('tr', {}, h('td', {}, h('a', {href: '#', onclick: ev => { ev.preventDefault(); ctx.go({screen: 'doc', id: d.id}); }}, docTitle(d))), h('td', {}, KINDS[d.kind].short), h('td', {}, evName(S, d.event_id) || '—'),
-        h('td', {}, d.status === 'done' ? h('span', {class: 'wr-tag ok'}, 'Xong') : h('span', {class: 'wr-tag'}, 'Nháp')),
-        h('td', {}, h('div', {class: 'wr-row', style: 'justify-content:flex-end'}, btn('Tải về', run(err, () => exportDoc(ctx, d, 'download')), {ghost: true, sm: 1}),
-          btn(d.drive && d.drive.id ? 'Cập nhật Drive' : 'Lưu Drive', run(err, async () => { if (await exportDoc(ctx, d, 'drive')) ctx.note('Đã lưu lên Drive'); }), {sm: 1}),
-          d.drive && d.drive.url && h('a', {class: 'wr-btn ghost sm', href: d.drive.url, target: '_blank', rel: 'noopener'}, 'Mở')))))) : h('div', {class: 'wr-empty'}, 'Không có tài liệu nào ở đây.'));
+  const S = ctx.store, U = ctx.ui.pub ||= {f: 'open'}, err = errBox();
+  const F = {open: d => !['published'].includes(d.status), review: d => d.status === 'review' || d.status === 'revise', approved: d => d.status === 'approved', published: d => d.status === 'published', all: () => true};
+  const L = S.docs.filter(F[U.f] || F.all), n = k => S.docs.filter(F[k]).length;
+  const link = (o, l) => o && o.url ? h('a', {class: 'wr-btn ghost sm', href: o.url, target: '_blank', rel: 'noopener'}, l) : null;
+  return h('div', {class: 'wr-wrap'}, h('div', {class: 'wr-h'}, h('h2', {}, 'Xuất bản & bàn giao'), h('p', {}, 'Theo dõi từng tài liệu: Nháp → Gửi duyệt → Cần sửa → Đã duyệt → Đã đăng. Xuất Word/Excel/PDF, Google Docs/Sheets, gửi duyệt, nhận góp ý.')), err,
+    h('div', {class: 'wr-tabs'}, [['open', 'Đang làm'], ['review', 'Đang duyệt'], ['approved', 'Đã duyệt'], ['published', 'Đã đăng'], ['all', 'Tất cả']].map(([k, l]) => h('button', {class: U.f === k ? 'on' : '', onclick: () => { U.f = k; ctx.render(); }}, l + ' (' + n(k) + ')'))),
+    L.length ? h('table', {class: 'wr-table'}, h('tr', {}, ['Tài liệu', 'Loại', 'Trạng thái', 'Hạn', 'Bản trên Google', ''].map(x => h('th', {}, x))),
+      L.map(d => h('tr', {}, h('td', {}, h('a', {href: '#', onclick: ev => { ev.preventDefault(); ctx.go({screen: 'doc', id: d.id}); }}, docTitle(d)), evName(S, d.event_id) ? h('div', {class: 'wr-mute'}, evName(S, d.event_id)) : null), h('td', {}, KINDS[d.kind].short),
+        h('td', {}, h('select', {class: 'wr-in wr-status st-' + d.status, 'aria-label': 'Trạng thái ' + docTitle(d), onchange: run(err, e => S.saveDoc(d.id, {status: e.target.value}))}, STATUS.map(([k, l]) => h('option', {value: k, selected: d.status === k}, l)))),
+        h('td', {}, dueTag(d) || '—'), h('td', {}, h('div', {class: 'wr-row'}, link(d.gdoc, d.kind === 'timeline' ? 'Sheets' : 'Docs'), link(d.drive, '.' + KINDS[d.kind].ext)) ),
+        h('td', {}, h('div', {class: 'wr-row', style: 'justify-content:flex-end'}, btn('Xuất', () => exportDialog(ctx, d), {ghost: true, sm: 1}), btn('Bàn giao', () => handoffDialog(ctx, d), {sm: 1})))))) : h('div', {class: 'wr-empty'}, 'Không có tài liệu nào ở đây.'));
 }
 
 // ===================== CÀI ĐẶT =====================
@@ -359,6 +396,13 @@ export function settings(ctx) {
           h('button', {class: 'wr-x del', 'aria-label': 'Xoá ' + x.name, onclick: run(err, () => S.del('staff', x.id))}, icon('x'))))),
         h('div', {class: 'wr-row'}, h('div', {style: 'flex:2'}, staffName), h('div', {style: 'flex:1'}, staffRole), btn('Thêm', run(err, async () => { const n = staffName.value.trim(); if (!n) return; const ex = S.staff.find(x => x.name.toLowerCase() === n.toLowerCase());
           if (ex) await S.set('staff', ex.id, {roles: [...new Set([...(ex.roles || []), staffRole.value])], active: true}); else await S.add('staff', {name: n, roles: [staffRole.value]}); })))),
+      Box('Người nhận bàn giao (trưởng phòng, biên tập, thiết kế…)', h('div', {class: 'wr-stack'}, (S.settings.contacts || []).map((c, i) => h('div', {class: 'wr-item'}, h('span', {class: 't'}, c.name + ' · ' + c.email), h('span', {class: 'm'}, c.role || ''),
+          h('button', {class: 'wr-x del', 'aria-label': 'Xoá ' + c.email, onclick: run(err, () => S.setSetting('contacts', (S.settings.contacts || []).filter((_, j) => j !== i)))}, icon('x'))))),
+        (() => { const n = h('input', {class: 'wr-in', placeholder: 'Tên', 'aria-label': 'Tên người nhận'}), em = h('input', {class: 'wr-in', type: 'email', placeholder: 'Email', 'aria-label': 'Email người nhận mới'}), ro = h('input', {class: 'wr-in', placeholder: 'Vai trò (vd Trưởng phòng)', 'aria-label': 'Vai trò người nhận'});
+          return h('div', {class: 'wr-row'}, h('div', {style: 'flex:1'}, n), h('div', {style: 'flex:1.3'}, em), h('div', {style: 'flex:1'}, ro), btn('Thêm', run(err, async () => { if (!/^\S+@\S+\.\S+$/.test(em.value.trim())) throw new Error('Email chưa đúng'); await S.setSetting('contacts', [...(S.settings.contacts || []), {name: n.value.trim() || em.value.trim(), email: em.value.trim(), role: ro.value.trim()}]); }))); })()),
+      Box('Nơi lưu trên Drive cho từng mục', h('p', {class: 'wr-mute'}, 'Mặc định: “PHÒNG VY — Workroom / <Mục>”. Muốn lưu thẳng vào thư mục chung của phòng: dán link thư mục Drive.'),
+        GROUPS.map(g => { const cur = (S.settings.dest || {})[g.id], inp = h('input', {class: 'wr-in', placeholder: 'Link thư mục Drive cho mục ' + g.name, 'aria-label': 'Nơi lưu ' + g.name, value: cur ? cur.url || cur.id : ''});
+          return h('div', {class: 'wr-row'}, h('b', {style: 'width:110px'}, g.name), h('div', {style: 'flex:1'}, inp), btn('Lưu', run(err, async () => { const id = ctx.g.idFromUrl(inp.value); const d = {...(S.settings.dest || {})}; if (!inp.value.trim()) delete d[g.id]; else if (!id) throw new Error('Link thư mục chưa đúng'); else d[g.id] = {id, url: inp.value.trim()}; await S.setSetting('dest', d); ctx.note('Đã lưu nơi lưu cho ' + g.name); }), {ghost: true, sm: 1})); })),
       Box('Mã khoá màn hình', h('div', {class: 'wr-row'}, btn(S.settings.pin_hash ? 'Đổi mã' : 'Đặt mã', run(err, async () => setPin(ctx)), {ghost: true}), S.settings.pin_hash && btn('Bỏ mã', run(err, () => S.setSetting('pin_hash', null)), {ghost: true}))),
       Box('Sao lưu', h('div', {class: 'wr-row'}, btn('Tải bản sao lưu', run(err, async () => download(new Blob([JSON.stringify(await S.exportAll(), null, 2)], {type: 'application/json'}), 'workroom-' + new Date().toISOString().slice(0, 10) + '.json')), {ghost: true}),
         btn('Khôi phục…', run(err, async () => { const f = await pickFile('.json'); if (!f) return; const d = JSON.parse(await f.text()); if (await confirmBox('Khôi phục', 'Chỉ THÊM bản ghi chưa có, không ghi đè, không xoá.', 'Khôi phục')) ctx.note('Đã thêm ' + await S.restore(d) + ' bản ghi'); }), {ghost: true})))));

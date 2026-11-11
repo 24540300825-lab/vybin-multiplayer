@@ -20,7 +20,7 @@ const NAV = [
   {id: 'home', name: 'Hôm nay', icon: 'home'},
   {grp: 'Việc thường ngày'}, ...GROUPS.map(g => ({id: 'group:' + g.id, name: g.name, icon: g.icon, g})),
   {grp: 'Chương trình lớn'}, {id: 'programs', name: 'Chương trình', icon: 'flag'},
-  {grp: 'Hoàn tất'}, {id: 'publish', name: 'Xuất bản', icon: 'drive'},
+  {grp: 'Hoàn tất'}, {id: 'publish', name: 'Xuất & bàn giao', icon: 'drive'},
   {sp: 1}, {id: 'settings', name: 'Cài đặt', icon: 'gear'},
 ];
 const navKey = v => v.screen === 'group' ? 'group:' + v.id : v.screen === 'program' ? 'programs' : v.screen;
@@ -28,7 +28,7 @@ const navKey = v => v.screen === 'group' ? 'group:' + v.id : v.screen === 'progr
 async function build(SH) {
   await new Promise(res => {
     if (document.getElementById('wrCss')) return res();
-    const l = h('link', {id: 'wrCss', rel: 'stylesheet', href: 'workroom.css?v=3'}); l.onload = l.onerror = res; document.head.append(l);
+    const l = h('link', {id: 'wrCss', rel: 'stylesheet', href: 'workroom.css?v=31'}); l.onload = l.onerror = res; document.head.append(l);
   });
   const store = await createStore(SH);          // ném 'not_owner' nếu máy chủ không xác nhận quyền vào
   const ai = createAI(store), g = createGoogle(SH, store);
@@ -46,7 +46,7 @@ async function build(SH) {
   const ctx = {
     store, ai, g, SH, ui: {},
     get view() { return st.view; },
-    go(v) { flush(); st.view = typeof v === 'string' ? {screen: v} : v; keep(); ctx.render(); main.scrollTop = 0; main.focus({preventScroll: true}); },
+    go(v) { flush(); for (const k of ['undo', 'redo', 'exportMenu', 'handoff', 'aiWrite', 'download', 'toDrive', 'pdf']) delete ctx.ui[k]; st.view = typeof v === 'string' ? {screen: v} : v; keep(); ctx.render(); main.scrollTop = 0; main.focus({preventScroll: true}); },
     render: () => render(),
     note(m) { noteEl.textContent = m; noteEl.classList.add('on'); clearTimeout(noteT); noteT = setTimeout(() => noteEl.classList.remove('on'), 3800); },
     busy(m) { if (busyEl) { busyEl.remove(); busyEl = null; } if (m) { busyEl = h('div', {class: 'wr-dlg'}, h('div', {class: 'wr-dlg-box'}, h('h3', {}, '✨ ' + m), h('p', {class: 'wr-mute'}, 'Thường mất 10–40 giây.'), h('div', {class: 'wr-dlg-act'}, btn('Dừng', () => ai.stop(), {ghost: true})))); root.append(busyEl); } },
@@ -57,11 +57,11 @@ async function build(SH) {
   const locked = () => !!store.settings.pin_hash && sessionStorage.getItem('vyWrUnlocked') !== '1';
 
   function renderSide() {
-    const cur = navKey(st.view), n = {publish: store.docs.filter(d => d.status === 'done' && !(d.drive && d.drive.id)).length};
+    const cur = navKey(st.view), n = {publish: store.docs.filter(d => d.status === 'revise' || (d.handoff && d.handoff.deadline && new Date(d.handoff.deadline) < Date.now() && !['approved', 'published'].includes(d.status))).length};
     side.replaceChildren(h('div', {class: 'wr-brand'}, 'PHÒNG VY', h('small', {}, 'Workspace')),
       ...NAV.map(x => x.grp ? h('div', {class: 'wr-grp'}, x.grp) : x.sp ? h('span', {class: 'sp'}) :
         h('button', {class: 'wr-nav' + (cur === x.id ? ' on' : ''), 'aria-current': cur === x.id ? 'page' : null, onclick: () => ctx.go(x.id.startsWith('group:') ? {screen: 'group', id: x.id.slice(6)} : {screen: x.id})},
-          icon(x.icon), h('span', {}, x.name), n[x.id] > 0 && h('em', {title: 'Đã xong nhưng chưa lưu Drive'}, n[x.id]))),
+          icon(x.icon), h('span', {}, x.name), n[x.id] > 0 && h('em', {title: 'Cần sửa theo góp ý / quá hạn'}, n[x.id]))),
       store.local ? h('div', {class: 'wr-dev'}, 'BẢN THỬ — dữ liệu chỉ lưu trên trình duyệt này.') : null);
   }
   const TITLES = {home: 'Hôm nay', programs: 'Chương trình lớn', publish: 'Xuất bản', settings: 'Cài đặt'};
@@ -70,7 +70,8 @@ async function build(SH) {
     const title = d ? KINDS[d.kind].name : v.screen === 'group' ? (GROUPS.find(x => x.id === v.id) || {}).name : v.screen === 'program' ? 'Chương trình' : TITLES[v.screen] || '';
     top.replaceChildren(h('h1', {}, 'PHÒNG VY · ' + (title || '')), h('span', {class: 'sp'}),
       h('span', {class: 'wr-save' + (s.state === 'error' ? ' err' : ''), title: s.error || ''}, s.state === 'saving' ? 'Đang lưu…' : s.state === 'error' ? 'Lưu lỗi' : s.at ? 'Đã lưu' : ''),
-      h('button', {class: 'wr-ai' + (st.cop ? ' on' : ''), 'aria-pressed': String(st.cop), onclick: () => ctx.toggleCop()}, icon('spark'), h('span', {class: 'lbl'}, 'Trợ lý AI')),
+      h('button', {class: 'wr-x', title: 'Phím tắt (⌘/)', 'aria-label': 'Phím tắt', onclick: () => ctx.showKeys()}, '⌘'),
+      h('button', {class: 'wr-ai' + (st.cop ? ' on' : ''), 'aria-pressed': String(st.cop), title: 'Trợ lý AI (⌘J)', onclick: () => ctx.toggleCop()}, icon('spark'), h('span', {class: 'lbl'}, 'Trợ lý AI')),
       h('button', {class: 'wr-exit', onclick: hide}, icon('door'), h('span', {class: 'lbl'}, 'Về phòng')));
   }
   function lockScreen() {
@@ -111,6 +112,30 @@ async function build(SH) {
   store.on('save', () => { if (st.open) renderTop(); });
   g.on(() => { if (st.open) renderAll(); });
   addEventListener('beforeunload', flush);
+  // ---------- PHÍM TẮT (giống Google Docs/Sheets) ----------
+  const KEYS = [['⌘Z', 'Hoàn tác'], ['⌘⇧Z  ·  ⌘Y', 'Làm lại'], ['⌘S', 'Lưu ngay'], ['⌘⇧A', 'AI viết / sửa tài liệu đang mở'], ['⌘J', 'Mở / đóng Trợ lý AI'], ['⌘⇧E', 'Xuất (Word, Excel, PDF, Google…)'],
+    ['⌘⇧S', 'Cập nhật bản Google Docs/Sheets'], ['⌘⇧D', 'Tải file đúng mẫu về máy'], ['⌘P', 'Xuất PDF'], ['⌘⇧B', 'Bàn giao (gửi duyệt, góp ý)'], ['⌘Enter', 'Bấm nút chính trong hộp thoại'], ['Esc', 'Đóng hộp thoại'], ['⌘/', 'Xem bảng phím tắt']];
+  const showKeys = () => import('./ui.js').then(({dialog}) => dialog({title: 'Phím tắt', body: h('table', {class: 'wr-table'}, KEYS.map(([k, l]) => h('tr', {}, h('td', {}, h('kbd', {}, /Mac|iPhone|iPad/.test(navigator.platform) ? k : k.replace(/⌘/g, 'Ctrl+').replace(/⇧/g, 'Shift+'))), h('td', {}, l))))}));
+  root.addEventListener('keydown', e => {
+    if (!st.open || locked()) return;
+    const mod = e.metaKey || e.ctrlKey, k = (e.key || '').toLowerCase(), dlg = root.querySelector('.wr-dlg');
+    if (dlg) { if (mod && k === 'enter') { const b = dlg.querySelector('.wr-dlg-act .wr-btn:not(.ghost)'); if (b) { e.preventDefault(); b.click(); } } return; }
+    if (!mod) return;
+    const inCop = cop.contains(e.target), U = ctx.ui, ed = st.view.screen === 'doc', go = fn => { e.preventDefault(); e.stopPropagation(); fn(); };
+    if (k === 'z' && !inCop && ed && U.undo) return go(e.shiftKey ? U.redo : U.undo);
+    if (k === 'y' && !inCop && ed && U.redo) return go(U.redo);
+    if (k === 's' && !e.shiftKey) return go(() => { flush(); ctx.note('Đã lưu'); });
+    if (k === 's' && e.shiftKey && ed && U.toDrive) return go(U.toDrive);
+    if (k === 'j') return go(() => { ctx.toggleCop(!st.cop); if (st.cop) setTimeout(() => { const t = cop.querySelector('textarea'); t && t.focus(); }, 30); });
+    if (k === '/' || k === '?') return go(showKeys);
+    if (!ed) return;
+    if (k === 'a' && e.shiftKey && U.aiWrite) return go(U.aiWrite);
+    if (k === 'e' && e.shiftKey && U.exportMenu) return go(U.exportMenu);
+    if (k === 'd' && e.shiftKey && U.download) return go(U.download);
+    if (k === 'b' && e.shiftKey && U.handoff) return go(U.handoff);
+    if (k === 'p' && !e.shiftKey && U.pdf) return go(U.pdf);
+  }, true);
+  ctx.showKeys = showKeys;
 
   function show(opt) {
     st.onClose = opt.onClose || null; st.open = true;

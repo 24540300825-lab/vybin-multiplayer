@@ -25,7 +25,7 @@ const DEF = {
   wr_articles: () => ({kind: 'news', title: '', body: '', status: 'draft', origin: 'manual', sources: [], doc: {}, stale: []}),
   wr_timeline: () => ({pos: 0, phase: 'truoc', content: '', format: '', deadline: '', publish_at: '', channel: '', a_content: '', a_media: '', a_editor: '', note: '', done: false, origin: 'manual'}),
   wr_staff: () => ({roles: [], note: '', busy: '', active: true}),
-  wr_docs: () => ({title: '', data: {}, status: 'draft', stale: false, drive: {}, event_id: null}), wr_doc_versions: () => ({label: ''}),
+  wr_docs: () => ({title: '', data: {}, status: 'draft', stale: false, drive: {}, gdoc: {}, handoff: {}, sources: [], event_id: null}), wr_doc_versions: () => ({label: ''}),
   wr_chats: () => ({title: 'Cuộc trò chuyện mới', messages: []}),
   wr_ai_log: () => ({ok: true}), wr_versions: () => ({label: ''}), wr_reviews: () => ({reader: {}, items: []}),
 };

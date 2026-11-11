@@ -2,6 +2,7 @@
 // AI chỉ điền NỘI DUNG vào dàn ý của mẫu (schema); bố cục, nhãn, chữ cố định, định dạng do kinds.js + fmt.js đảm bảo.
 // Văn phong: lấy từ chính các bài mẫu của Vy (lưu riêng tư trong cơ sở dữ liệu, mục "sample").
 import {KINDS, asText} from './kinds.js';
+import {toAI} from './sources.js';
 
 const clip = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n) + '\n…' : s; };
 export const RULES = `Bạn là biên tập viên Phòng Truyền thông & Quan hệ doanh nghiệp, Trường Đại học Luật TP. Hồ Chí Minh (ULAW).
@@ -35,16 +36,18 @@ export async function writeDoc(ctx, kind, o = {}) {
     sm.length ? '\nBÀI MẪU CỦA PHÒNG (học cấu trúc & văn phong, KHÔNG chép dữ kiện):\n' + sm.map((s, i) => `--- MẪU ${i + 1}: ${s.name} ---\n${clip(s.content, 7000)}`).join('\n') : '',
     /schedule|timeline/.test(kind) ? '\nDANH SÁCH NHÂN SỰ (chỉ phân công những người này):\n' + staffList(store) : ''].join('\n');
   const opts = o.opts ? Object.entries(o.opts).filter(([, v]) => v).map(([k, v]) => `- ${({tone: 'Giọng văn', length: 'Độ dài', emoji: 'Emoji', extra: 'Yêu cầu thêm', des: 'Kèm nội dung DES'})[k] || k}: ${v}`).join('\n') : '';
+  const src = toAI(o.sources || []);
   const has = o.current && asText(kind, o.current).replace(/\s|\[CẦN BỔ SUNG\]|-+/g, '').length > 80;
   const prompt = [
     o.program ? 'THÔNG TIN CHƯƠNG TRÌNH:\n' + programFacts(o.program) : '',
     o.brief ? 'THÔNG TIN / TƯ LIỆU VY CUNG CẤP:\n' + clip(o.brief, 24000) : '',
+    src.text ? 'NGUỒN VY NẠP VÀO (phân tích kỹ, lấy dữ kiện từ đây):\n' + clip(src.text, 60000) : '', src.note,
     opts ? 'TUỲ CHỌN:\n' + opts : '',
     has ? 'BẢN HIỆN TẠI (JSON):\n' + clip(JSON.stringify(o.current), 20000) : '',
     o.instruction ? 'YÊU CẦU: ' + o.instruction : (has ? 'YÊU CẦU: hoàn thiện bản hiện tại, giữ những gì đã đúng.' : 'YÊU CẦU: viết bản hoàn chỉnh.'),
     has ? 'Trả về TOÀN BỘ tài liệu sau khi sửa (JSON đúng schema); phần không cần sửa giữ nguyên.' : 'Trả về JSON đúng schema.',
   ].filter(Boolean).join('\n\n');
-  const out = await ctx.ai.json({task: (has ? 'Sửa ' : 'Viết ') + K.short, system: sys, prompt, schema: o.schema || K.schema, temperature: 0.6});
+  const out = await ctx.ai.json({task: (has ? 'Sửa ' : 'Viết ') + K.short, system: sys, prompt, parts: src.parts, schema: o.schema || K.schema, temperature: 0.6});
   if (o.raw) return out;
   return merge(o.current || K.blank(), out);
 }

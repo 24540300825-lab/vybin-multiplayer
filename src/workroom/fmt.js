@@ -24,7 +24,14 @@ const flags = (rpr, b, i) => {
   if (!rpr || rpr === '<w:rPr></w:rPr>') return '<w:rPr>' + f + '</w:rPr>';
   return /<w:rFonts[^>]*\/>/.test(rpr) ? rpr.replace(/(<w:rFonts[^>]*\/>)/, '$1' + f) : rpr.replace(/^<w:rPr>(<w:rStyle[^>]*\/>)?/, (m0, st) => '<w:rPr>' + (st || '') + f);
 };
+// ảnh trong .docx (tin bài): gom vào MEDIA khi đang dựng, đóng gói ở docx()
+let MEDIA = null;
+function drawing(im) {
+  const n = MEDIA.push(im), cx = 5486400, cy = Math.round(cx * (im.h || 3) / (im.w || 4));
+  return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${900 + n}" name="Ảnh ${n}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${900 + n}" name="anh${n}.jpg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdWrImg${n}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+}
 function para(pr, line, bl = {}) {
+  if (bl.image && MEDIA) return `<w:p>${pr.ppr}${drawing(bl.image)}</w:p>`;
   const runs = segs(line, bl.b ?? pr.b, bl.i ?? pr.i).filter(s => s.t).map(s => `<w:r>${flags(pr.rpr, s.b, s.i)}<w:t xml:space="preserve">${X(s.t)}</w:t></w:r>`).join('');
   return `<w:p>${pr.ppr}${runs}</w:p>`;
 }
@@ -57,8 +64,14 @@ async function tpl(file) {
 }
 export async function docx(id, layout, file = id + '.docx') {
   const parts = {...await tpl(file)};
-  const doc = utf8.dec(parts['word/document.xml']).replace('{{BODY}}', bodyXml(id, layout));
-  parts['word/document.xml'] = utf8.enc(doc);
+  MEDIA = []; let body; try { body = bodyXml(id, layout); } finally { var media = MEDIA; MEDIA = null; }
+  parts['word/document.xml'] = utf8.enc(utf8.dec(parts['word/document.xml']).replace('{{BODY}}', body));
+  if (media.length) {
+    const rels = utf8.dec(parts['word/_rels/document.xml.rels']).replace('</Relationships>', media.map((m, i) => `<Relationship Id="rIdWrImg${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/wrimg${i + 1}.jpg"/>`).join('') + '</Relationships>');
+    parts['word/_rels/document.xml.rels'] = utf8.enc(rels);
+    media.forEach((m, i) => { parts[`word/media/wrimg${i + 1}.jpg`] = Uint8Array.from(atob(m.data), c => c.charCodeAt(0)); });
+    let ct = utf8.dec(parts['[Content_Types].xml']); if (!/Extension="jpg"/.test(ct)) ct = ct.replace('<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">', '$&<Default ContentType="image/jpeg" Extension="jpg"/>'); parts['[Content_Types].xml'] = utf8.enc(ct);
+  }
   return new Blob([await zip(parts).arrayBuffer()], {type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
 }
 
@@ -105,6 +118,7 @@ function css(pr) {
 const segHtml = (pr, l, bl = {}) => segs(l, bl.b ?? pr.b, bl.i ?? pr.i).map(s => `<span style="${s.b ? 'font-weight:700;' : ''}${s.i ? 'font-style:italic' : ''}">${X(s.t)}</span>`).join('') || '&nbsp;';
 function parasHtml(spec, blocks, table) {
   return blocks.map(bl => { const pr = (table ? spec[table].C || {} : {})[bl.p] || spec.P[bl.p] || (table && (spec[table][bl.p] || (spec[table].span && spec[table].span[bl.p]))); if (!pr) return ''; const st = css(pr);
+    if (bl.image) return `<p style="${st}"><img src="data:image/jpeg;base64,${bl.image.data}" style="width:100%;height:auto" alt=""></p>`;
     return lines(bl.t).map(l => `<p style="${st}"${bl.hl ? ` data-hl="${X(bl.hl)}"` : ''}>${segHtml(pr, l, bl)}</p>`).join(''); }).join('');
 }
 export function previewHtml(id, layout) {
