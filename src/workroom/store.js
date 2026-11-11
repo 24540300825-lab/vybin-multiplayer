@@ -12,12 +12,11 @@ export const STAGES = [
 export const stageName = id => (STAGES.find(s => s[0] === id) || [0, id])[1];
 // bảng nạp sẵn vào bộ nhớ khi mở Workroom: tên ngắn → [bảng, cột sắp xếp, tăng dần?, giới hạn]
 const COLS = {
-  events: ['wr_events', 'created_at', false, 500], tasks: ['wr_tasks', 'created_at', false, 1000], activity: ['wr_activity', 'at', false, 200],
-  knowledge: ['wr_knowledge', 'created_at', false, 500], articles: ['wr_articles', 'updated_at', false, 500], timeline: ['wr_timeline', 'pos', true, 2000],
-  staff: ['wr_staff', 'name', true, 500], chats: ['wr_chats', 'updated_at', false, 100], ailog: ['wr_ai_log', 'at', false, 300],
+  events: ['wr_events', 'created_at', false, 500], docs: ['wr_docs', 'updated_at', false, 2000], activity: ['wr_activity', 'at', false, 200],
+  knowledge: ['wr_knowledge', 'created_at', false, 500], staff: ['wr_staff', 'name', true, 500], chats: ['wr_chats', 'updated_at', false, 50], ailog: ['wr_ai_log', 'at', false, 300],
 };
 const TABLE = Object.fromEntries(Object.entries(COLS).map(([k, v]) => [k, v[0]]));
-Object.assign(TABLE, {versions: 'wr_versions', reviews: 'wr_reviews'});
+Object.assign(TABLE, {versions: 'wr_doc_versions'});
 // giá trị mặc định (giống default của Postgres) cho kho cục bộ
 const DEF = {
   wr_events: () => ({stage: 'intake', archived: false, is_demo: false, facts: {}, assign: {}, links: {}, needs_check: []}),
@@ -25,16 +24,16 @@ const DEF = {
   wr_knowledge: () => ({category: 'reference', status: 'reference', source: 'upload', content: '', meta: {}}),
   wr_articles: () => ({kind: 'news', title: '', body: '', status: 'draft', origin: 'manual', sources: [], doc: {}, stale: []}),
   wr_timeline: () => ({pos: 0, phase: 'truoc', content: '', format: '', deadline: '', publish_at: '', channel: '', a_content: '', a_media: '', a_editor: '', note: '', done: false, origin: 'manual'}),
-  wr_staff: () => ({roles: [], skills: '', busy: [], confirmed: false, active: true, source: 'manual'}),
+  wr_staff: () => ({roles: [], note: '', busy: '', active: true}),
+  wr_docs: () => ({title: '', data: {}, status: 'draft', stale: false, drive: {}, event_id: null}), wr_doc_versions: () => ({label: ''}),
   wr_chats: () => ({title: 'Cuộc trò chuyện mới', messages: []}),
   wr_ai_log: () => ({ok: true}), wr_versions: () => ({label: ''}), wr_reviews: () => ({reader: {}, items: []}),
 };
 
 const isLocalMode = SH => !SH.sess || !!CONFIG.mock || !!SH.devLocal;
 
-// Ai được vào Workroom? Máy chủ quyết định (hàm wr_is_owner). Giao diện chỉ hỏi, không tự cho phép.
+// Ai được vào Workroom? Máy chủ quyết định (hàm wr_is_owner, bảng wr_owner — hiện có Vy + Bin để thử). Giao diện chỉ hỏi, không tự cho phép.
 export async function checkAccess(SH) {
-  if (SH.slot !== 'vy') return false;
   if (isLocalMode(SH)) return true;                       // chạy thử trên máy, không có dữ liệu thật
   try { const {data, error} = await SH.sess.sb.rpc('wr_is_owner'); return !error && data === true; }
   catch (e) { return false; }
@@ -57,7 +56,7 @@ function localBackend() {
       T(t).push(r); save(); return r;
     },
     async update(t, rid, patch) { const r = T(t).find(x => x.id === rid); if (!r) throw new Error('Không tìm thấy bản ghi'); Object.assign(r, patch, {updated_at: now()}); save(); return {...r}; },
-    async remove(t, rid) { db[t] = T(t).filter(x => x.id !== rid); if (t === 'wr_articles') { db.wr_versions = T('wr_versions').filter(v => v.article_id !== rid); db.wr_reviews = T('wr_reviews').filter(v => v.article_id !== rid); } save(); },
+    async remove(t, rid) { db[t] = T(t).filter(x => x.id !== rid); if (t === 'wr_docs') db.wr_doc_versions = T('wr_doc_versions').filter(v => v.doc_id !== rid); save(); },
     async getSettings() { return (T('wr_settings')[0] || {}).data || {}; },
     async setSettings(data) { db.wr_settings = [{id: true, data}]; save(); },
   };
@@ -127,48 +126,35 @@ export async function createStore(SH) {
     const r = await be.insert('wr_events', {...clean, name: row.name.trim()});
     S.events.unshift(r); await S.log('event.create', `Tạo sự kiện ${r.code} — ${r.name}`, r.id); S.emit('change'); return r;
   });
-  // Đổi dữ kiện của sự kiện → KHÔNG tự sửa tài liệu đã viết; chỉ đánh dấu những đầu ra có thể bị ảnh hưởng để Vy rà lại.
-  const FACT = {name: 'Tên sự kiện', event_date: 'Ngày', event_time: 'Giờ', venue: 'Địa điểm', organizer: 'Đơn vị tổ chức', attendees: 'Thành phần', brief: 'Brief'};
-  S.updateEvent = (id, patch, what = '') => write(async () => {
+  // Đổi thông tin chương trình → KHÔNG tự sửa tài liệu đã viết; chỉ đánh dấu "cần xem lại" để Vy quyết định.
+  const FACT = {name: 'Tên', event_date: 'Ngày', event_time: 'Giờ', venue: 'Địa điểm', organizer: 'Đơn vị tổ chức', attendees: 'Thành phần', brief: 'Brief'};
+  S.updateEvent = (id, patch) => write(async () => {
     const old = S.eventOf(id), changed = Object.keys(FACT).filter(k => k in patch && (patch[k] || '') !== (old[k] || ''));
-    if (changed.length) {
-      const at = new Date().toISOString(), marks = changed.map(k => ({field: k, label: FACT[k], old: old[k] || '', new: patch[k] || '', at}));
-      const affected = S.articles.filter(a => a.event_id === id && (a.body || a.title));
-      const hasTl = S.timeline.some(t => t.event_id === id), hasAs = old.assign && (old.assign.content || old.assign.media || old.assign.editor);
-      if (affected.length || hasTl || hasAs) patch = {...patch, needs_check: [...(old.needs_check || []), ...marks]};
-      for (const a of affected) {
-        const r = await be.update('wr_articles', a.id, {stale: [...(a.stale || []), ...marks]});
-        S.articles = S.articles.map(x => x.id === a.id ? r : x);
-      }
-    }
-    const r = await be.update('wr_events', id, patch);
-    S.events = S.events.map(e => e.id === id ? r : e);
-    await S.log('event.update', `${r.code}: ${what || (changed.length ? 'đổi ' + changed.map(k => FACT[k]).join(', ') : 'cập nhật')}`, id);
+    const r = await be.update('wr_events', id, patch); S.events = S.events.map(e => e.id === id ? r : e);
+    if (changed.length) for (const d of S.docs.filter(d => d.event_id === id && !d.stale)) { const x = await be.update('wr_docs', d.id, {stale: true}); S.docs = S.docs.map(y => y.id === d.id ? x : y); }
+    if (changed.length) await S.log('event.update', `${r.name}: đổi ${changed.map(k => FACT[k]).join(', ')}`, id);
     S.emit('change'); return r;
   });
-
-  S.createTask = t => S.add('tasks', {title: t.title.trim(), description: t.description || null, event_id: t.event_id || null, owner_name: t.owner_name || null,
-    deadline: t.deadline || null, priority: t.priority || 'normal', source: t.source || 'manual', ref: t.ref || {}}, {log: `Thêm việc: ${t.title.trim()}`});
-  S.updateTask = (id, patch) => {
-    if (patch.status) patch.done_at = patch.status === 'done' ? new Date().toISOString() : null;
-    const t = S.tasks.find(x => x.id === id);
-    return S.set('tasks', id, patch, {log: patch.status ? `${t ? t.title : 'Việc'} → ${({todo: 'Chưa làm', doing: 'Đang làm', done: 'Xong'})[patch.status]}` : null});
-  };
-  S.removeTask = id => { const t = S.tasks.find(x => x.id === id); return S.del('tasks', id, {log: t ? `Xoá việc: ${t.title}` : null}); };
+  // ---- tài liệu theo mẫu ----
+  S.doc = id => S.docs.find(d => d.id === id) || null;
+  S.createDoc = (kind, data, o = {}) => S.add('docs', {kind, data, title: o.title || '', event_id: o.event_id || null}, {log: `Tạo ${o.label || kind}: ${o.title || ''}`.trim()});
+  S.saveDoc = (id, patch, o = {}) => S.set('docs', id, patch, o);
+  S.snapshot = (doc, label) => be.insert('wr_doc_versions', {doc_id: doc.id, data: doc.data, label: String(label || '').slice(0, 120)}).catch(e => console.warn('[workroom] phiên bản', e));
+  S.versions = id => be.where('wr_doc_versions', 'doc_id', id, {order: 'created_at', asc: false});
 
   S.setSetting = (k, v) => write(async () => { S.settings = {...S.settings, [k]: v}; await be.setSettings(S.settings); S.emit('change'); });
   // sao lưu / khôi phục toàn bộ dữ liệu Workroom
   S.exportAll = async () => {
     const out = {format: 'vy-workroom-backup', version: 2, exported_at: new Date().toISOString(), source: local ? 'local-dev' : 'supabase', settings: S.settings};
     for (const k of Object.keys(COLS)) if (k !== 'ailog') out[k] = S[k];
-    out.versions = await be.list('wr_versions', {limit: 5000}); out.reviews = await be.list('wr_reviews', {limit: 2000});
+    out.versions = await be.list('wr_doc_versions', {limit: 5000});
     return out;
   };
   // khôi phục: chỉ THÊM những bản ghi chưa có (theo id) — không ghi đè, không xoá
   S.restore = data => write(async () => {
     if (!data || data.format !== 'vy-workroom-backup') throw new Error('File này không phải file sao lưu của Workroom');
     let n = 0;
-    for (const k of ['events', 'knowledge', 'staff', 'articles', 'tasks', 'timeline', 'chats', 'versions', 'reviews']) {
+    for (const k of ['events', 'knowledge', 'staff', 'docs', 'chats', 'versions']) {
       const have = new Set((S[k] || await be.list(TABLE[k], {limit: 5000})).map(r => r.id));
       for (const r of data[k] || []) if (r && r.id && !have.has(r.id)) { try { await be.insert(TABLE[k], r); n++; } catch (e) { console.warn('[workroom] khôi phục', k, e.message); } }
     }

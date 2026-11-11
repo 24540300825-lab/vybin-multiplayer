@@ -1,236 +1,180 @@
-/* PHÒNG VY — WORKROOM. Chỉ tải khi mở Work Mode. Mọi luật nằm trong #wr, đơn vị px (không dùng rem của HUD game). */
+/* PHÒNG VY — WORKROOM (v3). Chỉ tải khi mở Work Mode. Mọi luật nằm trong #wr. */
 #wr{
   --paper:#fbf6ea; --paper2:#f3ead8; --card:#fffdf7; --ink:#3b2a1a; --ink2:#7a6650; --ink3:#a8957d;
-  --line:#e6dac2; --sun:#ffc46b; --sun2:#ffe2ad; --coral:#e9764f; --wood:#2f2217; --wood2:#3d2d1f; --wood-ink:#f3e7d0;
+  --line:#e6dac2; --sun:#ffc46b; --sun2:#ffe8bd; --coral:#e9764f; --wood:#2f2217; --wood2:#3d2d1f; --wood-ink:#f3e7d0;
   --ok:#3f9b5c; --warn:#c98a1b; --bad:#c8493c; --r:14px;
   position:fixed; inset:0; z-index:20; display:none; color:var(--ink); background:var(--paper);
   font:500 15px/1.5 'Nunito Sans','Nunito',system-ui,sans-serif; -webkit-font-smoothing:antialiased;
-  grid-template-columns:232px minmax(0,1fr); grid-template-rows:56px minmax(0,1fr);
+  grid-template-columns:220px minmax(0,1fr); grid-template-rows:54px minmax(0,1fr);
   opacity:0; transform:scale(1.015); transition:opacity .28s ease, transform .36s cubic-bezier(.2,.8,.2,1);
 }
 #wr.on{display:grid} #wr.in{opacity:1; transform:none}
 #wr *{box-sizing:border-box}
 #wr button,#wr input,#wr select,#wr textarea{font:inherit; color:inherit}
 #wr button{cursor:pointer; border:0; background:none; padding:0}
-#wr button:focus-visible,#wr input:focus-visible,#wr select:focus-visible,#wr textarea:focus-visible{outline:2px solid var(--coral); outline-offset:2px}
-#wr h1,#wr h2,#wr h3,#wr p{margin:0}
-#wr svg{width:20px; height:20px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
+#wr :focus-visible{outline:2px solid var(--coral); outline-offset:2px}
+#wr h1,#wr h2,#wr h3,#wr h4,#wr p{margin:0}
+#wr a{color:#b4522f}
+#wr svg{width:19px; height:19px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
 
-/* ---- sidebar ---- */
+/* ---- thanh bên ---- */
 #wr .wr-side{grid-row:1/3; background:var(--wood); color:var(--wood-ink); display:flex; flex-direction:column; padding:14px 10px; gap:2px; overflow:auto}
-#wr .wr-brand{padding:6px 10px 16px; font:900 17px/1.2 'Nunito',sans-serif; letter-spacing:.02em}
-#wr .wr-brand small{display:block; font:600 12px/1.4 'Nunito Sans',sans-serif; color:#bfae93; letter-spacing:0}
-#wr .wr-nav{display:flex; align-items:center; gap:10px; width:100%; padding:9px 10px; border-radius:10px; text-align:left; font-weight:700; color:#d8c9ae; transition:background .12s,color .12s}
+#wr .wr-brand{padding:4px 10px 14px; font:900 17px/1.2 'Nunito',sans-serif; letter-spacing:.02em}
+#wr .wr-brand small{display:block; font:600 12px/1.4 'Nunito Sans',sans-serif; color:#bfae93}
+#wr .wr-grp{padding:14px 10px 4px; font:800 11px/1 'Nunito Sans',sans-serif; letter-spacing:.08em; color:#9d8b70; text-transform:uppercase}
+#wr .wr-nav{display:flex; align-items:center; gap:10px; width:100%; padding:9px 10px; border-radius:10px; text-align:left; font-weight:700; color:#d8c9ae}
 #wr .wr-nav:hover{background:var(--wood2); color:#fff}
 #wr .wr-nav.on{background:var(--sun); color:var(--ink)}
-#wr .wr-nav em{margin-left:auto; font:700 11px/1 'Nunito Sans',sans-serif; font-style:normal; padding:3px 6px; border-radius:20px; background:rgba(255,255,255,.1); color:#bfae93}
-#wr .wr-nav.on em{background:rgba(59,42,26,.14); color:var(--ink)}
-#wr .wr-sep{height:1px; background:rgba(255,255,255,.08); margin:8px 6px}
+#wr .wr-nav em{margin-left:auto; font:800 11px/1 'Nunito Sans',sans-serif; font-style:normal; padding:3px 7px; border-radius:20px; background:rgba(255,255,255,.12)}
+#wr .wr-nav.on em{background:rgba(59,42,26,.14)}
 #wr .wr-side .sp{flex:1}
 #wr .wr-dev{margin:8px 4px 0; padding:8px 10px; border-radius:10px; background:rgba(233,118,79,.18); color:#ffcdb9; font:700 12px/1.4 'Nunito Sans',sans-serif}
 
-/* ---- topbar ---- */
+/* ---- thanh trên ---- */
 #wr .wr-top{display:flex; align-items:center; gap:10px; padding:0 16px; border-bottom:1px solid var(--line); background:var(--card); min-width:0}
-#wr .wr-top h1{font:800 16px/1 'Nunito',sans-serif; white-space:nowrap}
+#wr .wr-top h1{font:800 16px/1 'Nunito',sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0}
 #wr .wr-top .sp{flex:1}
-#wr .wr-evsel{max-width:300px; min-width:0; padding:6px 10px; border:1px solid var(--line); border-radius:10px; background:var(--paper); font-weight:700}
-#wr .wr-chip{display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:20px; background:var(--paper2); font:700 12.5px/1 'Nunito Sans',sans-serif; color:var(--ink2); white-space:nowrap}
-#wr .wr-chip i{width:8px; height:8px; border-radius:50%; background:var(--ink3)}
-#wr .wr-chip.ok i{background:var(--ok)} #wr .wr-chip.warn i{background:var(--warn)} #wr .wr-chip.bad i{background:var(--bad)}
-#wr .wr-chip.bad{color:var(--bad)}
-#wr .wr-ib{display:inline-flex; align-items:center; gap:6px; padding:7px 10px; border-radius:10px; font-weight:700; color:var(--ink2)}
-#wr .wr-ib:hover,#wr .wr-ib.on{background:var(--paper2); color:var(--ink)}
-#wr .wr-exit{display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:10px; background:var(--ink); color:var(--paper); font:800 13px/1 'Nunito',sans-serif; letter-spacing:.04em}
+#wr .wr-save{font:700 12.5px/1 'Nunito Sans',sans-serif; color:var(--ink3); white-space:nowrap}
+#wr .wr-save.err{color:var(--bad)}
+#wr .wr-ai{display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:10px; background:linear-gradient(135deg,#ffd27f,#ffb36b); font:800 13.5px/1 'Nunito',sans-serif; white-space:nowrap}
+#wr .wr-ai.on{background:var(--ink); color:var(--paper)}
+#wr .wr-exit{display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:10px; background:var(--ink); color:var(--paper); font:800 13.5px/1 'Nunito',sans-serif; white-space:nowrap}
 #wr .wr-exit:hover{background:#56402b}
 
-/* ---- main + copilot ---- */
-#wr .wr-body{display:grid; grid-template-columns:minmax(0,1fr); min-height:0}
-#wr.cop .wr-body{grid-template-columns:minmax(0,1fr) 340px}
-#wr .wr-main{overflow:auto; padding:26px 32px 48px}
-#wr .wr-wrap{max-width:1040px; margin:0 auto}
+/* ---- vùng chính + trợ lý ---- */
+#wr .wr-body{display:grid; grid-template-columns:minmax(0,1fr); min-height:0; position:relative}
+#wr.cop .wr-body{grid-template-columns:minmax(0,1fr) 380px}
+#wr .wr-main{overflow:auto; padding:24px 28px 60px}
+#wr .wr-wrap{max-width:1080px; margin:0 auto}
+#wr .wr-wrap.wide{max-width:none}
 #wr .wr-cop{display:none; border-left:1px solid var(--line); background:var(--card); flex-direction:column; min-height:0}
 #wr.cop .wr-cop{display:flex}
-#wr .wr-cop header{padding:14px 16px; border-bottom:1px solid var(--line); font:800 15px/1.2 'Nunito',sans-serif}
-#wr .wr-cop .ctx{padding:12px 16px; display:grid; gap:6px; font-size:13.5px; color:var(--ink2)}
-#wr .wr-cop .ctx b{color:var(--ink)}
-#wr textarea:disabled,#wr input:disabled{opacity:.6; cursor:not-allowed}
 
-/* ---- nội dung ---- */
-#wr .wr-h{display:flex; align-items:flex-end; gap:12px; margin-bottom:18px}
-#wr .wr-h h2{font:900 26px/1.15 'Nunito',sans-serif}
-#wr .wr-h p{color:var(--ink2)}
-#wr .wr-grid{display:grid; gap:16px; grid-template-columns:repeat(2,minmax(0,1fr))}
-#wr .wr-card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:18px 20px; min-width:0}
-#wr .wr-card.span{grid-column:1/-1}
-#wr .wr-card h3{font:800 15px/1.2 'Nunito',sans-serif; margin-bottom:12px; display:flex; align-items:center; gap:8px}
-#wr .wr-card h3 span{margin-left:auto; font:700 12.5px/1 'Nunito Sans',sans-serif; color:var(--ink3)}
-#wr .wr-empty{color:var(--ink3); padding:6px 0}
-#wr .wr-row{display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line); min-width:0}
-#wr .wr-row:first-of-type{border-top:0}
-#wr .wr-row .t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600}
-#wr .wr-row .m{color:var(--ink3); font-size:13px; white-space:nowrap}
-#wr .wr-row.done .t{text-decoration:line-through; color:var(--ink3)}
-#wr .wr-tag{display:inline-block; padding:2px 8px; border-radius:20px; background:var(--paper2); color:var(--ink2); font:700 12px/1.5 'Nunito Sans',sans-serif; white-space:nowrap}
-#wr .wr-tag.code{background:var(--sun2); color:var(--ink)} #wr .wr-tag.late{background:#f8dcd7; color:var(--bad)}
-#wr .wr-tag.high{background:#fbe3d6; color:#b4522f} #wr .wr-tag.demo{background:#e4e0f5; color:#5b4b9a}
-#wr .wr-btn{display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:10px; background:var(--sun); color:var(--ink); font-weight:800}
+/* ---- chữ, nút, ô nhập ---- */
+#wr .wr-h{display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap}
+#wr .wr-h h2{font:900 24px/1.15 'Nunito',sans-serif}
+#wr .wr-h p{color:var(--ink2); width:100%}
+#wr .wr-h .sp{flex:1}
+#wr .wr-mute{color:var(--ink3); font-size:13.5px}
+#wr .wr-err{color:var(--bad); font-weight:700}
+#wr .wr-err:empty{display:none}
+#wr .wr-btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:9px 15px; border-radius:10px; background:var(--sun); color:var(--ink); font-weight:800; white-space:nowrap}
 #wr .wr-btn:hover{background:#ffb84d} #wr .wr-btn:disabled{opacity:.5; cursor:default}
 #wr .wr-btn.ghost{background:var(--paper2)} #wr .wr-btn.ghost:hover{background:var(--line)}
-#wr .wr-x{color:var(--ink3); padding:4px; border-radius:8px} #wr .wr-x:hover{color:var(--bad); background:#f8dcd7}
-#wr .wr-form{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
-#wr .wr-form input,#wr .wr-form select,#wr .wr-in{padding:8px 11px; border:1px solid var(--line); border-radius:10px; background:var(--paper); min-width:0}
-#wr .wr-form .grow{flex:1 1 220px}
-#wr .wr-check{width:22px; height:22px; border-radius:7px; border:2px solid var(--ink3); display:grid; place-items:center; flex:none; color:transparent}
-#wr .wr-check.on{background:var(--ok); border-color:var(--ok); color:#fff} #wr .wr-check svg{width:14px; height:14px; stroke-width:3}
-#wr .wr-bar{height:8px; border-radius:8px; background:var(--paper2); overflow:hidden} #wr .wr-bar i{display:block; height:100%; background:var(--ok); border-radius:8px; transition:width .3s}
-#wr .wr-stages{display:flex; gap:4px; flex-wrap:wrap; margin-top:8px}
-#wr .wr-stages span{padding:3px 9px; border-radius:20px; font:700 12px/1.5 'Nunito Sans',sans-serif; background:var(--paper2); color:var(--ink3)}
-#wr .wr-stages span.past{color:var(--ink2)} #wr .wr-stages span.now{background:var(--ink); color:var(--paper)}
-#wr .wr-steps{display:grid; gap:10px}
-#wr .wr-step{display:flex; gap:12px; align-items:flex-start}
-#wr .wr-step .n{width:26px; height:26px; border-radius:50%; background:var(--paper2); display:grid; place-items:center; font-weight:800; flex:none}
-#wr .wr-step.ok .n{background:var(--ok); color:#fff}
-#wr .wr-step b{display:block} #wr .wr-step span{color:var(--ink2); font-size:14px}
-#wr .wr-list{margin:0; padding-left:18px; color:var(--ink2)} #wr .wr-list li{margin:3px 0}
-#wr .wr-err{margin-top:8px; color:var(--bad); font-weight:700}
-#wr .wr-note{position:absolute; left:50%; bottom:22px; transform:translateX(-50%); padding:10px 18px; border-radius:24px; background:var(--ink); color:var(--paper); font-weight:700; opacity:0; pointer-events:none; transition:opacity .2s; max-width:80vw}
+#wr .wr-btn.dark{background:var(--ink); color:var(--paper)}
+#wr .wr-btn.sm{padding:6px 10px; font-size:13.5px}
+#wr .wr-x{display:inline-grid; place-items:center; color:var(--ink3); padding:5px; border-radius:8px} #wr .wr-x:hover{color:var(--ink); background:var(--paper2)}
+#wr .wr-x.del:hover{color:var(--bad); background:#f8dcd7}
+#wr .wr-in{width:100%; padding:8px 11px; border:1px solid var(--line); border-radius:10px; background:#fff; min-width:0}
+#wr textarea.wr-in{resize:vertical; line-height:1.5; min-height:42px}
+#wr .wr-in:focus{border-color:var(--sun)}
+#wr .wr-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+#wr .wr-stack{display:grid; gap:10px}
+#wr .wr-tag{display:inline-block; padding:2px 9px; border-radius:20px; background:var(--paper2); color:var(--ink2); font:700 12px/1.6 'Nunito Sans',sans-serif; white-space:nowrap}
+#wr .wr-tag.ok{background:#dcefe1; color:var(--ok)} #wr .wr-tag.warn{background:#fbecd0; color:#9a6a12} #wr .wr-tag.prog{background:#e4e0f5; color:#5b4b9a}
+#wr .wr-steps{margin:0; padding-left:20px; display:grid; gap:4px}
+#wr .wr-note{position:absolute; left:50%; bottom:22px; transform:translateX(-50%); padding:10px 18px; border-radius:24px; background:var(--ink); color:var(--paper); font-weight:700; opacity:0; pointer-events:none; transition:opacity .2s; z-index:9; max-width:90%}
 #wr .wr-note.on{opacity:1}
 
+/* ---- thẻ, ô lựa chọn ---- */
+#wr .wr-card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:16px 18px; min-width:0}
+#wr .wr-card h3{font:800 15px/1.2 'Nunito',sans-serif; margin-bottom:10px; display:flex; align-items:center; gap:8px}
+#wr .wr-grid{display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+#wr .wr-tiles{display:grid; gap:10px; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); margin-bottom:22px}
+#wr .wr-tile{display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:14px; border-radius:var(--r); background:var(--card); border:1px solid var(--line); text-align:left; font-weight:800; min-height:92px}
+#wr .wr-tile:hover{border-color:var(--sun); background:#fff8ea}
+#wr .wr-tile small{font:600 12.5px/1.35 'Nunito Sans',sans-serif; color:var(--ink3)}
+#wr .wr-tile svg{width:24px; height:24px; color:var(--coral)}
+#wr .wr-sec{font:800 13px/1 'Nunito Sans',sans-serif; letter-spacing:.06em; color:var(--ink3); text-transform:uppercase; margin:20px 0 10px}
+#wr .wr-item{display:flex; align-items:center; gap:10px; width:100%; padding:11px 14px; border:1px solid var(--line); border-radius:12px; background:var(--card); text-align:left; margin-bottom:8px}
+#wr .wr-item:hover{border-color:var(--sun)}
+#wr .wr-item .t{flex:1; min-width:0; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+#wr .wr-item .m{color:var(--ink3); font-size:13px; white-space:nowrap}
+#wr .wr-empty{padding:26px; text-align:center; color:var(--ink3); border:1.5px dashed var(--line); border-radius:var(--r)}
+#wr .wr-banner{display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:12px; background:#fbecd0; color:#7c5510; font-weight:700; margin-bottom:14px; flex-wrap:wrap}
+
+/* ---- trình soạn: form trái, bản xem trước phải ---- */
+#wr .wr-ed{display:grid; grid-template-columns:minmax(360px,1fr) minmax(0,1.15fr); gap:20px; align-items:start}
+#wr .wr-form{display:grid; gap:12px; min-width:0}
+#wr .wr-box{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:14px 16px; display:grid; gap:10px}
+#wr .wr-box > h4{font:800 14px/1.2 'Nunito',sans-serif; display:flex; align-items:center; gap:8px}
+#wr .wr-box > h4 .sp{flex:1}
+#wr details.wr-box > summary{font:800 14px/1.2 'Nunito',sans-serif; cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px}
+#wr details.wr-box > summary::-webkit-details-marker{display:none}
+#wr details.wr-box > summary::before{content:'▸'; color:var(--ink3); transition:transform .15s}
+#wr details.wr-box[open] > summary::before{transform:rotate(90deg)}
+#wr .wr-f{display:grid; gap:4px; min-width:0}
+#wr .wr-f > span{font:700 12.5px/1.2 'Nunito Sans',sans-serif; color:var(--ink2)}
+#wr .wr-f2{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 10px}
+#wr .wr-f3{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px 10px}
+#wr .wr-li{border:1px solid var(--line); border-radius:12px; padding:10px 12px; display:grid; gap:8px; background:#fffefb}
+#wr .wr-li > header{display:flex; align-items:center; gap:4px; font:800 13.5px/1.2 'Nunito',sans-serif}
+#wr .wr-li > header b{flex:1}
+#wr .wr-add{border:1.5px dashed var(--line); border-radius:12px; padding:9px; font-weight:800; color:var(--ink2); text-align:center; width:100%}
+#wr .wr-add:hover{border-color:var(--sun); color:var(--ink)}
+#wr .wr-pv{position:sticky; top:0; max-height:calc(100vh - 110px); overflow:auto; background:#8a7b66; border-radius:var(--r); padding:16px}
+#wr .wr-pv-bar{display:flex; align-items:center; gap:8px; color:#fff; font:700 12.5px/1 'Nunito Sans',sans-serif; margin-bottom:10px}
+#wr .pv{background:#fff; color:#000; font-family:'Times New Roman',Times,serif; line-height:1.15; padding:96px; box-shadow:0 4px 18px rgba(0,0,0,.25); width:794px; overflow-wrap:anywhere; transform-origin:0 0}
+#wr .pv.land{width:1123px}
+#wr .wr-ed.one{grid-template-columns:minmax(0,1fr)} #wr .wr-ed.one .wr-pv{position:static; max-height:none}
+#wr .wr-main:focus{outline:none}
+#wr .pv p{min-height:1em}
+#wr .pv-t{border-collapse:collapse; width:100%; table-layout:fixed; margin:6px 0}
+#wr .pv-t td,#wr .pv-t th{border:1px solid #000; vertical-align:top; padding:4px 5px; font-size:inherit}
+#wr .pv-t th{font-weight:700}
+#wr .pv-x{font-size:11pt; table-layout:auto} #wr .pv-x th{background:#9fc5e8} #wr .pv-x td.n,#wr .pv-x td.b{font-weight:700; background:#cfe2f3} #wr .pv-x td.n{background:#9fc5e8; text-align:center} #wr .pv-x td.a{background:#cfe2f3}
+#wr .pv-x tr.ch td{background:#0b5394; color:#fff; font-weight:700} #wr .pv-x tr.ph td{background:#9fc5e8; font-weight:700}
+#wr .pv-xh{display:flex; justify-content:space-between; text-align:center; font-size:11pt; gap:16px} #wr .pv-xt{text-align:center; font-weight:700; margin:14px 0 8px}
+#wr .wr-grid-ed{overflow-x:auto} #wr .wr-grid-ed table{border-collapse:collapse; min-width:980px; width:100%; font-size:13.5px}
+#wr .wr-grid-ed th{background:var(--paper2); padding:6px; font:800 12px/1.2 'Nunito Sans',sans-serif; text-align:left; border:1px solid var(--line)}
+#wr .wr-grid-ed td{border:1px solid var(--line); padding:0} #wr .wr-grid-ed td textarea{border:0; border-radius:0; background:transparent; padding:6px; min-height:34px; resize:vertical}
+#wr .wr-grid-ed td.c{text-align:center; padding:6px}
+
+/* ---- trợ lý AI ---- */
+#wr .wr-cop header{display:flex; align-items:center; gap:8px; padding:12px 14px; border-bottom:1px solid var(--line); font:800 15px/1.2 'Nunito',sans-serif}
+#wr .wr-cop header .sp{flex:1}
+#wr .wr-cop .ctx{padding:8px 14px; font-size:12.5px; color:var(--ink2); border-bottom:1px solid var(--line); background:var(--paper)}
+#wr .wr-msgs{flex:1; min-height:0; overflow:auto; padding:14px; display:flex; flex-direction:column; gap:10px}
+#wr .wr-msg{max-width:92%; padding:9px 13px; border-radius:14px; background:var(--paper2); white-space:pre-wrap; word-break:break-word; font-size:14.5px}
+#wr .wr-msg.user{align-self:flex-end; background:var(--sun2)}
+#wr .wr-msg.model{align-self:flex-start}
+#wr .wr-msg .acts{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+#wr .wr-msg .did{display:block; font-size:12.5px; color:var(--ink2); margin-top:6px}
+#wr .wr-msg.busy{color:var(--ink3); font-style:italic}
+#wr .wr-sugg{display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px}
+#wr .wr-sugg button{padding:6px 10px; border-radius:20px; background:var(--paper2); font:700 12.5px/1.2 'Nunito Sans',sans-serif; text-align:left}
+#wr .wr-sugg button:hover{background:var(--sun2)}
+#wr .wr-composer{display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); align-items:flex-end}
+#wr .wr-composer textarea{flex:1; max-height:160px}
+
+/* ---- hộp thoại ---- */
+#wr .wr-dlg{position:absolute; inset:0; z-index:8; background:rgba(47,34,23,.45); display:grid; place-items:center; padding:20px}
+#wr .wr-dlg-box{width:min(560px,100%); max-height:90vh; display:flex; flex-direction:column; background:var(--card); border-radius:16px; padding:20px 22px; box-shadow:0 18px 50px rgba(47,34,23,.3)}
+#wr .wr-dlg-box.wide{width:min(1100px,100%)} #wr .wr-dlg-box h3{font:900 18px/1.25 'Nunito',sans-serif; margin-bottom:12px}
+#wr .wr-dlg-body{overflow:auto; min-height:0} #wr .wr-dlg-act{display:flex; gap:8px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap}
+#wr .wr-variants{display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+#wr .wr-variant{border:2px solid var(--line); border-radius:12px; padding:12px; display:grid; gap:8px; align-content:start}
+#wr .wr-variant .pv{padding:16px; font-size:11pt; box-shadow:none; border:1px solid var(--line); width:auto}
+#wr .wr-lock{max-width:380px; margin:12vh auto 0}
+#wr .wr-table{border-collapse:collapse; width:100%; font-size:14px}
+#wr .wr-table th{text-align:left; padding:8px 10px; font:800 12.5px/1.3 'Nunito Sans',sans-serif; color:var(--ink2); border-bottom:1px solid var(--line)}
+#wr .wr-table td{padding:8px 10px; border-top:1px solid var(--line); vertical-align:middle}
+#wr .wr-tabs{display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap}
+#wr .wr-tabs button{padding:6px 12px; border-radius:20px; background:var(--paper2); font-weight:800; font-size:13.5px}
+#wr .wr-tabs button.on{background:var(--ink); color:var(--paper)}
+#wr .wr-seg{display:inline-flex; background:var(--paper2); border-radius:10px; padding:3px}
+#wr .wr-seg button{padding:5px 11px; border-radius:8px; font-weight:800; font-size:13px; color:var(--ink2)}
+#wr .wr-seg button.on{background:#fff; color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.1)}
+
+@media (max-width:1100px){#wr .wr-ed{grid-template-columns:minmax(0,1fr)} #wr .wr-pv{position:static; max-height:none}}
 @media (max-width:900px){
-  #wr{grid-template-columns:minmax(0,1fr); grid-template-rows:56px auto minmax(0,1fr)}
-  #wr .wr-side{grid-row:2; flex-direction:row; padding:6px 8px; overflow-x:auto; gap:4px}
-  #wr .wr-brand,#wr .wr-side .sp,#wr .wr-sep,#wr .wr-dev,#wr .wr-nav em{display:none}
-  #wr .wr-nav{width:auto; white-space:nowrap; padding:8px 10px}
-  #wr .wr-top{grid-row:1} #wr .wr-top h1,#wr .wr-chip.opt{display:none}
-  #wr .wr-main{padding:18px 16px 40px} #wr .wr-grid{grid-template-columns:minmax(0,1fr)}
+  #wr{grid-template-columns:minmax(0,1fr); grid-template-rows:auto 54px minmax(0,1fr)}
+  #wr .wr-side{grid-row:auto; flex-direction:row; align-items:center; overflow-x:auto; padding:8px; gap:4px}
+  #wr .wr-brand,#wr .wr-grp,#wr .wr-side .sp,#wr .wr-dev{display:none}
+  #wr .wr-nav{width:auto; white-space:nowrap; padding:7px 10px}
   #wr.cop .wr-body{grid-template-columns:minmax(0,1fr)} #wr.cop .wr-main{display:none}
+  #wr .wr-main{padding:16px}
+  #wr .wr-top .lbl,#wr .wr-save{display:none}
+  #wr .wr-f2,#wr .wr-f3{grid-template-columns:minmax(0,1fr)}
 }
 @media (prefers-reduced-motion:reduce){#wr{transition:none}}
-
-/* ---- các module (M2–M8) ---- */
-#wr button.wr-chip{cursor:pointer} #wr button.wr-chip:hover{background:var(--line)}
-#wr a{color:#a4532f; font-weight:700} #wr a:hover{color:var(--coral)}
-#wr .wr-ta{display:block; width:100%; min-height:120px; resize:vertical; margin-top:8px; line-height:1.5}
-#wr .wr-pre{white-space:pre-wrap; word-break:break-word; font:500 13.5px/1.55 'Nunito Sans',system-ui,sans-serif; background:var(--paper2); border-radius:10px; padding:12px 14px; margin:8px 0 0; max-height:320px; overflow:auto}
-#wr .wr-warn,#wr .wr-okbox{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; border-radius:12px; margin-bottom:12px; font-weight:600}
-#wr .wr-warn{background:#fbe9d2; color:#8a5a12} #wr .wr-okbox{background:#e3f1e3; color:#2f6b3f}
-#wr .wr-warn svg{color:var(--warn)}
-#wr .wr-title{width:100%; font:800 20px/1.3 'Nunito',sans-serif; padding:10px 12px}
-#wr .wr-tools{display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin:10px 0 8px; padding:6px; background:var(--paper2); border-radius:10px; position:sticky; top:-26px; z-index:1}
-#wr .wr-tools button{display:inline-flex; align-items:center; gap:5px; padding:6px 10px; border-radius:8px; font-weight:700; font-size:14px}
-#wr .wr-tools button:hover:not(:disabled){background:var(--card)} #wr .wr-tools button:disabled{opacity:.45; cursor:default}
-#wr .wr-tools .sep{width:1px; height:20px; background:var(--line); margin:0 4px} #wr .wr-tools svg{width:16px; height:16px}
-#wr .wr-ed,#wr .wr-read{font:500 16.5px/1.7 'Nunito Sans',system-ui,sans-serif; max-width:74ch}
-#wr .wr-ed{min-height:340px; padding:18px 20px; border:1px solid var(--line); border-radius:12px; background:#fff; outline:none}
-#wr .wr-ed:focus{border-color:var(--sun)}
-#wr .wr-ed p,#wr .wr-read p{margin:0 0 12px} #wr .wr-ed h2,#wr .wr-read h2{font:800 18px/1.35 'Nunito',sans-serif; margin:18px 0 8px}
-#wr .wr-ed .cap,#wr .wr-read .cap{text-align:center; font-style:italic; color:var(--ink2); font-size:15px}
-#wr .wr-ed .credit,#wr .wr-read .credit{text-align:right; margin-bottom:2px} #wr .wr-ed hr,#wr .wr-read hr{border:0; border-top:1px dashed var(--ink3); margin:14px 0}
-#wr .wr-read{max-height:70vh; overflow:auto}
-#wr .wr-diff{margin:6px 0 2px; font-size:14.5px; line-height:1.55} #wr .wr-diff del{background:#f8dcd7; color:#8f2f25; text-decoration:line-through; padding:1px 3px; border-radius:4px}
-#wr .wr-diff ins{background:#d9efdc; color:#245c33; text-decoration:none; padding:1px 3px; border-radius:4px}
-#wr .wr-scroll{overflow-x:auto; margin-top:10px; border:1px solid var(--line); border-radius:12px}
-#wr .wr-table{border-collapse:collapse; width:100%; min-width:1180px; font-size:14px}
-#wr .wr-table th{background:var(--sun2); font:800 13px/1.3 'Nunito',sans-serif; padding:8px 6px; border:1px solid var(--line); text-align:center; white-space:nowrap}
-#wr .wr-table td{border:1px solid var(--line); padding:2px; vertical-align:top} #wr .wr-table td.c{text-align:center; padding-top:9px; color:var(--ink2)}
-#wr .wr-table tr.grp td{background:var(--paper2)} #wr .wr-table tr.grp .wr-cell{font-weight:800}
-#wr .wr-table tr.dup td{background:#fbe9d2}
-#wr .wr-table td:nth-child(2){min-width:260px} #wr .wr-table td:nth-child(10){min-width:180px}
-#wr .wr-cell{width:100%; border:1px solid transparent; background:transparent; padding:6px 7px; border-radius:6px; resize:vertical; font-size:14px; line-height:1.4}
-#wr .wr-cell:hover{border-color:var(--line)} #wr .wr-cell:focus{background:#fff; border-color:var(--sun); outline:none}
-#wr .wr-card > .wr-cell{font-weight:700; margin-bottom:4px}
-#wr .wr-item{border-top:1px solid var(--line); margin-top:14px; padding-top:12px}
-#wr .wr-fields{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px 12px; margin-top:8px}
-#wr .wr-fields label{display:block} #wr .wr-fields label.wide{grid-column:1/-1} #wr .wr-fields label > span{display:block; font:700 12.5px/1.4 'Nunito Sans',sans-serif; color:var(--ink2)}
-#wr .wr-fields .wr-cell{border-color:var(--line); background:var(--paper)}
-#wr .wr-chk{display:inline-flex; align-items:center; gap:5px; font-size:14px; white-space:nowrap}
-#wr .wr-code{font:600 13px/1.4 ui-monospace,Consolas,monospace; background:var(--wood); color:var(--wood-ink); padding:8px 12px; border-radius:8px; user-select:all; word-break:break-all}
-#wr .wr-asst{display:flex; flex-direction:column; height:100%} #wr .wr-chatcard{flex:1; min-height:0; display:flex; padding:0; overflow:hidden}
-#wr .wr-main:has(.wr-asst){display:flex; flex-direction:column} #wr .wr-main:has(.wr-asst) > .wr-wrap{flex:1; min-height:0; width:100%}
-#wr .wr-chat{display:flex; flex-direction:column; flex:1; min-height:0; min-width:0}
-#wr .wr-msgs{flex:1; min-height:120px; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:10px}
-#wr .wr-msg{max-width:88%; padding:10px 14px; border-radius:14px; background:var(--paper2); position:relative; white-space:pre-wrap; word-break:break-word}
-#wr .wr-msg.user{align-self:flex-end; background:var(--sun2)} #wr .wr-msg.assistant{align-self:flex-start; padding-right:34px}
-#wr .wr-msg .wr-x{position:absolute; top:6px; right:6px} #wr .wr-msg .wr-x svg{width:15px; height:15px}
-#wr .wr-msg .src{margin-top:6px; font-size:12.5px; color:var(--ink2); white-space:normal}
-#wr .wr-act{margin-top:8px; padding:10px 12px; border-radius:10px; background:var(--card); border:1px solid var(--line); white-space:normal; font-size:14px}
-#wr .wr-composer{display:flex; gap:8px; align-items:flex-end; padding:12px 16px; border-top:1px solid var(--line)}
-#wr .wr-composer textarea{flex:1; min-height:48px; max-height:160px; resize:none; padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:var(--paper)}
-#wr .wr-cop .wr-chat{border-top:1px solid var(--line)} #wr .wr-cop .wr-msgs{padding:12px} #wr .wr-cop .wr-composer{padding:10px 12px}
-#wr .wr-chat > .wr-err{margin:0 16px 6px}
-@media (max-width:900px){#wr .wr-fields{grid-template-columns:minmax(0,1fr)} #wr .wr-ed{padding:14px}}
-
-/* ================= Milestone 2–8 ================= */
-#wr .wr-ic{display:inline-flex} #wr a{color:#a4532f} #wr a.wr-btn,#wr a.wr-tag{text-decoration:none}
-#wr .wr-wrap.wide{max-width:1320px} #wr .wr-wrap.tall{height:100%; display:flex; flex-direction:column} #wr .wr-wrap.tall .wr-h{flex:none}
-#wr .wr-btn.danger{background:var(--bad); color:#fff} #wr .wr-btn.danger:hover{background:#a93a2e}
-#wr .wr-tag.ok{background:#dcefe0; color:#2c6e41}
-#wr .wr-linkbtn{color:var(--ink); text-align:left; font-weight:700; text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:3px}
-#wr .wr-linkbtn:hover{text-decoration-color:var(--coral)} #wr .wr-linkbtn.cur{color:#a4532f}
-#wr .wr-row .t.wrap{white-space:normal} #wr .wr-row select.wr-in{padding:5px 8px; max-width:170px}
-#wr .wr-chip.btnlike{cursor:pointer} #wr .wr-chip.btnlike:hover{filter:brightness(.96)}
-#wr .wr-ib{position:relative} #wr .wr-badge{position:absolute; top:0; right:0; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:var(--bad); color:#fff; font:800 11px/17px 'Nunito Sans',sans-serif; font-style:normal; text-align:center}
-#wr .wr-stack{display:grid; gap:10px} #wr textarea.wr-in{width:100%; resize:vertical; line-height:1.5}
-#wr .wr-banner{display:flex; gap:12px; align-items:flex-start; padding:12px 14px; margin-bottom:14px; border-radius:12px; background:#fbe3d6; border:1px solid #f0c3ab; color:#7a3418}
-#wr .wr-banner.soft{background:#fff3d6; border-color:#f0dba6; color:#6b4d10} #wr .wr-banner>div{flex:1; min-width:0} #wr .wr-banner svg{margin-top:2px}
-#wr .wr-fields{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px}
-#wr .wr-fld{display:grid; gap:4px} #wr .wr-fld span{font:700 12.5px/1.2 'Nunito Sans',sans-serif; color:var(--ink2)} #wr .wr-fld .wr-in{width:100%}
-#wr .wr-fld.w2{grid-column:span 2} #wr .wr-fld.w3{grid-column:1/-1}
-#wr .wr-tabs{display:flex; gap:4px; border-bottom:1px solid var(--line)} #wr .wr-tab{padding:8px 12px; font-weight:800; color:var(--ink2); border-bottom:3px solid transparent; margin-bottom:-1px}
-#wr .wr-tab.on{color:var(--ink); border-color:var(--sun)}
-#wr .wr-pre{white-space:pre-wrap; word-break:break-word; font:500 13.5px/1.55 'Nunito Sans',sans-serif; background:var(--paper2); padding:12px 14px; border-radius:10px; max-height:240px; overflow:auto; margin:8px 0 0}
-#wr .wr-pre.tall{max-height:60vh} #wr .wr-code{font:600 13px/1.4 ui-monospace,Consolas,monospace; background:var(--paper2); padding:6px 10px; border-radius:8px; user-select:all; word-break:break-all}
-#wr .wr-guide{margin-top:12px; padding:12px 14px; border-radius:12px; background:var(--paper)} #wr .wr-guide summary{font-weight:800; cursor:pointer} #wr .wr-guide li{margin:8px 0}
-#wr details summary{cursor:pointer}
-/* hộp thoại */
-#wr .wr-dlg{position:absolute; inset:0; z-index:5; background:rgba(47,34,23,.45); display:grid; place-items:center; padding:20px}
-#wr .wr-dlg-box{width:min(520px,100%); max-height:88vh; display:flex; flex-direction:column; background:var(--card); border-radius:16px; padding:20px 22px; box-shadow:0 18px 50px rgba(47,34,23,.3)}
-#wr .wr-dlg-box.wide{width:min(980px,100%)} #wr .wr-dlg-box h3{font:900 18px/1.25 'Nunito',sans-serif; margin-bottom:12px}
-#wr .wr-dlg-body{overflow:auto; min-height:0} #wr .wr-dlg-act{display:flex; gap:8px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap}
-/* bảng */
-#wr .wr-tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:12px}
-#wr .wr-table{border-collapse:collapse; width:100%; font-size:14px} #wr .wr-table th{position:sticky; top:0; background:var(--paper2); text-align:left; padding:8px 10px; font:800 12.5px/1.3 'Nunito Sans',sans-serif; white-space:nowrap}
-#wr .wr-table td{padding:7px 10px; border-top:1px solid var(--line); vertical-align:top} #wr .wr-table.edit td{padding:3px 4px}
-#wr .wr-table tr.sec td{background:var(--sun2); padding:7px 10px} #wr .wr-table tr.dup td{background:#fdeeea} #wr .wr-table tr.off td{opacity:.5}
-#wr .wr-cell{width:100%; padding:6px 7px; border:1px solid transparent; border-radius:7px; background:transparent} #wr .wr-cell:hover{border-color:var(--line)} #wr .wr-cell:focus{background:#fff; border-color:var(--sun)}
-#wr .wr-table .m{color:var(--ink3); font-size:12.5px}
-/* trình soạn thảo */
-#wr .wr-edgrid{display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:16px; align-items:start} #wr .wr-edgrid.rev{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-#wr .wr-paper{background:#fff; border:1px solid var(--line); border-radius:var(--r); padding:26px 34px 34px; min-width:0}
-#wr .wr-paper.read{max-height:calc(100vh - 210px); overflow:auto; position:sticky; top:0}
-#wr .wr-title{width:100%; border:0; background:transparent; font:900 24px/1.25 'Nunito',sans-serif; padding:0 0 12px; color:var(--ink)} #wr h2.wr-title{margin:0}
-#wr .wr-toolbar{display:flex; flex-wrap:wrap; gap:2px; align-items:center; padding:6px; margin-bottom:14px; border-radius:10px; background:var(--paper); position:sticky; top:-26px; z-index:2}
-#wr .wr-tb{min-width:34px; height:32px; padding:0 8px; border-radius:7px; font-weight:800; display:inline-flex; align-items:center; justify-content:center} #wr .wr-tb:hover{background:var(--paper2)}
-#wr .wr-toolbar .sep{width:1px; height:20px; background:var(--line); margin:0 4px}
-#wr .wr-ed{min-height:46vh; outline:none; font:500 16.5px/1.75 Georgia,'Times New Roman',serif; color:#2b2018} #wr .wr-ed p{margin:0 0 14px} #wr .wr-ed h2{font:800 20px/1.3 'Nunito',sans-serif; margin:22px 0 10px}
-#wr .wr-ed h3{font:800 17px/1.3 'Nunito',sans-serif; margin:18px 0 8px} #wr .wr-ed ul,#wr .wr-ed ol{margin:0 0 14px; padding-left:24px}
-#wr .wr-side2{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:12px 14px; display:grid; gap:10px; position:sticky; top:0; max-height:calc(100vh - 130px); overflow:auto}
-#wr .wr-prop{display:grid; gap:10px; padding:12px; border-radius:12px; background:var(--paper)}
-#wr .wr-diff{font:500 14.5px/1.6 Georgia,serif; white-space:pre-wrap; word-break:break-word} #wr .wr-diff.big{max-height:62vh; overflow:auto}
-#wr .wr-diff ins{background:#d6efdb; text-decoration:none; border-radius:3px} #wr .wr-diff del{background:#f8dcd7; color:#9a3a2e; border-radius:3px}
-#wr .wr-pick{display:block; width:100%; text-align:left; padding:9px 11px; border-radius:9px; background:#fff; border:1px solid var(--line); font-weight:700} #wr .wr-pick:hover{border-color:var(--sun)}
-#wr .wr-stream{white-space:pre-wrap; margin-top:12px; padding:14px 16px; max-height:300px; overflow:auto; border-radius:12px; background:#fff; border:1px dashed var(--line); font:500 15px/1.65 Georgia,serif}
-#wr .wr-item{padding:12px 14px; margin-top:10px; border-radius:12px; background:var(--paper); border-left:4px solid var(--ink3); display:grid; gap:8px}
-#wr .wr-item.closed{opacity:.6} #wr .wr-item.error{border-color:var(--bad)} #wr .wr-item.fact,#wr .wr-item.missing{border-color:var(--warn)} #wr .wr-item.clarity,#wr .wr-item.structure{border-color:#5b7fb8} #wr .wr-item.style{border-color:#8a6fb0}
-#wr .wr-item blockquote{margin:0; padding:6px 10px; background:#fff; border-radius:8px; font:500 14.5px/1.6 Georgia,serif} #wr .wr-item .why{color:var(--ink2); font-size:14px} #wr .wr-item .wr-in{flex:1 1 200px}
-#wr .wr-tag.t-error{background:#f8dcd7; color:var(--bad)} #wr .wr-tag.t-fact,#wr .wr-tag.t-missing{background:#fdebc4; color:#7a5510} #wr .wr-tag.t-clarity,#wr .wr-tag.t-structure{background:#dfe8f5; color:#34527f} #wr .wr-tag.t-style{background:#e9e1f3; color:#5b4380}
-/* trò chuyện */
-#wr .wr-chat{flex:1; min-height:0; display:grid; grid-template-columns:230px minmax(0,1fr); gap:16px} #wr .wr-chat.compact{display:flex; flex-direction:column; grid-template-columns:none; gap:0; flex:1; min-height:0}
-#wr .wr-chatlist{overflow:auto; display:grid; gap:2px; align-content:start} #wr .wr-chatmain{display:flex; flex-direction:column; min-height:0; background:var(--card); border:1px solid var(--line); border-radius:var(--r)}
-#wr .wr-msgs{flex:1; min-height:120px; overflow:auto; padding:16px 18px; display:flex; flex-direction:column; gap:12px}
-#wr .wr-msg{max-width:86%; display:grid; gap:6px} #wr .wr-msg.user{align-self:flex-end; justify-items:end}
-#wr .wr-bub{padding:10px 14px; border-radius:14px; background:var(--paper2); white-space:pre-wrap; word-break:break-word; line-height:1.6} #wr .wr-msg.user .wr-bub{background:var(--sun2)} #wr .wr-bub:empty{display:none}
-#wr .wr-msgfoot{display:flex; flex-wrap:wrap; gap:12px; align-items:center; font-size:13px} #wr .wr-msgfoot details{flex-basis:100%} #wr .wr-msgfoot .wr-linkbtn{font-weight:600; font-size:13px}
-#wr .wr-act{padding:12px 14px; border-radius:12px; background:#fff; border:1px solid var(--line); display:grid; gap:8px} #wr .wr-act.execute{border-color:#f0c3ab; background:#fff8f4}
-#wr .wr-composer{padding:12px 14px; border-top:1px solid var(--line); display:grid; gap:8px}
-#wr .wr-cop{overflow:hidden} #wr .wr-cop .wr-msgs{padding:12px 14px} #wr .wr-cop .wr-msg{max-width:100%}
-#wr .wr-lock{max-width:420px; margin:12vh auto 0} #wr.locked .wr-side .wr-nav{pointer-events:none; opacity:.4}
-@media (max-width:1100px){ #wr .wr-edgrid,#wr .wr-edgrid.rev{grid-template-columns:minmax(0,1fr)} #wr .wr-paper.read,#wr .wr-side2{position:static; max-height:none} #wr .wr-fields{grid-template-columns:minmax(0,1fr)} #wr .wr-fld.w2{grid-column:auto} #wr .wr-chat{grid-template-columns:minmax(0,1fr)} #wr .wr-chatlist{display:none} #wr .wr-paper{padding:18px} }
-#wr .wr-card h3>span:not(.wr-tag){margin-left:auto}
-#wr .wr-side2 .wr-row{flex-wrap:wrap} #wr .wr-side2 .wr-row .t{flex-basis:100%}
-@media (max-width:900px){
-  #wr .wr-top{gap:6px; padding:0 8px} #wr .wr-top .wr-chip{display:none} #wr .wr-evsel{flex:1 1 auto; max-width:none}
-  #wr .wr-top .lbl{display:none} #wr .wr-exit{padding:8px 10px} #wr .wr-exit::after{content:'Về phòng'; font:800 12px/1 'Nunito',sans-serif}
-  #wr .wr-ib{padding:7px 8px}
-}
-#wr .wr-sub{font:800 14px/1.3 'Nunito',sans-serif; margin:16px 0 0}

@@ -33,3 +33,13 @@ Cập nhật: 10/11/2026 · **đã lên bản chính** (`main`), nhánh `workroo
 ## Ghi chú kỹ thuật cho phiên sau
 - Bộ kiểm thử nằm ngoài repo (scratchpad của phiên). Ollama giả: `/api/version|tags|chat|pull`; Google giả: Drive copy/create/upload/get, Sheets get/values/batchUpdate, Calendar insert, Gmail drafts.
 - Dữ liệu thử của Workroom độc lập nằm ở `localStorage['vyWorkroomDev']`.
+
+## v3 — 11/11/2026: làm lại giao diện theo góp ý
+- Giao diện tiếng Việt, gọn: Hôm nay · Kịch bản · Caption · Tin bài · Phân công · Timeline · Chương trình · Xuất bản · Cài đặt. Bỏ các module cũ (Content Studio, Editorial Desk, Knowledge Hub, Task Manager…).
+- Định dạng theo MẪU THẬT: `tools/build-workroom-tpl.py` dựng khung (`src/workroom/tpl/`) từ file mẫu của Vy (không đưa nội dung mẫu vào repo); `fmt.js` điền chữ giữ nguyên XML định dạng → .docx/.xlsx đúng lề, cỡ chữ, cột, đánh số. Đã đối chiếu bằng LibreOffice.
+- Thêm Kịch bản: Bản tin ULAW TV, Bản tin Tiếng Anh (script tiếng Việt), Kịch bản video storyboard.
+- AI = Gemini (khoá miễn phí của Vy). Một Trợ lý AI duy nhất thao tác trực tiếp, có Hoàn tác.
+- Chương trình lớn tách riêng, tài liệu thuộc chương trình liên thông thông tin; đổi thông tin → đánh dấu “Cần xem lại”.
+- Giai đoạn thử: Bin cũng vào được (thêm vào `wr_owner`, migration 011). Khoá lại: xem chú thích trong 011.
+- Camera: ngồi bàn → lướt ra sau lưng nhìn màn hình rồi mở Workroom (`api.deskCam`).
+- Dữ liệu riêng tư đã nạp: 7 bài mẫu (văn phong) vào `wr_knowledge`, 45 nhân sự vào `wr_staff`.

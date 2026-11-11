@@ -18,6 +18,7 @@ const P = {   // icon nét 24×24
   tick: 'M5 12.5l4.5 4.5L19 7.5', x: 'M6 6l12 12M18 6L6 18', door: 'M14 4h5v16h-5M10 12H3M6 8l-4 4 4 4M14 4L8 6v12l6 2z', plus: 'M12 5v14M5 12h14', down: 'M12 4v11M7 11l5 5 5-5M5 20h14',
   up: 'M12 20V9M7 13l5-5 5 5M5 4h14', send: 'M4 12l16-8-6 16-3-7z', stop: 'M7 7h10v10H7z', copy: 'M9 9h10v11H9zM5 15V4h10', link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1',
   doc: 'M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5', sheet: 'M5 4h14v16H5zM5 9h14M5 14h14M10 4v16', undo: 'M9 7L4 12l5 5M4 12h10a5 5 0 0 1 0 10h-2', redo: 'M15 7l5 5-5 5M20 12H10a5 5 0 0 0 0 10h2',
+  film: 'M4 5h16v14H4zM4 9h16M4 15h16M8 5v4M12 5v4M16 5v4M8 15v4M12 15v4M16 15v4', chat: 'M4 5h16v11H9l-5 4z', flag: 'M5 21V4h11l-2 4 2 4H5', drive: 'M8 3h8l6 11-4 7H6l-4-7zM8 3l6 11M2 14h20M16 3l-8 14',
   warn: 'M12 4l9 16H3zM12 10v4M12 17h.01', ext: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5', trash: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13', refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7',
 };
 export const icon = k => h('span', {class: 'wr-ic', html: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${P[k] || ''}"/></svg>`});
@@ -27,7 +28,7 @@ export const fmtDT = d => d ? new Date(d).toLocaleString('vi-VN', {day: '2-digit
 export const head = (title, sub, ...right) => h('div', {class: 'wr-h'}, h('div', {}, h('h2', {}, title), sub && h('p', {}, sub)), h('span', {style: 'flex:1'}), ...right);
 export const card = (title, meta, ...body) => h('section', {class: 'wr-card'}, h('h3', {}, title, meta != null && meta !== false && h('span', {}, meta)), ...body);
 export const chip = (cls, text, title) => h('span', {class: 'wr-chip ' + cls, title}, h('i'), text);
-export const btn = (label, onclick, o = {}) => h('button', {class: 'wr-btn' + (o.ghost ? ' ghost' : '') + (o.danger ? ' danger' : ''), type: o.type || 'button', disabled: o.disabled, title: o.title, onclick}, o.icon && icon(o.icon), label);
+export const btn = (label, onclick, o = {}) => h('button', {class: 'wr-btn' + (o.ghost ? ' ghost' : '') + (o.danger ? ' danger' : '') + (o.sm ? ' sm' : '') + (o.cls ? ' ' + o.cls : ''), type: o.type || 'button', disabled: o.disabled, title: o.title, onclick}, o.icon && icon(o.icon), label);
 export const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
 // chạy thao tác có ghi dữ liệu; lỗi thì hiện ngay cạnh nút (không im lặng)
 export const run = (errBox, fn) => async ev => {
@@ -84,7 +85,7 @@ export function dialog({title, body, buttons = [['Đóng', null]], wide = false}
     const done = v => { ov.remove(); document.removeEventListener('keydown', key, true); try { prev && prev.focus(); } catch (e) {} res(v); };
     const key = e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } };
     const box = h('div', {class: 'wr-dlg-box' + (wide ? ' wide' : ''), role: 'dialog', 'aria-modal': 'true', 'aria-label': title},
-      h('h3', {}, title), h('div', {class: 'wr-dlg-body'}, typeof body === 'string' ? h('p', {}, body) : body),
+      h('h3', {}, title), h('div', {class: 'wr-dlg-body'}, typeof body === 'string' ? h('p', {style: 'white-space:pre-wrap'}, body) : typeof body === 'function' ? body(v => done(v)) : body),
       h('div', {class: 'wr-dlg-act'}, buttons.map(([l, v, k]) => h('button', {class: 'wr-btn' + (k === 'primary' ? '' : k === 'danger' ? ' danger' : ' ghost'), onclick: () => done(typeof v === 'function' ? v() : v)}, l))));
     const ov = h('div', {class: 'wr-dlg', onclick: e => { if (e.target === ov) done(null); }}, box);
     root.append(ov); document.addEventListener('keydown', key, true);
@@ -92,6 +93,6 @@ export function dialog({title, body, buttons = [['Đóng', null]], wide = false}
   });
 }
 export const confirmBox = (title, text, yes = 'Đồng ý', danger = false) => dialog({title, body: text, buttons: [['Huỷ', null], [yes, true, danger ? 'danger' : 'primary']]});
-export const download = (blob, name) => { const a = h('a', {href: URL.createObjectURL(blob), download: name}); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); };
+export const download = (blob, name) => { const a = h('a', {href: URL.createObjectURL(blob)}); a.setAttribute('download', name); document.body.append(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 4000); };
 export const pickFile = accept => new Promise(res => { const i = h('input', {type: 'file', accept, style: 'display:none', onchange: () => { res(i.files[0] || null); i.remove(); }}); document.body.append(i); i.click(); });
 export const debounce = (fn, ms) => { let t; const d = (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; d.flush = (...a) => { clearTimeout(t); return fn(...a); }; return d; };

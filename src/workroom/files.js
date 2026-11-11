@@ -37,6 +37,23 @@ export async function unzip(buf, want) {   // → {tên: chuỗi} cho những t�
   return out;
 }
 
+// toàn bộ file trong gói → {tên: Uint8Array} (dùng để mở khung định dạng mẫu rồi đóng gói lại)
+export async function unzipAll(buf) {
+  const u = new Uint8Array(buf), v = new DataView(u.buffer, u.byteOffset, u.byteLength); let e = u.length - 22;
+  while (e >= 0 && v.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error('File mẫu hỏng');
+  const n = v.getUint16(e + 10, true); let p = v.getUint32(e + 16, true); const out = {};
+  for (let i = 0; i < n; i++) {
+    const method = v.getUint16(p + 10, true), cs = v.getUint32(p + 20, true), nl = v.getUint16(p + 28, true), el = v.getUint16(p + 30, true), cl = v.getUint16(p + 32, true), lo = v.getUint32(p + 42, true);
+    const name = dec.decode(u.subarray(p + 46, p + 46 + nl)); p += 46 + nl + el + cl;
+    if (name.endsWith('/')) continue;
+    const ds = lo + 30 + v.getUint16(lo + 26, true) + v.getUint16(lo + 28, true), raw = u.subarray(ds, ds + cs);
+    out[name] = method === 0 ? raw.slice() : new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+  }
+  return out;
+}
+export const utf8 = {enc: s => enc.encode(s), dec: b => dec.decode(b)};
+
 // ---------- DOCX ----------
 // đọc: mỗi đoạn văn 1 dòng; tiêu đề (Heading/Title) thành "# …"; in đậm cả đoạn giữ nguyên chữ
 export async function readDocx(buf) {

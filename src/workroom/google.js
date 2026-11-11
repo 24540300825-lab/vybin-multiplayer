@@ -77,6 +77,24 @@ export function createGoogle(SH, store) {
     // cập nhật nội dung Docs đã tạo từ Workroom (thay toàn bộ nội dung — chỉ gọi sau khi người dùng xác nhận)
     updateDoc(id, html, name) { return upload('PATCH', `https://www.googleapis.com/upload/drive/v3/files/${id}?${q({uploadType: 'multipart', fields: FIELDS})}`, name ? {name} : {}, html); },
   };
+  // tải file .docx/.xlsx lên Drive (giữ nguyên định dạng file như mẫu). id có sẵn → ghi phiên bản mới cho đúng file đó (Drive giữ lịch sử phiên bản)
+  G.drive.putFile = (blob, {name, mime, parent, id}) => {
+    const b = 'wr' + Math.random().toString(36).slice(2), meta = id ? {name} : {name, mimeType: mime, ...(parent ? {parents: [parent]} : {})};
+    const body = new Blob([`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: ${mime}\r\n\r\n`, blob, `\r\n--${b}--`]);
+    return api(id ? `https://www.googleapis.com/upload/drive/v3/files/${id}?${q({uploadType: 'multipart', fields: FIELDS})}` : `https://www.googleapis.com/upload/drive/v3/files?${q({uploadType: 'multipart', fields: FIELDS})}`,
+      {method: id ? 'PATCH' : 'POST', headers: {'Content-Type': 'multipart/related; boundary=' + b}, body});
+  };
+  // thư mục con theo tên (tạo nếu chưa có), nhớ id trong cài đặt
+  G.folderPath = async names => {
+    const key = names.join(' / '), map = {...(store.settings.drive_dirs || {})};
+    if (map[key]) { try { await G.drive.meta(map[key].id); return map[key]; } catch (e) { if (e.code !== 'http') throw e; } }
+    let parent = (await G.workFolder()).id, f = null;
+    for (const n of names) {
+      const found = await api(`${D}/files?${q({q: `'${parent}' in parents and trashed = false and mimeType = '${MIME.folder}' and name = '${n.replace(/['\\]/g, ' ')}'`, fields: `files(${FIELDS})`, includeItemsFromAllDrives: 'true'})}`);
+      f = (found.files || [])[0] || await G.drive.createFolder(n, parent); parent = f.id;
+    }
+    map[key] = {id: f.id, url: f.webViewLink}; await store.setSetting('drive_dirs', map); return map[key];
+  };
   function upload(method, url, meta, html) {
     const b = 'wr' + Math.random().toString(36).slice(2), doc = `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:'Times New Roman';font-size:13pt;line-height:1.5}p{text-align:justify}h1{font-size:15pt;text-align:center}h2{font-size:14pt}h3{font-size:13pt}</style></head><body>${html}</body></html>`;
     return api(url, {method, headers: {'Content-Type': 'multipart/related; boundary=' + b}, body: `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${doc}\r\n--${b}--`});

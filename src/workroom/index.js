@@ -1,13 +1,12 @@
-// PHÒNG VY — WORKROOM · khung Work Mode (sidebar, thanh trên, vùng làm việc, AI Copilot).
-// Chạy ở TRANG VỎ (shell) nên game 3D bên dưới giữ nguyên trạng thái; cuộc gọi, nhạc, chat không đứt.
-// Chỉ được tải khi Vy mở Work Mode lần đầu (lazy) — không làm nặng lúc vào game.
+// PHÒNG VY — WORKROOM · khung Work Mode (thanh bên, thanh trên, vùng làm việc, Trợ lý AI).
+// Chạy ở TRANG VỎ (shell) nên game 3D bên dưới giữ nguyên trạng thái. Chỉ tải khi mở Work Mode lần đầu.
 import {createStore} from './store.js';
 import {createAI} from './ai.js';
 import {createGoogle} from './google.js';
-import {createActions} from './actions.js';
-import {MODULES, pinOk} from './modules.js';
-import {chatPanel} from './m-assistant.js';
-import {h, icon, chip, btn} from './ui.js';
+import {createCopilot} from './copilot.js';
+import {GROUPS, KINDS} from './kinds.js';
+import * as V from './views.js';
+import {h, icon, btn} from './ui.js';
 
 let inst = null;
 export async function openWorkroom(SH, opt = {}) {
@@ -17,97 +16,110 @@ export async function openWorkroom(SH, opt = {}) {
   return w;
 }
 
+const NAV = [
+  {id: 'home', name: 'Hôm nay', icon: 'home'},
+  {grp: 'Việc thường ngày'}, ...GROUPS.map(g => ({id: 'group:' + g.id, name: g.name, icon: g.icon, g})),
+  {grp: 'Chương trình lớn'}, {id: 'programs', name: 'Chương trình', icon: 'flag'},
+  {grp: 'Hoàn tất'}, {id: 'publish', name: 'Xuất bản', icon: 'drive'},
+  {sp: 1}, {id: 'settings', name: 'Cài đặt', icon: 'gear'},
+];
+const navKey = v => v.screen === 'group' ? 'group:' + v.id : v.screen === 'program' ? 'programs' : v.screen;
+
 async function build(SH) {
   await new Promise(res => {
     if (document.getElementById('wrCss')) return res();
-    const l = h('link', {id: 'wrCss', rel: 'stylesheet', href: 'workroom.css?v=2'}); l.onload = l.onerror = res; document.head.append(l);
+    const l = h('link', {id: 'wrCss', rel: 'stylesheet', href: 'workroom.css?v=3'}); l.onload = l.onerror = res; document.head.append(l);
   });
-  const store = await createStore(SH);          // ném 'not_owner' nếu máy chủ không xác nhận là chủ phòng
+  const store = await createStore(SH);          // ném 'not_owner' nếu máy chủ không xác nhận quyền vào
   const ai = createAI(store), g = createGoogle(SH, store);
-  const st = {mod: 'overview', eventId: null, cop: false, onClose: null, open: false};
-  try { const s = JSON.parse(localStorage.getItem('vyWorkroomUi') || '{}'); if (MODULES.some(m => m.id === s.mod)) st.mod = s.mod; st.cop = !!s.cop; st.eventId = s.eventId || null; } catch (e) {}
-  const keep = () => { try { localStorage.setItem('vyWorkroomUi', JSON.stringify({mod: st.mod, cop: st.cop, eventId: st.eventId})); } catch (e) {} };
+  const st = {view: {screen: 'home'}, cop: false, onClose: null, open: false};
+  try { const s = JSON.parse(localStorage.getItem('vyWorkroomUi3') || '{}'); if (s.view) st.view = s.view; st.cop = !!s.cop; } catch (e) {}
+  const keep = () => { try { localStorage.setItem('vyWorkroomUi3', JSON.stringify({view: st.view, cop: st.cop})); } catch (e) {} };
 
   const root = h('div', {id: 'wr', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Phòng Vy — Workroom'});
-  const side = h('nav', {class: 'wr-side', 'aria-label': 'Các khu làm việc'}), top = h('header', {class: 'wr-top'});
-  const main = h('main', {class: 'wr-main', tabIndex: -1}), cop = h('aside', {class: 'wr-cop', 'aria-label': 'AI Copilot'}), noteEl = h('div', {class: 'wr-note', role: 'status'});
+  const side = h('nav', {class: 'wr-side', 'aria-label': 'Các mục'}), top = h('header', {class: 'wr-top'});
+  const main = h('main', {class: 'wr-main', tabIndex: -1}), cop = h('aside', {class: 'wr-cop', 'aria-label': 'Trợ lý AI'}), noteEl = h('div', {class: 'wr-note', role: 'status'});
   root.append(side, top, h('div', {class: 'wr-body'}, main, cop), noteEl);
   document.body.append(root);
 
-  let noteT = 0;
+  let noteT = 0, busyEl = null;
   const ctx = {
-    store, ai, g, ui: {}, SH,
-    event: () => store.eventOf(st.eventId) || null,
-    setEvent(id) { st.eventId = id || null; keep(); render(); },
-    go(id) { if (!MODULES.some(m => m.id === id)) return; flush(); st.mod = id; keep(); render(); main.scrollTop = 0; main.focus({preventScroll: true}); },
+    store, ai, g, SH, ui: {},
+    get view() { return st.view; },
+    go(v) { flush(); st.view = typeof v === 'string' ? {screen: v} : v; keep(); ctx.render(); main.scrollTop = 0; main.focus({preventScroll: true}); },
     render: () => render(),
-    note(m) { noteEl.textContent = m; noteEl.classList.add('on'); clearTimeout(noteT); noteT = setTimeout(() => noteEl.classList.remove('on'), 3200); },
+    note(m) { noteEl.textContent = m; noteEl.classList.add('on'); clearTimeout(noteT); noteT = setTimeout(() => noteEl.classList.remove('on'), 3800); },
+    busy(m) { if (busyEl) { busyEl.remove(); busyEl = null; } if (m) { busyEl = h('div', {class: 'wr-dlg'}, h('div', {class: 'wr-dlg-box'}, h('h3', {}, '✨ ' + m), h('p', {class: 'wr-mute'}, 'Thường mất 10–40 giây.'), h('div', {class: 'wr-dlg-act'}, btn('Dừng', () => ai.stop(), {ghost: true})))); root.append(busyEl); } },
+    toggleCop(v) { st.cop = v == null ? !st.cop : v; keep(); render(); },
   };
-  ctx.actions = createActions(ctx);
-  const flush = () => { try { ctx.ui.flush && ctx.ui.flush(); } catch (e) { console.error(e); } };
+  ctx.cop = createCopilot(ctx);
+  const flush = () => { try { ctx.ui.flush && ctx.ui.flush(); } catch (e) { console.error(e); } ctx.ui.flush = null; };
   const locked = () => !!store.settings.pin_hash && sessionStorage.getItem('vyWrUnlocked') !== '1';
 
   function renderSide() {
-    const n = {tasks: store.tasks.filter(t => t.status !== 'done').length, editorial: store.articles.filter(a => a.status === 'review').length};
-    side.replaceChildren(h('div', {class: 'wr-brand'}, 'PHÒNG VY', h('small', {}, 'Workroom')),
-      ...MODULES.flatMap(m => [m.sep && h('div', {class: 'wr-sep'}), h('button', {class: 'wr-nav' + (st.mod === m.id ? ' on' : ''), 'aria-current': st.mod === m.id ? 'page' : null, title: m.name, onclick: () => ctx.go(m.id)}, icon(m.icon), h('span', {}, m.name), n[m.id] > 0 && h('em', {}, n[m.id]))]).filter(Boolean),
-      h('span', {class: 'sp'}), ...(store.local ? [h('div', {class: 'wr-dev'}, 'BẢN THỬ — dữ liệu chỉ lưu trên trình duyệt này, không phải dữ liệu thật.')] : []));
+    const cur = navKey(st.view), n = {publish: store.docs.filter(d => d.status === 'done' && !(d.drive && d.drive.id)).length};
+    side.replaceChildren(h('div', {class: 'wr-brand'}, 'PHÒNG VY', h('small', {}, 'Workspace')),
+      ...NAV.map(x => x.grp ? h('div', {class: 'wr-grp'}, x.grp) : x.sp ? h('span', {class: 'sp'}) :
+        h('button', {class: 'wr-nav' + (cur === x.id ? ' on' : ''), 'aria-current': cur === x.id ? 'page' : null, onclick: () => ctx.go(x.id.startsWith('group:') ? {screen: 'group', id: x.id.slice(6)} : {screen: x.id})},
+          icon(x.icon), h('span', {}, x.name), n[x.id] > 0 && h('em', {title: 'Đã xong nhưng chưa lưu Drive'}, n[x.id]))),
+      store.local ? h('div', {class: 'wr-dev'}, 'BẢN THỬ — dữ liệu chỉ lưu trên trình duyệt này.') : null);
   }
+  const TITLES = {home: 'Hôm nay', programs: 'Chương trình lớn', publish: 'Xuất bản', settings: 'Cài đặt'};
   function renderTop() {
-    const s = store.save, cur = ctx.event(), a = ai.state, gs = g.status;
-    const saveChip = s.state === 'saving' ? ['warn', 'Đang lưu…'] : s.state === 'error' ? ['bad', 'Lưu lỗi'] : ['ok', s.at ? 'Đã lưu ' + s.at.toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'}) : 'Đã lưu'];
-    const cl = m => /[:-]cloud$/.test(m || '') ? ' ☁' : '', aiChip = a.busy ? ['warn', 'AI: ' + (a.task || 'đang xử lý') + (a.model ? ' · ' + a.model + cl(a.model) : '') + '…'] : ai.ready ? ['ok', 'AI: ' + ai.cfg.model + cl(ai.cfg.model) + (ai.cfg.heavy && ai.cfg.heavy !== ai.cfg.model && ai.has(ai.cfg.heavy) ? ' + ' + ai.cfg.heavy + cl(ai.cfg.heavy) : '')] : a.status === 'online' ? ['warn', 'AI: chưa có model'] : a.status === 'unknown' ? ['', 'AI: đang kiểm tra'] : ['bad', 'AI: offline'];
-    const late = store.tasks.filter(t => t.status !== 'done' && t.deadline && new Date(t.deadline) < new Date()).length, stale = store.articles.filter(x => (x.stale || []).length).length + store.events.filter(e => (e.needs_check || []).length).length, nN = late + stale;
-    top.replaceChildren(...[h('h1', {}, 'PHÒNG VY — WORKSPACE'),
-      h('select', {class: 'wr-evsel', 'aria-label': 'Sự kiện đang làm', onchange: e => ctx.setEvent(e.target.value)}, h('option', {value: ''}, store.events.length ? 'Chưa chọn sự kiện' : 'Chưa có sự kiện'), store.events.filter(e => !e.archived || (cur && cur.id === e.id)).map(e => h('option', {value: e.id, selected: cur && cur.id === e.id}, `${e.code} — ${e.name}`))),
-      h('span', {class: 'sp'}),
-      h('span', {class: 'wr-chip ' + saveChip[0], title: s.error || 'Trạng thái lưu'}, h('i'), saveChip[1]),
-      h('button', {class: 'wr-chip opt btnlike ' + (gs === 'connected' ? 'ok' : gs === 'expired' ? 'warn' : ''), title: 'Google Workspace — bấm để mở Cài đặt & Kết nối', onclick: () => ctx.go('settings')}, h('i'), gs === 'connected' ? 'Google: đã kết nối' : gs === 'expired' ? 'Google: cần kết nối lại' : 'Google: chưa kết nối'),
-      h('button', {class: 'wr-chip opt btnlike ' + aiChip[0], title: a.error || 'AI trên máy — bấm để mở Cài đặt & Kết nối', onclick: () => ctx.go('settings')}, h('i'), aiChip[1]),
-      a.busy > 0 && h('button', {class: 'wr-ib', title: 'Dừng tác vụ AI đang chạy', onclick: () => ai.stop()}, icon('stop'), 'Dừng'),
-      h('button', {class: 'wr-ib', title: nN ? `${late} việc quá hạn · ${stale} mục cần rà lại` : 'Không có thông báo', 'aria-label': 'Thông báo', onclick: () => ctx.go(late ? 'tasks' : 'overview')}, icon('warn'), nN > 0 && h('em', {class: 'wr-badge'}, nN)),
-      h('button', {class: 'wr-ib' + (st.cop ? ' on' : ''), 'aria-pressed': String(st.cop), title: 'Bật / tắt AI Copilot', onclick: () => { st.cop = !st.cop; keep(); render(); }}, icon('spark'), h('span', {class: 'lbl'}, 'Copilot')),
-      h('button', {class: 'wr-exit', onclick: hide}, icon('door'), h('span', {class: 'lbl'}, 'BACK TO ROOM'))].filter(Boolean));
-  }
-  function renderCop() {
-    if (!st.cop || st.mod === 'assistant') return cop.replaceChildren();
-    const m = MODULES.find(x => x.id === st.mod), cur = ctx.event();
-    cop.replaceChildren(h('header', {}, 'AI Copilot'), h('div', {class: 'ctx'}, h('div', {}, 'Đang ở: ', h('b', {}, m.name)), h('div', {}, 'Sự kiện: ', h('b', {}, cur ? `${cur.code} — ${cur.name}` : 'chưa chọn'))), chatPanel(ctx, {mod: st.mod, compact: true}));
+    const v = st.view, s = store.save, d = v.screen === 'doc' && store.doc(v.id);
+    const title = d ? KINDS[d.kind].name : v.screen === 'group' ? (GROUPS.find(x => x.id === v.id) || {}).name : v.screen === 'program' ? 'Chương trình' : TITLES[v.screen] || '';
+    top.replaceChildren(h('h1', {}, 'PHÒNG VY · ' + (title || '')), h('span', {class: 'sp'}),
+      h('span', {class: 'wr-save' + (s.state === 'error' ? ' err' : ''), title: s.error || ''}, s.state === 'saving' ? 'Đang lưu…' : s.state === 'error' ? 'Lưu lỗi' : s.at ? 'Đã lưu' : ''),
+      h('button', {class: 'wr-ai' + (st.cop ? ' on' : ''), 'aria-pressed': String(st.cop), onclick: () => ctx.toggleCop()}, icon('spark'), h('span', {class: 'lbl'}, 'Trợ lý AI')),
+      h('button', {class: 'wr-exit', onclick: hide}, icon('door'), h('span', {class: 'lbl'}, 'Về phòng')));
   }
   function lockScreen() {
     const inp = h('input', {class: 'wr-in', type: 'password', placeholder: 'Mã khoá', 'aria-label': 'Mã khoá', autocomplete: 'off'}), msg = h('p', {class: 'wr-err'});
-    const go = async e => { e.preventDefault(); if (await pinOk(store, inp.value)) { sessionStorage.setItem('vyWrUnlocked', '1'); render(); } else { msg.textContent = 'Mã khoá không đúng.'; inp.select(); } };
+    const go = async e => { e.preventDefault(); if (await V.pinOk(store, inp.value)) { sessionStorage.setItem('vyWrUnlocked', '1'); render(); } else { msg.textContent = 'Mã khoá không đúng.'; inp.select(); } };
     setTimeout(() => inp.focus(), 50);
-    return h('div', {class: 'wr-wrap'}, h('form', {class: 'wr-card wr-lock', onsubmit: go}, h('h3', {}, 'Workroom đang khoá'), h('p', {class: 'wr-empty'}, 'Nhập mã khoá để tiếp tục.'), h('div', {class: 'wr-form'}, inp, btn('Mở khoá', null, {type: 'submit'})), msg));
+    return h('form', {class: 'wr-card wr-lock wr-stack', onsubmit: go}, h('h3', {}, 'Workroom đang khoá'), inp, btn('Mở khoá', null, {type: 'submit'}), msg);
+  }
+  function screen() {
+    const v = st.view;
+    switch (v.screen) {
+      case 'group': return GROUPS.some(x => x.id === v.id) ? V.group(ctx, v.id) : V.home(ctx);
+      case 'doc': return V.editor(ctx, v.id);
+      case 'programs': return V.programs(ctx);
+      case 'program': return V.program(ctx, v.id);
+      case 'publish': return V.publish(ctx);
+      case 'settings': return V.settings(ctx);
+      default: return V.home(ctx);
+    }
   }
   function render() {
     if (!st.open) return;
     flush();
-    if (st.eventId && !store.eventOf(st.eventId)) st.eventId = null;
-    const ae = document.activeElement, mark = ae && root.contains(ae) && ae !== main ? {label: ae.getAttribute('aria-label'), start: ae.selectionStart} : null, y = main.scrollTop;
-    root.classList.toggle('cop', st.cop && st.mod !== 'assistant'); root.classList.toggle('locked', locked());
+    const ae = document.activeElement, mark = ae && main.contains(ae) && ae !== main ? {label: ae.getAttribute('aria-label'), s: ae.selectionStart, e: ae.selectionEnd} : null, y = main.scrollTop;
+    root.classList.toggle('cop', st.cop && !locked()); root.classList.toggle('locked', locked());
     renderSide(); renderTop();
     if (locked()) { cop.replaceChildren(); main.replaceChildren(lockScreen()); return; }
-    renderCop();
-    const m = MODULES.find(x => x.id === st.mod) || MODULES[0];
-    let el; try { el = m.render(ctx); } catch (e) { console.error('[workroom] module ' + m.id, e); el = h('div', {class: 'wr-wrap'}, h('p', {class: 'wr-err'}, 'Module này gặp lỗi: ' + e.message)); }
+    if (st.cop && !cop.childElementCount) cop.replaceChildren(ctx.cop.panel()); else if (!st.cop) cop.replaceChildren();
+    let el; try { el = screen(); } catch (e) { console.error('[workroom]', e); el = h('div', {class: 'wr-wrap'}, h('p', {class: 'wr-err'}, 'Màn hình này gặp lỗi: ' + e.message), btn('Về Hôm nay', () => ctx.go('home'))); }
     main.replaceChildren(el); main.scrollTop = y;
-    if (mark && mark.label) { const t = [...root.querySelectorAll('[aria-label]')].find(x => x.getAttribute('aria-label') === mark.label && !x.disabled); if (t) { try { t.focus({preventScroll: true}); } catch (e) {} } }   // vẽ lại không làm mất chỗ đang gõ
+    if (mark && mark.label) { const t = [...main.querySelectorAll('[aria-label]')].find(x => x.getAttribute('aria-label') === mark.label && !x.disabled); if (t) { try { t.focus({preventScroll: true}); if (mark.s != null && t.setSelectionRange) t.setSelectionRange(mark.s, mark.e); } catch (e) {} } }
   }
-  store.on('change', render);
+  // trợ lý vẽ lại theo màn hình (để thấy "Đang mở…" đúng): khi đổi màn thì làm mới khung trợ lý
+  let lastKey = '';
+  const renderAll = () => { const k = JSON.stringify(st.view); if (k !== lastKey && st.cop) { lastKey = k; cop.replaceChildren(); } render(); };
+  ctx.render = renderAll;
+  store.on('change', renderAll);
   store.on('save', () => { if (st.open) renderTop(); });
-  ai.on(() => { if (st.open) renderTop(); });
-  g.on(() => { if (st.open) render(); });
-  let wasReady = ai.ready; ai.on(() => { if (ai.ready !== wasReady) { wasReady = ai.ready; render(); } });
+  g.on(() => { if (st.open) renderAll(); });
   addEventListener('beforeunload', flush);
 
   function show(opt) {
     st.onClose = opt.onClose || null; st.open = true;
-    render(); root.classList.add('on');
+    renderAll(); root.classList.add('on');
     requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add('in')));
     main.focus({preventScroll: true});
     store.reload().catch(e => ctx.note('Không tải lại được dữ liệu: ' + e.message));
-    ai.probe(); g.afterReturn().catch(() => {});
+    if (ai.cfg.key) ai.probe().then(() => { if (st.open && st.view.screen === 'settings') renderAll(); });
+    g.afterReturn().catch(() => {});
   }
   function hide() {
     if (!st.open) return; flush(); st.open = false;

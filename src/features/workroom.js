@@ -1,25 +1,29 @@
 // PHÒNG VY — WORKROOM · phần trong game: ghim "START WORKING" ở bàn làm việc phòng Vy.
-// Chỉ bật khi: đang là nhân vật VY, đang ở phòng Vy, và máy chủ xác nhận tài khoản này là chủ Workroom.
-// Bin và mọi tài khoản khác: file này thoát ngay — ghế vẫn là ghế "Ngồi" bình thường, không có gì khác đi.
+// Chỉ bật khi: đang ở phòng Vy và máy chủ xác nhận tài khoản này được vào Workroom (bảng wr_owner — giai đoạn thử: Vy + Bin).
+// Tài khoản khác: file này thoát ngay — ghế vẫn là ghế "Ngồi" bình thường.
+// Ngồi xuống → camera lướt ra sau lưng nhìn vào màn hình (như cảnh xem TV) → mở Workroom. Về phòng → camera lướt về.
 // Giao diện Work Mode nằm ở trang vỏ (src/workroom/), ở đây chỉ lo: ngồi xuống → gõ phím → mở; thoát → trả lại game.
 export default {
   id: 'workroom',
   async init(ctx) {
-    if (ctx.slot !== 'vy' || ctx.mapId !== 'vy') return;
+    if (ctx.mapId !== 'vy') return;
     let WR = null; try { WR = window.parent !== window && window.parent.VYSHELL && window.parent.VYSHELL.workroom; } catch (e) {}
     if (!WR || !(await WR.access())) return;
     const api = ctx.api, L = api.local;
     let want = 0, opening = false;
     const seated = () => L.P.mode === 'sit' || L.P.mode === 'type';
-    const onClose = () => {                       // BACK TO ROOM: vẽ 3D lại bình thường, Vy thôi gõ phím nhưng vẫn ngồi ở bàn
+    const cam = (mode, done) => { if (api.deskCam) api.deskCam(mode, done); else if (done) done(); };
+    const onClose = () => {                       // VỀ PHÒNG: vẽ 3D lại bình thường, camera lướt về, thôi gõ phím nhưng vẫn ngồi ở bàn
       api.lowDraw = false;
+      cam('out');
       if (L.P.mode === 'type') L.cmdSit('sit');
     };
     async function open() {
       if (opening) return; opening = true; want = 0;
       if (L.P.mode === 'sit') L.cmdSit('type');   // người kia thấy Vy đang gõ phím làm việc
+      await new Promise(res => cam('in', res));   // cảnh quay: ra sau lưng, nhìn vào màn hình
       try { await WR.open({onClose}); api.lowDraw = true; }
-      catch (e) { console.error('[workroom]', e); ctx.toast('Không mở được Workroom: ' + (e.message === 'not_owner' ? 'tài khoản này không phải chủ phòng' : e.message)); if (L.P.mode === 'type') L.cmdSit('sit'); }
+      catch (e) { console.error('[workroom]', e); cam('out'); ctx.toast('Không mở được Workroom: ' + (e.message === 'not_owner' ? 'tài khoản này chưa được cấp quyền' : e.message)); if (L.P.mode === 'type') L.cmdSit('sit'); }
       opening = false;
     }
     const start = () => { if (seated()) return open(); want = performance.now(); L.cmdSit('type'); };
