@@ -2,7 +2,7 @@
 // • .docx .xlsx .csv .txt → trích chữ ngay trên máy.   • Ảnh → thu nhỏ (tối đa 1280 px) rồi gửi Gemini xem trực tiếp.
 // • PDF → Gemini đọc trực tiếp (lần đầu nhờ AI chép lại chữ để lưu; file gốc không lưu).
 // • Link Google Docs/Sheets/Drive → đọc qua Google (cần kết nối Google).
-import {h, icon} from './ui.js';
+import {h, icon, withMenu, moreBtn, dialog} from './ui.js';
 import {readAnyFile} from './files.js';
 
 const MAX_IMG = 10, MAX_TEXT = 60000;
@@ -53,8 +53,12 @@ export const srcSummary = list => list.length ? list.map(s => s.type === 'image'
 // ---------- ô thả nguồn (dùng ở hộp tạo mới và trong tài liệu) ----------
 export function sourceBox(ctx, list, onChange, o = {}) {
   const err = h('p', {class: 'wr-err'}), chips = h('div', {class: 'wr-chips'}), busy = h('span', {class: 'wr-mute'});
-  const paint = () => chips.replaceChildren(...list.map((s, i) => h('span', {class: 'wr-src'}, s.type === 'image' ? h('img', {src: 'data:' + s.mime + ';base64,' + s.data, alt: ''}) : icon('doc'), h('span', {title: s.name}, s.name),
-    h('button', {class: 'wr-x del', 'aria-label': 'Bỏ nguồn ' + s.name, onclick: () => { list.splice(i, 1); paint(); onChange && onChange(list); }}, icon('x')))));
+  const drop = i => { list.splice(i, 1); paint(); onChange && onChange(list); };
+  const view = s => dialog({title: s.name, wide: true, body: s.type === 'image' ? h('img', {src: 'data:' + s.mime + ';base64,' + s.data, alt: s.name, style: 'max-width:100%;border-radius:10px'}) : h('pre', {style: 'white-space:pre-wrap;max-height:60vh;overflow:auto;font:14px/1.5 inherit'}, s.text)});
+  const items = (s, i) => [{label: 'Xem nội dung', icon: 'doc', run: () => view(s)}, s.url && {label: 'Mở bản gốc', icon: 'ext', run: () => window.open(s.url, '_blank', 'noopener')},
+    s.type === 'text' && {label: 'Sao chép chữ', icon: 'copy', run: () => navigator.clipboard.writeText(s.text)}, '-', {label: 'Bỏ nguồn này', icon: 'trash', danger: true, run: () => drop(i)}];
+  const paint = () => chips.replaceChildren(...list.map((s, i) => withMenu(h('span', {class: 'wr-src', title: 'Bấm để xem · chuột phải để thao tác'}, s.type === 'image' ? h('img', {src: 'data:' + s.mime + ';base64,' + s.data, alt: '', onclick: () => view(s)}) : icon('doc'), h('span', {title: s.name, onclick: () => view(s), style: 'cursor:pointer'}, s.name),
+    h('button', {class: 'wr-x del', 'aria-label': 'Bỏ nguồn ' + s.name, onclick: () => drop(i)}, icon('x'))), () => items(s, i))));
   const add = async items => {
     err.textContent = ''; busy.textContent = 'Đang đọc…';
     for (const it of items) {

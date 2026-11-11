@@ -6,9 +6,11 @@ import {createGoogle} from './google.js';
 import {createCopilot} from './copilot.js';
 import {GROUPS, KINDS} from './kinds.js';
 import * as V from './views.js';
-import {h, icon, btn} from './ui.js';
+import {h, icon, btn, moreBtn, withMenu, confirmBox} from './ui.js';
 
 let inst = null;
+// tải sẵn (ẩn) để lúc ngồi xuống mở ngay, không phải chờ
+export function prepareWorkroom(SH) { if (!inst) inst = build(SH); return inst.catch(e => { inst = null; throw e; }); }
 export async function openWorkroom(SH, opt = {}) {
   if (!inst) inst = build(SH);
   const w = await inst.catch(e => { inst = null; throw e; });
@@ -28,7 +30,7 @@ const navKey = v => v.screen === 'group' ? 'group:' + v.id : v.screen === 'progr
 async function build(SH) {
   await new Promise(res => {
     if (document.getElementById('wrCss')) return res();
-    const l = h('link', {id: 'wrCss', rel: 'stylesheet', href: 'workroom.css?v=31'}); l.onload = l.onerror = res; document.head.append(l);
+    const l = h('link', {id: 'wrCss', rel: 'stylesheet', href: 'workroom.css?v=32'}); l.onload = l.onerror = res; document.head.append(l);
   });
   const store = await createStore(SH);          // ném 'not_owner' nếu máy chủ không xác nhận quyền vào
   const ai = createAI(store), g = createGoogle(SH, store);
@@ -60,17 +62,27 @@ async function build(SH) {
     const cur = navKey(st.view), n = {publish: store.docs.filter(d => d.status === 'revise' || (d.handoff && d.handoff.deadline && new Date(d.handoff.deadline) < Date.now() && !['approved', 'published'].includes(d.status))).length};
     side.replaceChildren(h('div', {class: 'wr-brand'}, 'PHÒNG VY', h('small', {}, 'Workspace')),
       ...NAV.map(x => x.grp ? h('div', {class: 'wr-grp'}, x.grp) : x.sp ? h('span', {class: 'sp'}) :
-        h('button', {class: 'wr-nav' + (cur === x.id ? ' on' : ''), 'aria-current': cur === x.id ? 'page' : null, onclick: () => ctx.go(x.id.startsWith('group:') ? {screen: 'group', id: x.id.slice(6)} : {screen: x.id})},
-          icon(x.icon), h('span', {}, x.name), n[x.id] > 0 && h('em', {title: 'Cần sửa theo góp ý / quá hạn'}, n[x.id]))),
+        withMenu(h('button', {class: 'wr-nav' + (cur === x.id ? ' on' : ''), 'aria-current': cur === x.id ? 'page' : null, onclick: () => ctx.go(x.id.startsWith('group:') ? {screen: 'group', id: x.id.slice(6)} : {screen: x.id})},
+          icon(x.icon), h('span', {}, x.name), n[x.id] > 0 && h('em', {title: 'Cần sửa theo góp ý / quá hạn'}, n[x.id])), () => navMenu(x))),
       store.local ? h('div', {class: 'wr-dev'}, 'BẢN THỬ — dữ liệu chỉ lưu trên trình duyệt này.') : null);
   }
+  // ⋯ trên thanh trên cùng: tạo nhanh + cài đặt nhanh
+  const topMenu = () => [{head: 'Tạo mới'}, ...GROUPS.map(g => ({label: g.id === 'script' ? 'Kịch bản' : g.name, icon: g.icon, run: () => V.newDocFlow(ctx, g.id)})), {label: 'Chương trình lớn', icon: 'flag', run: () => V.newProgram(ctx)}, '-',
+    {head: 'Nhanh'}, {label: st.cop ? 'Đóng Trợ lý AI' : 'Mở Trợ lý AI', icon: 'spark', kbd: '⌘J', run: () => ctx.toggleCop()},
+    {label: g.status === 'connected' ? 'Google: đã kết nối' : 'Kết nối Google', icon: 'drive', disabled: g.status === 'connected', run: () => g.connect(['drive']).catch(e => ctx.note(e.message))},
+    {label: ai.cfg.key ? 'AI: ' + (ai.model || 'Gemini') : 'Bật AI (dán khoá Gemini)', icon: 'gear', run: () => ctx.go('settings')},
+    store.settings.pin_hash && {label: 'Khoá màn hình ngay', icon: 'stop', run: () => { sessionStorage.removeItem('vyWrUnlocked'); render(); }},
+    {label: 'Phím tắt', icon: 'list', kbd: '⌘/', run: () => ctx.showKeys()}, {label: 'Cài đặt', icon: 'gear', run: () => ctx.go('settings')}, '-',
+    {label: 'Về phòng', icon: 'door', run: hide}];
+  const navMenu = x => x.g ? [{label: 'Mở ' + x.name, icon: 'ext', run: () => ctx.go({screen: 'group', id: x.g.id})}, {label: '+ Tạo ' + (x.g.id === 'script' ? 'kịch bản' : x.name.toLowerCase()), icon: 'plus', run: () => V.newDocFlow(ctx, x.g.id)}]
+    : x.id === 'programs' ? [{label: 'Mở danh sách', icon: 'ext', run: () => ctx.go('programs')}, {label: '+ Tạo chương trình lớn', icon: 'plus', run: () => V.newProgram(ctx)}] : [{label: 'Mở', icon: 'ext', run: () => ctx.go(x.id)}];
   const TITLES = {home: 'Hôm nay', programs: 'Chương trình lớn', publish: 'Xuất bản', settings: 'Cài đặt'};
   function renderTop() {
     const v = st.view, s = store.save, d = v.screen === 'doc' && store.doc(v.id);
     const title = d ? KINDS[d.kind].name : v.screen === 'group' ? (GROUPS.find(x => x.id === v.id) || {}).name : v.screen === 'program' ? 'Chương trình' : TITLES[v.screen] || '';
     top.replaceChildren(h('h1', {}, 'PHÒNG VY · ' + (title || '')), h('span', {class: 'sp'}),
       h('span', {class: 'wr-save' + (s.state === 'error' ? ' err' : ''), title: s.error || ''}, s.state === 'saving' ? 'Đang lưu…' : s.state === 'error' ? 'Lưu lỗi' : s.at ? 'Đã lưu' : ''),
-      h('button', {class: 'wr-x', title: 'Phím tắt (⌘/)', 'aria-label': 'Phím tắt', onclick: () => ctx.showKeys()}, '⌘'),
+      moreBtn(() => topMenu(), 'Thao tác nhanh'),
       h('button', {class: 'wr-ai' + (st.cop ? ' on' : ''), 'aria-pressed': String(st.cop), title: 'Trợ lý AI (⌘J)', onclick: () => ctx.toggleCop()}, icon('spark'), h('span', {class: 'lbl'}, 'Trợ lý AI')),
       h('button', {class: 'wr-exit', onclick: hide}, icon('door'), h('span', {class: 'lbl'}, 'Về phòng')));
   }
@@ -114,7 +126,7 @@ async function build(SH) {
   addEventListener('beforeunload', flush);
   // ---------- PHÍM TẮT (giống Google Docs/Sheets) ----------
   const KEYS = [['⌘Z', 'Hoàn tác'], ['⌘⇧Z  ·  ⌘Y', 'Làm lại'], ['⌘S', 'Lưu ngay'], ['⌘⇧A', 'AI viết / sửa tài liệu đang mở'], ['⌘J', 'Mở / đóng Trợ lý AI'], ['⌘⇧E', 'Xuất (Word, Excel, PDF, Google…)'],
-    ['⌘⇧S', 'Cập nhật bản Google Docs/Sheets'], ['⌘⇧D', 'Tải file đúng mẫu về máy'], ['⌘P', 'Xuất PDF'], ['⌘⇧B', 'Bàn giao (gửi duyệt, góp ý)'], ['⌘Enter', 'Bấm nút chính trong hộp thoại'], ['Esc', 'Đóng hộp thoại'], ['⌘/', 'Xem bảng phím tắt']];
+    ['⌘⇧S', 'Cập nhật bản Google Docs/Sheets'], ['⌘⇧D', 'Tải file đúng mẫu về máy'], ['⌘P', 'Xuất PDF'], ['⌘⇧B', 'Bàn giao (gửi duyệt, góp ý)'], ['⌘Enter', 'Bấm nút chính trong hộp thoại'], ['Esc', 'Đóng hộp thoại'], ['⌘/', 'Xem bảng phím tắt'], ['Chuột phải · ⋯', 'Thao tác nhanh trên từng mục (đổi tên, nhân bản, chuyển, trạng thái, xoá…)']];
   const showKeys = () => import('./ui.js').then(({dialog}) => dialog({title: 'Phím tắt', body: h('table', {class: 'wr-table'}, KEYS.map(([k, l]) => h('tr', {}, h('td', {}, h('kbd', {}, /Mac|iPhone|iPad/.test(navigator.platform) ? k : k.replace(/⌘/g, 'Ctrl+').replace(/⇧/g, 'Shift+'))), h('td', {}, l))))}));
   root.addEventListener('keydown', e => {
     if (!st.open || locked()) return;

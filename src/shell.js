@@ -43,6 +43,7 @@ export async function bootShell() {
     SH.workroom = {
       access: () => (acc ||= import('./workroom/store.js').then(m => m.checkAccess(SH)).catch(() => false)),
       open: async opt => (await import('./workroom/index.js')).openWorkroom(SH, opt),
+      preload: async () => (await import('./workroom/index.js')).prepareWorkroom(SH),
     };
   }
 

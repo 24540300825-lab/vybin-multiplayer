@@ -1992,14 +1992,20 @@ ${FRAG_COLOR}
       const t=SOFA.center.clone().lerp(SOFA.tv,0.62);t.y=A.L0+0.78;CINE.go(p,t,2.4,true,done,40,0.1)}
     else{const L=local.char.position,t=new THREE.Vector3(L.x,L.y+0.7,L.z),off=cineBack?cineBack.p:new THREE.Vector3(12,14,27);
       if(!CINE.active){done&&done();return}CINE.go(t.clone().add(off),t,1.5,false,done,CAM0.fov,CAM0.near)}};
-  // cảnh quay ngồi bàn làm việc (Workroom): lướt ra sau lưng nhân vật, cao hơn vai, nhìn vào màn hình trên bàn; 'out' = lướt về góc theo nhân vật
+  // cảnh quay ngồi bàn làm việc (Workroom): lướt ra sau lưng, ngang tầm vai, MÀN HÌNH trên bàn là trọng tâm khung hình; 'out' = lướt về góc theo nhân vật
+  let deskScr=null;
+  const findScreen=()=>{if(deskScr!==null)return deskScr;deskScr=false;if(!A.seatC)return false;let best=null,bd=2.2;
+    env.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];if(!ms.some(m=>m&&/screen|monitor|display|laptop/i.test(m.name||''))&&!/monitor|screen|laptop|imac|computer/i.test(o.name))return;if(/^TV|Tv_|TV_/.test(o.name))return;
+      const b=new THREE.Box3().setFromObject(o),c=b.getCenter(new THREE.Vector3()),d=Math.hypot(c.x-A.seatC.x,c.z-A.seatC.z);if(d<bd&&c.y>A.seatC.y-0.2){bd=d;best={c,h:b.max.y-b.min.y}}});
+    return deskScr=best||false};
   api.deskCam=(mode,done)=>{if(!A.seatC||OUTD){done&&done();return}
     if(mode==='in'){if(!CINE.active)cineBack={p:camera.position.clone().sub(controls.target)};
-      const f=A.fwd,side=new THREE.Vector3(f.z,0,-f.x),y0=A.seatTop||A.seatC.y;
-      const p=A.seatC.clone().addScaledVector(f,-1.35).addScaledVector(side,0.32);p.y=y0+1.05;
-      const t=A.seatC.clone().addScaledVector(f,0.95);t.y=y0+0.62;CINE.go(p,t,1.9,true,done,42,0.05)}
+      const f=A.fwd,side=new THREE.Vector3(f.z,0,-f.x),scr=findScreen(),seatY=(A.CY||0)+0.5;
+      const t=scr?scr.c.clone():A.seatC.clone().addScaledVector(f,0.85).setY(seatY+0.62);   // tâm màn hình (hoặc ước lượng: trước ghế ~85 cm, cao ngang mắt ngồi)
+      const p=t.clone().addScaledVector(f,-1.55).addScaledVector(side,0.22);p.y=t.y+0.32;   // sau lưng, cao hơn màn hình chút → nhìn qua vai, màn hình chiếm giữa khung
+      CINE.go(p,t,1.6,true,done,34,0.05)}
     else{const L=local.char.position,t=new THREE.Vector3(L.x,L.y+0.7,L.z),off=cineBack?cineBack.p:new THREE.Vector3(12,14,27);
-      if(!CINE.active){done&&done();return}CINE.go(t.clone().add(off),t,1.5,false,done,CAM0.fov,CAM0.near)}};
+      if(!CINE.active){done&&done();return}CINE.go(t.clone().add(off),t,1.4,false,done,CAM0.fov,CAM0.near)}};
   api.cineActive=()=>CINE.active;
   // ===== màn TV: tối khi tắt; bật thì sáng dịu, màu chuyển chậm (không vẽ nội dung video lên TV để khỏi tốn GPU) =====
   // TV: mesh TV_Screen = viền/khung (luôn đen). Mặt màn bên trong = tấm phẳng riêng, lùi vào 3 cm so với khung: tắt = đen bóng, bật = phát sáng.

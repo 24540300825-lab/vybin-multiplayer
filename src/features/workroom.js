@@ -10,6 +10,7 @@ export default {
     let WR = null; try { WR = window.parent !== window && window.parent.VYSHELL && window.parent.VYSHELL.workroom; } catch (e) {}
     if (!WR) return;
     if (!(await WR.access())) { console.info('[workroom] tài khoản này chưa được cấp quyền vào Workroom'); return; }
+    if (WR.preload) setTimeout(() => WR.preload().catch(() => {}), 2500);   // tải sẵn khi đang ở phòng Vy
     const api = ctx.api, L = api.local;
     let want = 0, opening = false;
     const seated = () => L.P.mode === 'sit' || L.P.mode === 'type';
@@ -22,7 +23,8 @@ export default {
     async function open() {
       if (opening) return; opening = true; want = 0;
       if (L.P.mode === 'sit') L.cmdSit('type');   // người kia thấy Vy đang gõ phím làm việc
-      await new Promise(res => cam('in', res));   // cảnh quay: ra sau lưng, nhìn vào màn hình
+      const ready = WR.preload ? WR.preload().catch(() => null) : null;   // tải song song với cảnh quay
+      await Promise.all([new Promise(res => cam('in', res)), ready]);   // cảnh quay xong là mở ngay
       try { await WR.open({onClose}); api.lowDraw = true; }
       catch (e) { console.error('[workroom]', e); cam('out'); ctx.toast('Không mở được Workroom: ' + (e.message === 'not_owner' ? 'tài khoản này chưa được cấp quyền' : e.message)); if (L.P.mode === 'type') L.cmdSit('sit'); }
       opening = false;

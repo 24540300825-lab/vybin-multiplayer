@@ -1,6 +1,6 @@
 // PHÒNG VY — WORKROOM · các màn hình: Hôm nay · từng loại việc · trình soạn theo mẫu · Chương trình · Xuất bản · Cài đặt.
 // Nguyên tắc giao diện: tiếng Việt, ít chữ, mỗi màn một việc; nút chính luôn ở trên cùng; xem trước = đúng file sẽ xuất.
-import {h, icon, btn, dialog, confirmBox, download, debounce, fmtDT, errBox, run, pickFile} from './ui.js';
+import {h, icon, btn, dialog, confirmBox, download, debounce, fmtDT, errBox, run, pickFile, menu, moreBtn, withMenu, ask} from './ui.js';
 import {GROUPS, KINDS, groupOf, preview, DES, SCHED_FIELDS, SCRIPT_TYPES} from './kinds.js';
 import {STATUS, statusTag, exportDialog, handoffDialog, saveGoogle, saveDrive, savePdf} from './out.js';
 import {sourceBox, srcSummary} from './sources.js';
@@ -75,11 +75,53 @@ export function home(ctx) {
     h('div', {class: 'wr-sec'}, 'Chương trình lớn'),
     progs.length ? progs.map(e => progItem(ctx, e)) : h('button', {class: 'wr-add', onclick: () => newProgram(ctx)}, '+ Tạo chương trình lớn'));
 }
+const clickable = (onOpen, attrs = {}) => ({class: 'wr-item', role: 'button', tabIndex: 0, onclick: onOpen, onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) onOpen(); }, ...attrs});
 function docItem(ctx, d) {
-  const ev = evName(ctx.store, d.event_id);
-  return h('button', {class: 'wr-item', onclick: () => ctx.go({screen: 'doc', id: d.id})}, icon(groupOf(d.kind).icon), h('span', {class: 't'}, docTitle(d)),
+  const ev = evName(ctx.store, d.event_id), items = () => docMenu(ctx, d);
+  return withMenu(h('div', clickable(() => ctx.go({screen: 'doc', id: d.id}), {'aria-label': docTitle(d)}), icon(groupOf(d.kind).icon), h('span', {class: 't'}, docTitle(d)),
     h('span', {class: 'wr-tag'}, KINDS[d.kind].short), ev && h('span', {class: 'wr-tag prog'}, ev), d.stale && h('span', {class: 'wr-tag warn'}, 'Cần xem lại'),
-    statusTag(d.status), dueTag(d), h('span', {class: 'm'}, ago(d.updated_at)));
+    statusTag(d.status), dueTag(d), h('span', {class: 'm'}, ago(d.updated_at)), moreBtn(items)), items);
+}
+// ---------- thao tác nhanh trên 1 tài liệu (⋯ / chuột phải) ----------
+const TITLE_PATH = {news_tv: 'title', news_en: 'title', video: 'title', caption: 'title', article: 'title', timeline: 'title', schedule: 'week'};
+export async function renameDoc(ctx, d) {
+  const p = TITLE_PATH[d.kind], v = await ask('Đổi tên', d.kind === 'schedule' ? 'Tuần số' : 'Tên mới', S_(getP(d.data || {}, p)));
+  if (v == null || !v) return; const data = JSON.parse(JSON.stringify(d.data || {})); setP(data, p, d.kind === 'timeline' && !/^TIMELINE/i.test(v) ? v : v);
+  hist(ctx, d.id).push(d.data, null, true); await ctx.store.saveDoc(d.id, {data, title: plain(KINDS[d.kind].titleOf(data) || '')}); ctx.note('Đã đổi tên');
+}
+export async function duplicateDoc(ctx, d, o = {}) {
+  const K = KINDS[d.kind], data = JSON.parse(JSON.stringify(d.data || {})), p = TITLE_PATH[d.kind];
+  if (p !== 'week') setP(data, p, S_(getP(data, p)) + ' (bản sao)');
+  const n = await ctx.store.createDoc(d.kind, data, {event_id: o.event_id !== undefined ? o.event_id : d.event_id, title: plain(K.titleOf(data) || ''), label: K.short + ' (bản sao)'});
+  if ((d.sources || []).length) await ctx.store.saveDoc(n.id, {sources: d.sources}, {silent: true});
+  ctx.note('Đã nhân bản'); return n;
+}
+export async function moveDoc(ctx, d) {
+  const S = ctx.store, sel = h('select', {class: 'wr-in', 'aria-label': 'Chuyển tới'}, h('option', {value: ''}, 'Việc thường ngày'), S.events.filter(e => !e.archived).map(e => h('option', {value: e.id, selected: e.id === d.event_id}, 'Chương trình: ' + e.name)));
+  const v = await dialog({title: 'Chuyển tài liệu', body: sel, buttons: [['Huỷ', null], ['Chuyển', () => sel.value || '__none', 'primary']]});
+  if (v == null) return; await S.saveDoc(d.id, {event_id: v === '__none' ? null : v}); ctx.note(v === '__none' ? 'Đã chuyển về việc thường ngày' : 'Đã chuyển vào chương trình');
+}
+export async function deleteDoc(ctx, d, after) {
+  if (!await confirmBox('Xoá tài liệu', `Xoá “${docTitle(d)}” khỏi Workroom? Bản đã lưu trên Google Drive (nếu có) vẫn giữ nguyên.`, 'Xoá', true)) return;
+  await ctx.store.del('docs', d.id, {log: 'Xoá ' + KINDS[d.kind].short + ': ' + docTitle(d)}); ctx.note('Đã xoá'); after && after();
+}
+export function docMenu(ctx, d) {
+  const S = ctx.store;
+  return [{label: 'Mở', icon: 'ext', run: () => ctx.go({screen: 'doc', id: d.id})}, {label: 'Đổi tên', icon: 'pen', run: () => renameDoc(ctx, d)},
+    {label: 'Nhân bản', icon: 'copy', run: async () => { const n = await duplicateDoc(ctx, d); ctx.go({screen: 'doc', id: n.id}); }},
+    {label: d.event_id ? 'Chuyển chương trình / về việc thường ngày' : 'Đưa vào chương trình…', icon: 'flag', run: () => moveDoc(ctx, d)}, '-', {head: 'Trạng thái'},
+    ...STATUS.map(([k, l]) => ({label: l, on: d.status === k, run: () => S.saveDoc(d.id, {status: k})})), '-',
+    {label: 'Xuất…', icon: 'down', kbd: '⌘⇧E', run: () => exportDialog(ctx, d)}, {label: 'Bàn giao…', icon: 'send', kbd: '⌘⇧B', run: () => handoffDialog(ctx, d)},
+    d.gdoc && d.gdoc.url && {label: 'Mở bản Google', icon: 'ext', run: () => window.open(d.gdoc.url, '_blank', 'noopener')},
+    {label: 'Sao chép link Google', icon: 'link', disabled: !(d.gdoc && d.gdoc.url), run: () => navigator.clipboard.writeText(d.gdoc.url).then(() => ctx.note('Đã sao chép link'))}, '-',
+    {label: 'Xoá', icon: 'trash', danger: true, run: () => deleteDoc(ctx, d, () => { if (ctx.view.screen === 'doc' && ctx.view.id === d.id) ctx.go(d.event_id ? {screen: 'program', id: d.event_id} : {screen: 'group', id: groupOf(d.kind).id}); })}];
+}
+export function progMenu(ctx, e) {
+  const S = ctx.store;
+  return [{label: 'Mở', icon: 'ext', run: () => ctx.go({screen: 'program', id: e.id})}, {label: 'Đổi tên', icon: 'pen', run: async () => { const v = await ask('Đổi tên chương trình', 'Tên mới', e.name); if (v) await S.updateEvent(e.id, {name: v}); }}, '-', {head: 'Tạo cho chương trình'},
+    ...GROUPS.map(g => ({label: (g.id === 'script' ? 'Kịch bản' : g.name), icon: g.icon, run: () => newDocFlow(ctx, g.id, {event_id: e.id})})), '-',
+    {label: 'Lưu trữ (ẩn)', icon: 'down', run: async () => { await S.updateEvent(e.id, {archived: true}); ctx.note('Đã lưu trữ'); }},
+    {label: 'Xoá chương trình', icon: 'trash', danger: true, run: async () => { if (!await confirmBox('Xoá chương trình', `Xoá “${e.name}”? Các tài liệu bên trong KHÔNG bị xoá — chúng chuyển về việc thường ngày.`, 'Xoá', true)) return; await S.del('events', e.id, {log: 'Xoá chương trình: ' + e.name}); for (const d of S.docs.filter(x => x.event_id === e.id)) d.event_id = null; if (ctx.view.screen === 'program') ctx.go({screen: 'programs'}); else ctx.render(); }}];
 }
 
 // ===================== DANH SÁCH THEO LOẠI (việc thường ngày) =====================
@@ -108,7 +150,7 @@ export function editor(ctx, id) {
   ctx.ui.flush = () => save.flush();
   const Hs = hist(ctx, doc.id);
   const E = {
-    D, doc,
+    D, doc, ctx: {aiPart: instr => aiApply(ctx, doc, instr).catch(e => ctx.note(e.message))},
     get: p => getP(D, p),
     set(p, v) { Hs.push(D, p); setP(D, p, v); doc.title = plain(K.titleOf(D) || ''); save(); repaint(); },
     change(fn) { Hs.push(D, null); fn(D); save.flush(); ctx.render(); },   // thay đổi cấu trúc (thêm/xoá/đổi chỗ) → lưu ngay + vẽ lại
@@ -127,8 +169,16 @@ export function editor(ctx, id) {
     h('span', {class: 'sp', style: 'flex:1'}),
     btn('Lịch sử', () => history(ctx, doc), {ghost: true, icon: 'clock'}),
     btn('Xuất', () => exportDialog(ctx, doc), {ghost: true, icon: 'down', title: 'Word, Excel, PDF, Google Docs/Sheets, sao chép để đăng (⌘⇧E)'}),
-    btn('Bàn giao', () => handoffDialog(ctx, doc), {icon: 'send', cls: 'dark', title: 'Gửi duyệt, hạn nộp, góp ý'}),
+    btn('Bàn giao', () => handoffDialog(ctx, doc), {icon: 'send', cls: 'dark', title: 'Gửi duyệt, hạn nộp, góp ý'}), moreBtn(() => edMenu()),
     doc.gdoc && doc.gdoc.url && h('a', {class: 'wr-btn ghost', href: doc.gdoc.url, target: '_blank', rel: 'noopener', title: 'Mở bản Google'}, icon('ext'), doc.kind === 'timeline' ? 'Sheets' : 'Docs'));
+  const edMenu = () => [...docMenu(ctx, doc).filter(Boolean).filter(x => x === '-' || x.head || !/^Mở$/.test(x.label)).slice(0, 4), '-',
+    {label: 'Hoàn tác', icon: 'undo', kbd: '⌘Z', disabled: !Hs.canUndo(), run: () => step(-1)}, {label: 'Làm lại', icon: 'redo', kbd: '⌘⇧Z', disabled: !Hs.canRedo(), run: () => step(1)},
+    {label: 'Lịch sử bản', icon: 'clock', run: () => history(ctx, doc)}, '-',
+    {label: 'Tải file đúng mẫu', icon: 'down', kbd: '⌘⇧D', run: () => exportDoc(ctx, doc, 'download')}, {label: 'Xuất PDF', icon: 'doc', kbd: '⌘P', run: () => savePdf(ctx, doc).catch(e => ctx.note(e.message))},
+    {label: 'Cập nhật bản Google', icon: 'drive', kbd: '⌘⇧S', run: () => saveGoogle(ctx, doc).then(u => u && ctx.note('Đã cập nhật bản Google')).catch(e => ctx.note(e.message))}, '-',
+    {label: 'Bỏ hết nguồn đã nạp', icon: 'x', disabled: !(doc.sources || []).length, run: async () => { if (await confirmBox('Bỏ nguồn', 'Bỏ tất cả nguồn đã nạp của tài liệu này?', 'Bỏ')) await S.saveDoc(doc.id, {sources: []}); }},
+    {label: 'Phím tắt', icon: 'list', kbd: '⌘/', run: () => ctx.showKeys && ctx.showKeys()}, '-',
+    {label: 'Xoá tài liệu', icon: 'trash', danger: true, run: () => deleteDoc(ctx, doc, () => ctx.go(ev ? {screen: 'program', id: ev.id} : {screen: 'group', id: groupOf(doc.kind).id}))}];
   const SB = (doc.sources || []).slice(), srcEl = sourceBox(ctx, SB, async L => { await S.saveDoc(doc.id, {sources: L.slice()}, {silent: true}); doc.sources = L.slice(); paint(); }, {rows: 2});
   const srcFold = Fold('Nguồn' + (SB.length ? ' (' + SB.length + ')' : '') + ' — thả thêm tài liệu, ảnh để AI dựng / bổ sung', !SB.length && !asTextLen(doc), srcEl,
     h('div', {class: 'wr-row'}, btn('✨ Dựng lại từ nguồn', run(err, () => aiApply(ctx, doc, 'Đọc kỹ toàn bộ NGUỒN, dựng lại tài liệu hoàn chỉnh theo đúng mẫu.', {fresh: true})), {sm: 1}),
@@ -136,7 +186,7 @@ export function editor(ctx, id) {
   const form = ({news_tv: d => formNews(E, false), news_en: d => formNews(E, true), video: formVideo, caption: formCaption, article: formArticle, schedule: formSchedule, timeline: formTimeline})[doc.kind](E);
   return h('div', {class: 'wr-wrap wide'},
     h('div', {class: 'wr-h'}, h('button', {class: 'wr-x', title: 'Quay lại', 'aria-label': 'Quay lại', onclick: () => ctx.go(ev ? {screen: 'program', id: ev.id} : {screen: 'group', id: groupOf(doc.kind).id})}, '←'),
-      h('h2', {}, docTitle(doc)), h('span', {class: 'wr-tag'}, K.name), ev && h('span', {class: 'wr-tag prog'}, ev.name), dueTag(doc)),
+      withMenu(h('h2', {title: 'Chuột phải để xem thao tác', tabIndex: 0, ondblclick: () => renameDoc(ctx, doc)}, docTitle(doc)), () => edMenu()), h('span', {class: 'wr-tag'}, K.name), ev && h('span', {class: 'wr-tag prog'}, ev.name), dueTag(doc)),
     acts, err, doc.stale && h('div', {class: 'wr-banner', style: 'margin-top:12px'}, icon('warn'), 'Thông tin chương trình đã thay đổi sau khi viết bài này.',
       btn('AI cập nhật theo chương trình', run(err, () => aiApply(ctx, doc, 'Cập nhật mọi dữ kiện (tên, ngày, giờ, địa điểm, thành phần…) cho khớp THÔNG TIN CHƯƠNG TRÌNH mới; giữ nguyên phần còn lại.', {clearStale: true})), {sm: 1}),
       btn('Bỏ qua', run(err, () => S.saveDoc(doc.id, {stale: false})), {ghost: true, sm: 1})),
@@ -227,9 +277,14 @@ const Fold = (title, open, ...kids) => h('details', {class: 'wr-box', open}, h('
 function List(E, path, {title, item, add, addLabel, min = 0}) {
   const a = E.get(path) || [];
   const mv = (i, d) => E.change(D => { const L = getP(D, path); const [x] = L.splice(i, 1); L.splice(i + d, 0, x); });
-  return h('div', {class: 'wr-stack'}, a.map((x, i) => h('div', {class: 'wr-li'}, h('header', {}, h('b', {}, title(x, i)),
+  const items = (x, i) => [{label: 'Đưa lên', icon: 'up', disabled: i === 0, run: () => mv(i, -1)}, {label: 'Đưa xuống', icon: 'down', disabled: i === a.length - 1, run: () => mv(i, 1)},
+    {label: 'Nhân bản mục', icon: 'copy', run: () => E.change(D => { const L = getP(D, path); L.splice(i + 1, 0, JSON.parse(JSON.stringify(L[i]))); })},
+    {label: 'Chèn mục mới bên dưới', icon: 'plus', run: () => E.change(D => getP(D, path).splice(i + 1, 0, add()))},
+    E.ctx && typeof x === 'object' && {label: '✨ AI viết lại mục này', icon: 'spark', run: async () => { const req = await ask('AI viết lại mục ' + title(x, i), 'Yêu cầu (vd: gọn hơn, trang trọng hơn)', ''); if (req != null) E.ctx.aiPart(`Chỉ viết lại mục "${title(x, i)}" (đường dẫn ${path}[${i}]) theo yêu cầu: ${req || 'hay hơn, đúng văn phong mẫu'}. Giữ nguyên mọi phần khác.`); }}, '-',
+    {label: 'Xoá mục', icon: 'trash', danger: true, disabled: a.length <= min, run: () => E.change(D => getP(D, path).splice(i, 1))}];
+  return h('div', {class: 'wr-stack'}, a.map((x, i) => withMenu(h('div', {class: 'wr-li'}, h('header', {}, h('b', {}, title(x, i)),
       i > 0 && h('button', {class: 'wr-x', title: 'Lên', 'aria-label': 'Đưa lên', onclick: () => mv(i, -1)}, icon('up')), i < a.length - 1 && h('button', {class: 'wr-x', title: 'Xuống', 'aria-label': 'Đưa xuống', onclick: () => mv(i, 1)}, icon('down')),
-      a.length > min && h('button', {class: 'wr-x del', title: 'Xoá', 'aria-label': 'Xoá mục', onclick: () => E.change(D => getP(D, path).splice(i, 1))}, icon('x'))), ...item(`${path}[${i}]`, x, i))),
+      moreBtn(() => items(x, i))), ...item(`${path}[${i}]`, x, i)), () => items(x, i))),
     h('button', {class: 'wr-add', onclick: () => E.change(D => { if (!getP(D, path)) setP(D, path, []); getP(D, path).push(add()); })}, '+ ' + addLabel));
 }
 // đoạn văn = mảng chuỗi, mỗi đoạn 1 ô
@@ -318,7 +373,8 @@ function formTimeline(E) {
 // ===================== CHƯƠNG TRÌNH LỚN =====================
 function progItem(ctx, e) {
   const n = ctx.store.docs.filter(d => d.event_id === e.id).length, date = e.event_date ? e.event_date.split('-').reverse().join('/') : '';
-  return h('button', {class: 'wr-item', onclick: () => ctx.go({screen: 'program', id: e.id})}, icon('flag'), h('span', {class: 't'}, e.name), date && h('span', {class: 'wr-tag'}, date), h('span', {class: 'm'}, n + ' tài liệu'));
+  const items = () => progMenu(ctx, e);
+  return withMenu(h('div', clickable(() => ctx.go({screen: 'program', id: e.id}), {'aria-label': e.name}), icon('flag'), h('span', {class: 't'}, e.name), date && h('span', {class: 'wr-tag'}, date), h('span', {class: 'm'}, n + ' tài liệu'), moreBtn(items)), items);
 }
 export async function newProgram(ctx) {
   const name = h('input', {class: 'wr-in', placeholder: 'Tên chương trình', 'aria-label': 'Tên chương trình'}), brief = h('textarea', {class: 'wr-in', rows: 6, placeholder: 'Dán thông báo / kế hoạch (AI sẽ tự điền ngày, giờ, địa điểm…)', 'aria-label': 'Brief chương trình'});
@@ -392,8 +448,10 @@ export function settings(ctx) {
         S.settings.drive_root && h('a', {href: S.settings.drive_root.url, target: '_blank', rel: 'noopener'}, 'Mở thư mục “PHÒNG VY — Workroom” trên Drive'),
         h('p', {class: 'wr-mute'}, 'Dùng để lưu file lên Drive. Phiên Google hết hạn sau ~1 giờ — bấm Kết nối lại khi được nhắc.')),
       Box('Nhân sự (AI dùng khi phân công)',
-        h('div', {class: 'wr-stack'}, S.staff.filter(x => x.active !== false).map(x => h('div', {class: 'wr-item'}, h('span', {class: 't'}, x.name), h('span', {class: 'm'}, (x.roles || []).join(', ')),
-          h('button', {class: 'wr-x del', 'aria-label': 'Xoá ' + x.name, onclick: run(err, () => S.del('staff', x.id))}, icon('x'))))),
+        h('div', {class: 'wr-stack'}, S.staff.filter(x => x.active !== false).map(x => { const items = () => [{label: 'Đổi tên', icon: 'pen', run: async () => { const v = await ask('Đổi tên', 'Tên', x.name); if (v) await S.set('staff', x.id, {name: v}); }},
+            {head: 'Vai trò'}, ...['Content', 'Media', 'Biên tập', 'MC', 'Thiết kế'].map(r => ({label: r, on: (x.roles || []).includes(r), run: () => S.set('staff', x.id, {roles: (x.roles || []).includes(r) ? x.roles.filter(y => y !== r) : [...(x.roles || []), r]})})), '-',
+            {label: 'Xoá khỏi danh sách', icon: 'trash', danger: true, run: () => S.del('staff', x.id)}];
+          return withMenu(h('div', {class: 'wr-item'}, h('span', {class: 't'}, x.name), h('span', {class: 'm'}, (x.roles || []).join(', ')), moreBtn(items)), items); })),
         h('div', {class: 'wr-row'}, h('div', {style: 'flex:2'}, staffName), h('div', {style: 'flex:1'}, staffRole), btn('Thêm', run(err, async () => { const n = staffName.value.trim(); if (!n) return; const ex = S.staff.find(x => x.name.toLowerCase() === n.toLowerCase());
           if (ex) await S.set('staff', ex.id, {roles: [...new Set([...(ex.roles || []), staffRole.value])], active: true}); else await S.add('staff', {name: n, roles: [staffRole.value]}); })))),
       Box('Người nhận bàn giao (trưởng phòng, biên tập, thiết kế…)', h('div', {class: 'wr-stack'}, (S.settings.contacts || []).map((c, i) => h('div', {class: 'wr-item'}, h('span', {class: 't'}, c.name + ' · ' + c.email), h('span', {class: 'm'}, c.role || ''),

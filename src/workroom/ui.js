@@ -96,3 +96,40 @@ export const confirmBox = (title, text, yes = 'Đồng ý', danger = false) => d
 export const download = (blob, name) => { const a = h('a', {href: URL.createObjectURL(blob)}); a.setAttribute('download', name); document.body.append(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 4000); };
 export const pickFile = accept => new Promise(res => { const i = h('input', {type: 'file', accept, style: 'display:none', onchange: () => { res(i.files[0] || null); i.remove(); }}); document.body.append(i); i.click(); });
 export const debounce = (fn, ms) => { let t; const d = (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; d.flush = (...a) => { clearTimeout(t); return fn(...a); }; return d; };
+
+// ---- menu ngữ cảnh: nút ⋯ và chuột phải dùng chung 1 danh sách thao tác ----
+// items: [{label, icon, kbd, danger, disabled, on (dấu ✓), run}] | '-' (gạch ngăn) | {head:'Tiêu đề nhỏ'}
+let openMenu = null;
+export function closeMenu() { if (openMenu) { openMenu.remove(); openMenu = null; } }
+export function menu(items, at) {
+  closeMenu();
+  const root = document.getElementById('wr') || document.body, list = items.filter(Boolean);
+  const m = h('div', {class: 'wr-menu', role: 'menu'}, list.map(it => it === '-' ? h('div', {class: 'sep'}) : it.head ? h('div', {class: 'hd'}, it.head) :
+    h('button', {role: 'menuitem', class: (it.danger ? 'danger' : '') + (it.on ? ' on' : ''), disabled: it.disabled, onclick: e => { e.stopPropagation(); closeMenu(); it.run && it.run(); }},
+      h('span', {class: 'ic'}, it.on ? '✓' : it.icon ? icon(it.icon) : ''), h('span', {class: 'l'}, it.label), it.kbd ? h('kbd', {}, it.kbd) : null)));
+  root.append(m); openMenu = m;
+  const r = at && at.getBoundingClientRect ? at.getBoundingClientRect() : null, W = innerWidth, H = innerHeight, mw = m.offsetWidth, mh = m.offsetHeight;
+  let x = r ? r.right - mw : at.x, y = r ? r.bottom + 4 : at.y;
+  if (x + mw > W - 8) x = W - mw - 8; if (x < 8) x = 8; if (y + mh > H - 8) y = r ? Math.max(8, r.top - mh - 4) : Math.max(8, H - mh - 8);
+  m.style.left = x + 'px'; m.style.top = y + 'px';
+  const btns = () => [...m.querySelectorAll('button:not(:disabled)')];
+  m.addEventListener('keydown', e => { const b = btns(), i = b.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); b[(i + 1) % b.length].focus(); } else if (e.key === 'ArrowUp') { e.preventDefault(); b[(i - 1 + b.length) % b.length].focus(); } else if (e.key === 'Escape') { e.stopPropagation(); closeMenu(); at && at.focus && at.focus(); } });
+  (btns()[0] || m).focus({preventScroll: true});
+  return m;
+}
+addEventListener('mousedown', e => { if (openMenu && !openMenu.contains(e.target)) closeMenu(); }, true);
+addEventListener('blur', closeMenu); addEventListener('resize', closeMenu);
+// nút ⋯
+export const moreBtn = (itemsFn, label = 'Thêm thao tác') => h('button', {class: 'wr-x wr-more', title: label, 'aria-label': label, 'aria-haspopup': 'menu', onclick: e => { e.stopPropagation(); e.preventDefault(); menu(itemsFn(), e.currentTarget); }}, '⋯');
+// gắn chuột phải (và phím Menu / Shift+F10) cho 1 phần tử
+export function withMenu(el, itemsFn) {
+  el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); menu(itemsFn(), {x: e.clientX, y: e.clientY}); });
+  el.addEventListener('keydown', e => { if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) { e.preventDefault(); menu(itemsFn(), el); } });
+  return el;
+}
+export async function ask(title, label, value = '') {
+  const inp = h('input', {class: 'wr-in', value, 'aria-label': label, placeholder: label});
+  const v = await dialog({title, body: h('label', {class: 'wr-f'}, h('span', {}, label), inp), buttons: [['Huỷ', null], ['Lưu', () => inp.value.trim(), 'primary']]});
+  return v == null ? null : v;
+}

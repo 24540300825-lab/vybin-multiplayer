@@ -192,6 +192,17 @@
 #wr .wr-status{font-weight:800; padding:7px 10px}
 #wr kbd{display:inline-block; padding:2px 8px; border-radius:6px; background:var(--paper2); border:1px solid var(--line); font:700 12.5px/1.4 ui-monospace,Menlo,monospace}
 
+/* ---- menu ⋯ / chuột phải ---- */
+#wr .wr-menu{position:fixed; z-index:30; min-width:220px; max-width:320px; padding:6px; border-radius:12px; background:var(--card); border:1px solid var(--line); box-shadow:0 12px 34px rgba(47,34,23,.22); display:grid}
+#wr .wr-menu button{display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:8px; text-align:left; font-weight:700; font-size:14px; color:var(--ink)}
+#wr .wr-menu button:hover,#wr .wr-menu button:focus-visible{background:var(--sun2); outline:none}
+#wr .wr-menu button:disabled{opacity:.4} #wr .wr-menu button.danger{color:var(--bad)} #wr .wr-menu button.danger:hover{background:#f8dcd7}
+#wr .wr-menu .ic{width:18px; display:grid; place-items:center; color:var(--ink2)} #wr .wr-menu .ic svg{width:16px; height:16px}
+#wr .wr-menu .l{flex:1} #wr .wr-menu kbd{font-size:11px; padding:1px 6px}
+#wr .wr-menu .sep{height:1px; background:var(--line); margin:4px 6px} #wr .wr-menu .hd{padding:6px 10px 2px; font:800 11px/1 'Nunito Sans',sans-serif; letter-spacing:.06em; color:var(--ink3); text-transform:uppercase}
+#wr .wr-more{font:900 18px/1 'Nunito',sans-serif; letter-spacing:1px; padding:4px 8px; color:var(--ink2)}
+#wr .wr-item{position:relative} #wr .wr-item .wr-more{margin-left:2px}
+#wr .wr-top .wr-more{color:var(--ink)}
 @media (max-width:1100px){#wr .wr-ed{grid-template-columns:minmax(0,1fr)} #wr .wr-pv{position:static; max-height:none}}
 @media (max-width:900px){
   #wr{grid-template-columns:minmax(0,1fr); grid-template-rows:auto 54px minmax(0,1fr)}
