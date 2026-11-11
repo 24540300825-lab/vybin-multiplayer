@@ -9,7 +9,7 @@ import {applyData, exportDoc, docTitle, getP, setP} from './views.js';
 import {plain} from './fmt.js';
 import {askKey} from './ai.js';
 
-const KIND_ENUM = Object.keys(KINDS);
+const KIND_ENUM = Object.keys(KINDS).filter(k => !KINDS[k].hidden);   // news_en chỉ còn để mở bản cũ
 const TOOLS = [
   {name: 'list_docs', description: 'Liệt kê tài liệu (kịch bản, caption, tin bài, lịch công tác, timeline). Lọc theo loại hoặc từ khoá.', parameters: {type: 'OBJECT', properties: {kind: {type: 'STRING', enum: KIND_ENUM}, query: {type: 'STRING'}, program_id: {type: 'STRING'}}}},
   {name: 'read_doc', description: 'Đọc toàn bộ nội dung (JSON) một tài liệu để biết đường dẫn trường trước khi sửa.', parameters: {type: 'OBJECT', properties: {id: {type: 'STRING'}}, required: ['id']}},

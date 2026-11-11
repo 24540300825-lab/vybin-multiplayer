@@ -16,7 +16,7 @@ export function samples(store, kind, n = 2) {
 }
 export function staffList(store) {
   const L = (store.staff || []).filter(s => s.active !== false);
-  return L.length ? L.map(s => `- ${s.name}${(s.roles || []).length ? ' (' + s.roles.join(', ') + ')' : ''}${s.note ? ' — ' + s.note : ''}`).join('\n') : '(chưa có danh sách — để trống phần phân công người)';
+  return L.length ? L.map(s => `- ${s.name}${(s.roles || []).length ? ' (' + s.roles.join(', ') + ')' : ''}${s.team ? ' · ' + s.team : ''}${s.busy ? ' · bận: ' + s.busy : ''}${s.note ? ' — ' + s.note : ''}`).join('\n') : '(chưa có danh sách — để trống phần phân công người)';
 }
 export function programFacts(ev) {
   if (!ev) return '';

@@ -7,6 +7,7 @@ import {sourceBox, srcSummary} from './sources.js';
 import {plain} from './fmt.js';
 import {writeDoc, captionVariants, extractProgram} from './gen.js';
 import {askKey, keyGuide, PROVIDERS, BACKUPS} from './ai.js';
+import {teamView, assignDialog, TEAM_TOUR, ASSIGN_TOUR, tour, tourDone} from './team.js';
 
 const S_ = v => String(v == null ? '' : v);
 const ago = d => { if (!d) return ''; const s = (Date.now() - new Date(d)) / 1000; return s < 60 ? 'vừa xong' : s < 3600 ? Math.floor(s / 60) + ' phút trước' : s < 86400 ? Math.floor(s / 3600) + ' giờ trước' : fmtDT(d); };
@@ -127,10 +128,21 @@ export function progMenu(ctx, e) {
 // ===================== DANH SÁCH THEO LOẠI (việc thường ngày) =====================
 export function group(ctx, gid) {
   const G = GROUPS.find(g => g.id === gid), S = ctx.store, U = ctx.ui[gid] ||= {f: 'all'};
-  const all = S.docs.filter(d => G.kinds.includes(d.kind) && !d.event_id), list = all.filter(d => U.f === 'all' || d.kind === U.f);
+  const TABS = G.tabs || G.kinds.filter(k => !KINDS[k].hidden).map(k => [k, KINDS[k].short, [k]]);
+  const all = S.docs.filter(d => G.kinds.includes(d.kind) && !d.event_id), list = all.filter(d => U.f === 'all' || ((TABS.find(t => t[0] === U.f) || [])[2] || [U.f]).includes(d.kind));
+  if (gid === 'schedule') {
+    const tab = ctx.ui.ph || 'docs', guide = () => tour(S, 'team', TEAM_TOUR(ctx), {force: true});
+    if (!tourDone(S, 'team') && !ctx.ui.tourTeam && (ctx.ui.tourTeam = 1)) setTimeout(() => { if (document.querySelector('.wr-ph-tabs')) { ctx.ui.ph = 'team'; ctx.render(); setTimeout(() => tour(S, 'team', TEAM_TOUR(ctx)), 120); } }, 350);
+    return h('div', {class: 'wr-wrap wide'},
+      h('div', {class: 'wr-h'}, h('h2', {}, G.name), h('div', {class: 'wr-tabs wr-ph-tabs', role: 'tablist', style: 'margin:0 0 0 14px'},
+          [['docs', 'Lịch tuần', all.length], ['team', 'Đội ngũ', (S.staff || []).filter(p => p.active !== false).length]].map(([k, l, n]) => h('button', {role: 'tab', 'aria-selected': String(tab === k), class: tab === k ? 'on' : '', onclick: () => { ctx.ui.ph = k; ctx.render(); }}, l, h('em', {}, n)))),
+        h('span', {class: 'sp'}), btn('Hướng dẫn', guide, {ghost: true, sm: 1, icon: 'book', title: 'Xem lại hướng dẫn mục Phân công'}),
+        tab === 'docs' && btn('+ Tạo lịch tuần', () => newDocFlow(ctx, gid))),
+      tab === 'team' ? teamView(ctx) : list.length ? list.map(d => docItem(ctx, d)) : h('div', {class: 'wr-empty'}, 'Chưa có lịch tuần. Bấm “+ Tạo lịch tuần” — dán lịch nhận được, AI dựng đúng mẫu rồi bấm “Chia người”.'));
+  }
   return h('div', {class: 'wr-wrap'},
     h('div', {class: 'wr-h'}, h('h2', {}, G.name), h('span', {class: 'sp'}), btn('+ Tạo ' + (gid === 'script' ? 'kịch bản' : G.name.toLowerCase()), () => newDocFlow(ctx, gid))),
-    G.kinds.length > 1 && h('div', {class: 'wr-tabs'}, [['all', 'Tất cả'], ...G.kinds.map(k => [k, KINDS[k].short])].map(([k, l]) => h('button', {class: U.f === k ? 'on' : '', onclick: () => { U.f = k; ctx.render(); }}, l))),
+    TABS.length > 1 && h('div', {class: 'wr-tabs'}, [['all', 'Tất cả'], ...TABS].map(([k, l]) => h('button', {class: U.f === k ? 'on' : '', onclick: () => { U.f = k; ctx.render(); }}, l))),
     list.length ? list.map(d => docItem(ctx, d)) : h('div', {class: 'wr-empty'}, 'Chưa có. Bấm nút + ở trên để tạo — AI sẽ viết theo đúng mẫu của phòng.'),
     S.docs.some(d => G.kinds.includes(d.kind) && d.event_id) && h('p', {class: 'wr-mute', style: 'margin-top:12px'}, 'Tài liệu thuộc chương trình lớn nằm trong mục Chương trình.'));
 }
@@ -161,9 +173,11 @@ export function editor(ctx, id) {
   Object.assign(ctx.ui, {undo: () => step(-1), redo: () => step(1), exportMenu: () => exportDialog(ctx, doc), handoff: () => handoffDialog(ctx, doc), aiWrite: () => aiWrite(ctx, doc),
     download: () => exportDoc(ctx, doc, 'download'), toDrive: run(err, async () => { const u = await saveGoogle(ctx, doc); if (u) ctx.note('Đã cập nhật bản Google'); }), pdf: run(err, () => savePdf(ctx, doc))});
   paint();
+  if (doc.kind === 'schedule' && !tourDone(S, 'assign') && !ctx.ui.tourAssign && (ctx.ui.tourAssign = 1)) setTimeout(() => document.querySelector('.wr-t-assign') && tour(S, 'assign', ASSIGN_TOUR), 400);
   const ev = doc.event_id && S.eventOf(doc.event_id);
   const acts = h('div', {class: 'wr-row wr-toolbar'},
     btn('✨ AI viết', () => aiWrite(ctx, doc), {title: 'AI viết / sửa (⌘⇧A)'}), doc.kind === 'caption' && btn('3 phương án', () => capVariants(ctx, doc), {ghost: true}),
+    doc.kind === 'schedule' && btn('Chia người', run(err, () => assignDialog(ctx, S.doc(doc.id) || doc, {apply: (data, label) => applyData(ctx, doc, data, label), aiApply: instr => aiApply(ctx, doc, instr)})), {ghost: true, icon: 'users', cls: 'wr-t-assign', title: 'Tự điền Content / Media / Biên tập cho mọi sự kiện'}),
     h('button', {class: 'wr-x', title: 'Hoàn tác (⌘Z)', 'aria-label': 'Hoàn tác', disabled: !Hs.canUndo(), onclick: () => step(-1)}, icon('undo')),
     h('button', {class: 'wr-x', title: 'Làm lại (⌘⇧Z)', 'aria-label': 'Làm lại', disabled: !Hs.canRedo(), onclick: () => step(1)}, icon('redo')),
     h('select', {class: 'wr-in wr-status st-' + doc.status, style: 'width:auto', 'aria-label': 'Trạng thái', onchange: run(err, async e => { await S.saveDoc(doc.id, {status: e.target.value}); })}, STATUS.map(([k, l]) => h('option', {value: k, selected: doc.status === k}, l))),
@@ -436,7 +450,6 @@ export const pinOk = async (store, pin) => !store.settings.pin_hash || await sha
 export function settings(ctx) {
   const S = ctx.store, A = ctx.ai, G = ctx.g, err = errBox(), st = A.state;
   const aiStatus = !A.cfg.key ? h('span', {class: 'wr-tag warn'}, 'Chưa bật') : st.status === 'ok' ? h('span', {class: 'wr-tag ok'}, 'Đang dùng ' + A.model) : st.status === 'unknown' ? h('span', {class: 'wr-tag'}, 'Chưa kiểm tra') : h('span', {class: 'wr-tag warn'}, st.error || 'Lỗi');
-  const staffName = h('input', {class: 'wr-in', placeholder: 'Tên (vd Ngọc Ninh)', 'aria-label': 'Tên nhân sự'}), staffRole = h('select', {class: 'wr-in', 'aria-label': 'Vai trò'}, ['Content', 'Media', 'Biên tập', 'MC', 'Thiết kế'].map(x => h('option', {}, x)));
   return h('div', {class: 'wr-wrap'}, h('div', {class: 'wr-h'}, h('h2', {}, 'Cài đặt')), err,
     h('div', {class: 'wr-stack'},
       Box(h('span', {}, 'AI chính — Google Gemini ', aiStatus),
@@ -458,13 +471,8 @@ export function settings(ctx) {
         h('div', {class: 'wr-row'}, G.status === 'connected' ? btn('Ngắt kết nối', run(err, async () => { await G.disconnect(); ctx.render(); }), {ghost: true}) : btn('Kết nối Google', run(err, () => G.connect(['drive'])))),
         S.settings.drive_root && h('a', {href: S.settings.drive_root.url, target: '_blank', rel: 'noopener'}, 'Mở thư mục “PHÒNG VY — Workroom” trên Drive'),
         h('p', {class: 'wr-mute'}, 'Dùng để đẩy file lên Drive/Docs/Sheets. Phiên Google hết hạn sau ~1 giờ — bấm Kết nối lại khi được nhắc. Lần đầu nếu báo “API chưa được bật”: bấm nút “Bật … API” trong thông báo lỗi → Enable → đợi 1–2 phút rồi Thử lại (cần Google Drive API; Gmail API nếu muốn tạo thư nháp).')),
-      Box('Nhân sự (AI dùng khi phân công)',
-        h('div', {class: 'wr-stack'}, S.staff.filter(x => x.active !== false).map(x => { const items = () => [{label: 'Đổi tên', icon: 'pen', run: async () => { const v = await ask('Đổi tên', 'Tên', x.name); if (v) await S.set('staff', x.id, {name: v}); }},
-            {head: 'Vai trò'}, ...['Content', 'Media', 'Biên tập', 'MC', 'Thiết kế'].map(r => ({label: r, on: (x.roles || []).includes(r), run: () => S.set('staff', x.id, {roles: (x.roles || []).includes(r) ? x.roles.filter(y => y !== r) : [...(x.roles || []), r]})})), '-',
-            {label: 'Xoá khỏi danh sách', icon: 'trash', danger: true, run: () => S.del('staff', x.id)}];
-          return withMenu(h('div', {class: 'wr-item'}, h('span', {class: 't'}, x.name), h('span', {class: 'm'}, (x.roles || []).join(', ')), moreBtn(items)), items); })),
-        h('div', {class: 'wr-row'}, h('div', {style: 'flex:2'}, staffName), h('div', {style: 'flex:1'}, staffRole), btn('Thêm', run(err, async () => { const n = staffName.value.trim(); if (!n) return; const ex = S.staff.find(x => x.name.toLowerCase() === n.toLowerCase());
-          if (ex) await S.set('staff', ex.id, {roles: [...new Set([...(ex.roles || []), staffRole.value])], active: true}); else await S.add('staff', {name: n, roles: [staffRole.value]}); })))),
+      Box('Đội ngũ', h('div', {class: 'wr-row'}, h('p', {class: 'wr-mute', style: 'flex:1'}, (S.staff || []).filter(p => p.active !== false).length + ' người đang làm. Danh sách, vai trò, team và lịch bận đã chuyển sang mục Phân công.'),
+        btn('Mở Đội ngũ', () => { ctx.ui.ph = 'team'; ctx.go({screen: 'group', id: 'schedule'}); }, {ghost: true, icon: 'users'}))),
       Box('Người nhận bàn giao (trưởng phòng, biên tập, thiết kế…)', h('div', {class: 'wr-stack'}, (S.settings.contacts || []).map((c, i) => h('div', {class: 'wr-item'}, h('span', {class: 't'}, c.name + ' · ' + c.email), h('span', {class: 'm'}, c.role || ''),
           h('button', {class: 'wr-x del', 'aria-label': 'Xoá ' + c.email, onclick: run(err, () => S.setSetting('contacts', (S.settings.contacts || []).filter((_, j) => j !== i)))}, icon('x'))))),
         (() => { const n = h('input', {class: 'wr-in', placeholder: 'Tên', 'aria-label': 'Tên người nhận'}), em = h('input', {class: 'wr-in', type: 'email', placeholder: 'Email', 'aria-label': 'Email người nhận mới'}), ro = h('input', {class: 'wr-in', placeholder: 'Vai trò (vd Trưởng phòng)', 'aria-label': 'Vai trò người nhận'});

@@ -30,7 +30,7 @@ const navKey = v => v.screen === 'group' ? 'group:' + v.id : v.screen === 'progr
 async function build(SH) {
   await new Promise(res => {
     if (document.getElementById('wrCss')) return res();
-    const l = h('link', {id: 'wrCss', rel: 'stylesheet', href: 'workroom.css?v=33'}); l.onload = l.onerror = res; document.head.append(l);
+    const l = h('link', {id: 'wrCss', rel: 'stylesheet', href: 'workroom.css?v=34'}); l.onload = l.onerror = res; document.head.append(l);
   });
   const store = await createStore(SH);          // ném 'not_owner' nếu máy chủ không xác nhận quyền vào
   const ai = createAI(store), g = createGoogle(SH, store);

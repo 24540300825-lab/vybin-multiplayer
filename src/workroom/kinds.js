@@ -165,15 +165,15 @@ function timelineData(d) { return {title: S(d.title), date: S(d.date) || `Tp. H�
 
 // ===================== DANH MỤC =====================
 export const GROUPS = [
-  {id: 'script', name: 'Kịch bản', icon: 'film', kinds: ['news_tv', 'news_en', 'video']},
+  {id: 'script', name: 'Kịch bản', icon: 'film', kinds: ['news_tv', 'news_en', 'video'], tabs: [['news', 'Thời sự', ['news_tv', 'news_en']], ['video', 'Video', ['video']]]},
   {id: 'caption', name: 'Caption', icon: 'chat', kinds: ['caption']},
   {id: 'article', name: 'Tin bài', icon: 'doc', kinds: ['article']},
   {id: 'schedule', name: 'Phân công', icon: 'users', kinds: ['schedule']},
   {id: 'timeline', name: 'Timeline', icon: 'cal', kinds: ['timeline']},
 ];
 export const KINDS = {
-  news_tv: {name: 'Bản tin ULAW TV', short: 'Bản tin TV', ext: 'docx', blank: () => newsBlank(false), layout: d => newsLayout(d, false), schema: NEWS_SCHEMA(false), guide: NEWS_GUIDE(false), titleOf: d => d.title},
-  news_en: {name: 'Bản tin ULAW Tiếng Anh', short: 'Bản tin TA', ext: 'docx', blank: () => newsBlank(true), layout: d => newsLayout(d, true), schema: NEWS_SCHEMA(true), guide: NEWS_GUIDE(true), titleOf: d => d.title},
+  news_tv: {name: 'Kịch bản thời sự (news)', short: 'Thời sự', ext: 'docx', blank: () => newsBlank(false), layout: d => newsLayout(d, false), schema: NEWS_SCHEMA(false), guide: NEWS_GUIDE(false), titleOf: d => d.title},
+  news_en: {name: 'Kịch bản thời sự (news)', short: 'Thời sự', hidden: true, ext: 'docx', blank: () => newsBlank(true), layout: d => newsLayout(d, true), schema: NEWS_SCHEMA(true), guide: NEWS_GUIDE(true), titleOf: d => d.title},
   video: {name: 'Kịch bản video (storyboard)', short: 'Video', ext: 'docx', blank: () => ({title: 'KỊCH BẢN VIDEO ', desc: '', music: 'media chọn', duration: '45-60s', cap: {title: '', paras: [], sign: SIGN},
     scenes: [{name: 'Intro', desc: '- Chạy intro của trường', vo: '', note: ''}, {name: 'Outro', desc: '', vo: '', note: ''}], withInfo: false, info: {title: '', head: '', steps: []}}), layout: videoLayout, schema: VIDEO_SCHEMA, guide: VIDEO_GUIDE, titleOf: d => d.title},
   caption: {name: 'Caption Facebook', short: 'Caption', ext: 'docx', blank: () => ({title: '', paras: [''], sign: 'Thực hiện: Phòng Truyền thông & QHDN', withDes: false, des: [], opts: {tone: 'trang trọng, truyền cảm hứng', length: 'vừa', emoji: 'mỗi đoạn 1 emoji', extra: ''}}),
@@ -187,7 +187,7 @@ export const KINDS = {
 export const groupOf = kind => GROUPS.find(g => g.kinds.includes(kind));
 // Kịch bản: 1 mục chung, chọn loại khi tạo
 export const SCRIPT_TYPES = [
-  {id: 'news', name: 'Bản tin thời sự', desc: 'Kịch bản quay news / bản tin: MC dẫn, điểm tin, tin chi tiết, chuyên đề', variants: [['news_tv', 'ULAW TV'], ['news_en', 'ULAW Tiếng Anh']]},
+  {id: 'news', name: 'Thời sự (news)', desc: 'Kịch bản quay bản tin: MC dẫn, điểm tin, tin chi tiết, chuyên đề', variants: [['news_tv', 'Thời sự']]},
   {id: 'video', name: 'Video (storyboard)', desc: 'Kịch bản quay TVC / clip ngắn: cảnh – mô tả hình – voice off – ghi chú', variants: [['video', 'Storyboard']]},
 ];
 // ===================== NỘI DUNG SAO CHÉP ĐỂ GỬI / ĐĂNG (theo từng loại việc) =====================

@@ -6,7 +6,7 @@ import {h, icon, btn, dialog, confirmBox, download, fmtDT, errBox, run} from './
 import {KINDS, groupOf, toFile, fileName, copies, preview, asText} from './kinds.js';
 import {writeDoc} from './gen.js';
 
-const MSG = {news_tv: 'kịch bản Bản tin ULAW TV', news_en: 'kịch bản Bản tin ULAW Tiếng Anh', video: 'kịch bản video', caption: 'caption', article: 'tin bài', schedule: 'lịch công tác tuần', timeline: 'timeline truyền thông'};
+const MSG = {news_tv: 'kịch bản thời sự', news_en: 'kịch bản thời sự', video: 'kịch bản video', caption: 'caption', article: 'tin bài', schedule: 'lịch công tác tuần', timeline: 'timeline truyền thông'};
 export const STATUS = [['draft', 'Nháp'], ['review', 'Gửi duyệt'], ['revise', 'Cần sửa'], ['approved', 'Đã duyệt'], ['published', 'Đã đăng']];
 export const statusName = s => (STATUS.find(x => x[0] === s) || STATUS[0])[1];
 export const statusTag = s => h('span', {class: 'wr-tag st-' + (s || 'draft')}, statusName(s));
