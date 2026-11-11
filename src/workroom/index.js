@@ -30,7 +30,7 @@ const navKey = v => v.screen === 'group' ? 'group:' + v.id : v.screen === 'progr
 async function build(SH) {
   await new Promise(res => {
     if (document.getElementById('wrCss')) return res();
-    const l = h('link', {id: 'wrCss', rel: 'stylesheet', href: 'workroom.css?v=32'}); l.onload = l.onerror = res; document.head.append(l);
+    const l = h('link', {id: 'wrCss', rel: 'stylesheet', href: 'workroom.css?v=33'}); l.onload = l.onerror = res; document.head.append(l);
   });
   const store = await createStore(SH);          // ném 'not_owner' nếu máy chủ không xác nhận quyền vào
   const ai = createAI(store), g = createGoogle(SH, store);
@@ -44,14 +44,14 @@ async function build(SH) {
   root.append(side, top, h('div', {class: 'wr-body'}, main, cop), noteEl);
   document.body.append(root);
 
-  let noteT = 0, busyEl = null;
+  let noteT = 0, busyEl = null, busyNote = null;
   const ctx = {
     store, ai, g, SH, ui: {},
     get view() { return st.view; },
-    go(v) { flush(); for (const k of ['undo', 'redo', 'exportMenu', 'handoff', 'aiWrite', 'download', 'toDrive', 'pdf']) delete ctx.ui[k]; st.view = typeof v === 'string' ? {screen: v} : v; keep(); ctx.render(); main.scrollTop = 0; main.focus({preventScroll: true}); },
+    go(v) { flush(); for (const k of ['undo', 'redo', 'exportMenu', 'handoff', 'aiWrite', 'download', 'toDrive', 'pdf', 'push']) delete ctx.ui[k]; st.view = typeof v === 'string' ? {screen: v} : v; keep(); ctx.render(); main.scrollTop = 0; main.focus({preventScroll: true}); },
     render: () => render(),
     note(m) { noteEl.textContent = m; noteEl.classList.add('on'); clearTimeout(noteT); noteT = setTimeout(() => noteEl.classList.remove('on'), 3800); },
-    busy(m) { if (busyEl) { busyEl.remove(); busyEl = null; } if (m) { busyEl = h('div', {class: 'wr-dlg'}, h('div', {class: 'wr-dlg-box'}, h('h3', {}, '✨ ' + m), h('p', {class: 'wr-mute'}, 'Thường mất 10–40 giây.'), h('div', {class: 'wr-dlg-act'}, btn('Dừng', () => ai.stop(), {ghost: true})))); root.append(busyEl); } },
+    busy(m) { if (busyEl) { busyEl.remove(); busyEl = null; } if (m) { busyNote = h('p', {class: 'wr-mute'}, ai.state.note || 'Thường mất 10–40 giây. Nếu một AI bận, Workroom tự chuyển sang AI khác và làm tiếp.'); busyEl = h('div', {class: 'wr-dlg'}, h('div', {class: 'wr-dlg-box'}, h('h3', {}, '✨ ' + m), busyNote, h('div', {class: 'wr-dlg-act'}, btn('Dừng', () => ai.stop(), {ghost: true})))); root.append(busyEl); } },
     toggleCop(v) { st.cop = v == null ? !st.cop : v; keep(); render(); },
   };
   ctx.cop = createCopilot(ctx);
@@ -70,7 +70,7 @@ async function build(SH) {
   const topMenu = () => [{head: 'Tạo mới'}, ...GROUPS.map(g => ({label: g.id === 'script' ? 'Kịch bản' : g.name, icon: g.icon, run: () => V.newDocFlow(ctx, g.id)})), {label: 'Chương trình lớn', icon: 'flag', run: () => V.newProgram(ctx)}, '-',
     {head: 'Nhanh'}, {label: st.cop ? 'Đóng Trợ lý AI' : 'Mở Trợ lý AI', icon: 'spark', kbd: '⌘J', run: () => ctx.toggleCop()},
     {label: g.status === 'connected' ? 'Google: đã kết nối' : 'Kết nối Google', icon: 'drive', disabled: g.status === 'connected', run: () => g.connect(['drive']).catch(e => ctx.note(e.message))},
-    {label: ai.cfg.key ? 'AI: ' + (ai.model || 'Gemini') : 'Bật AI (dán khoá Gemini)', icon: 'gear', run: () => ctx.go('settings')},
+    {label: ai.hasAny ? 'AI: ' + (ai.model || 'Gemini') : 'Bật AI (dán khoá Gemini)', icon: 'gear', run: () => ctx.go('settings')},
     store.settings.pin_hash && {label: 'Khoá màn hình ngay', icon: 'stop', run: () => { sessionStorage.removeItem('vyWrUnlocked'); render(); }},
     {label: 'Phím tắt', icon: 'list', kbd: '⌘/', run: () => ctx.showKeys()}, {label: 'Cài đặt', icon: 'gear', run: () => ctx.go('settings')}, '-',
     {label: 'Về phòng', icon: 'door', run: hide}];
@@ -122,11 +122,12 @@ async function build(SH) {
   ctx.render = renderAll;
   store.on('change', renderAll);
   store.on('save', () => { if (st.open) renderTop(); });
+  ai.on(() => { if (busyNote && ai.state.note) busyNote.textContent = ai.state.note; });
   g.on(() => { if (st.open) renderAll(); });
   addEventListener('beforeunload', flush);
   // ---------- PHÍM TẮT (giống Google Docs/Sheets) ----------
   const KEYS = [['⌘Z', 'Hoàn tác'], ['⌘⇧Z  ·  ⌘Y', 'Làm lại'], ['⌘S', 'Lưu ngay'], ['⌘⇧A', 'AI viết / sửa tài liệu đang mở'], ['⌘J', 'Mở / đóng Trợ lý AI'], ['⌘⇧E', 'Xuất (Word, Excel, PDF, Google…)'],
-    ['⌘⇧S', 'Cập nhật bản Google Docs/Sheets'], ['⌘⇧D', 'Tải file đúng mẫu về máy'], ['⌘P', 'Xuất PDF'], ['⌘⇧B', 'Bàn giao (gửi duyệt, góp ý)'], ['⌘Enter', 'Bấm nút chính trong hộp thoại'], ['Esc', 'Đóng hộp thoại'], ['⌘/', 'Xem bảng phím tắt'], ['Chuột phải · ⋯', 'Thao tác nhanh trên từng mục (đổi tên, nhân bản, chuyển, trạng thái, xoá…)']];
+    ['⌘⇧G', 'Đẩy lên Google (chọn dạng, thư mục)'], ['⌘⇧S', 'Cập nhật nhanh bản Google Docs/Sheets'], ['⌘⇧D', 'Tải file đúng mẫu về máy'], ['⌘P', 'Xuất PDF'], ['⌘⇧B', 'Bàn giao (gửi duyệt, góp ý)'], ['⌘Enter', 'Bấm nút chính trong hộp thoại'], ['Esc', 'Đóng hộp thoại'], ['⌘/', 'Xem bảng phím tắt'], ['Chuột phải · ⋯', 'Thao tác nhanh trên từng mục (đổi tên, nhân bản, chuyển, trạng thái, xoá…)']];
   const showKeys = () => import('./ui.js').then(({dialog}) => dialog({title: 'Phím tắt', body: h('table', {class: 'wr-table'}, KEYS.map(([k, l]) => h('tr', {}, h('td', {}, h('kbd', {}, /Mac|iPhone|iPad/.test(navigator.platform) ? k : k.replace(/⌘/g, 'Ctrl+').replace(/⇧/g, 'Shift+'))), h('td', {}, l))))}));
   root.addEventListener('keydown', e => {
     if (!st.open || locked()) return;
@@ -145,6 +146,7 @@ async function build(SH) {
     if (k === 'e' && e.shiftKey && U.exportMenu) return go(U.exportMenu);
     if (k === 'd' && e.shiftKey && U.download) return go(U.download);
     if (k === 'b' && e.shiftKey && U.handoff) return go(U.handoff);
+    if (k === 'g' && e.shiftKey && U.push) return go(U.push);
     if (k === 'p' && !e.shiftKey && U.pdf) return go(U.pdf);
   }, true);
   ctx.showKeys = showKeys;
@@ -155,7 +157,7 @@ async function build(SH) {
     requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add('in')));
     main.focus({preventScroll: true});
     store.reload().catch(e => ctx.note('Không tải lại được dữ liệu: ' + e.message));
-    if (ai.cfg.key) ai.probe().then(() => { if (st.open && st.view.screen === 'settings') renderAll(); });
+    if (ai.hasAny) ai.probe().then(() => { if (st.open && st.view.screen === 'settings') renderAll(); });
     g.afterReturn().catch(() => {});
   }
   function hide() {

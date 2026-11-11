@@ -34,7 +34,7 @@ export const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&'
 export const run = (errBox, fn) => async ev => {
   if (ev && ev.preventDefault) ev.preventDefault();
   if (errBox) errBox.textContent = '';
-  try { await fn(ev); } catch (e) { console.error('[workroom]', e); if (errBox) errBox.textContent = 'Lỗi: ' + (e.message || e); }
+  try { await fn(ev); } catch (e) { console.error('[workroom]', e); if (errBox) { errBox.replaceChildren('Lỗi: ' + (e.message || e)); if (e.url) errBox.append(' ', h('a', {href: e.url, target: '_blank', rel: 'noopener', class: 'wr-btn sm'}, e.urlLabel || 'Mở')); } }
 };
 export const errBox = () => h('div', {class: 'wr-err', role: 'alert'});
 

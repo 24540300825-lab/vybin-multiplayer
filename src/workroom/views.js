@@ -2,11 +2,11 @@
 // Nguyên tắc giao diện: tiếng Việt, ít chữ, mỗi màn một việc; nút chính luôn ở trên cùng; xem trước = đúng file sẽ xuất.
 import {h, icon, btn, dialog, confirmBox, download, debounce, fmtDT, errBox, run, pickFile, menu, moreBtn, withMenu, ask} from './ui.js';
 import {GROUPS, KINDS, groupOf, preview, DES, SCHED_FIELDS, SCRIPT_TYPES} from './kinds.js';
-import {STATUS, statusTag, exportDialog, handoffDialog, saveGoogle, saveDrive, savePdf} from './out.js';
+import {STATUS, statusTag, exportDialog, handoffDialog, saveGoogle, saveDrive, savePdf, pushDialog} from './out.js';
 import {sourceBox, srcSummary} from './sources.js';
 import {plain} from './fmt.js';
 import {writeDoc, captionVariants, extractProgram} from './gen.js';
-import {askKey, keyGuide} from './ai.js';
+import {askKey, keyGuide, PROVIDERS, BACKUPS} from './ai.js';
 
 const S_ = v => String(v == null ? '' : v);
 const ago = d => { if (!d) return ''; const s = (Date.now() - new Date(d)) / 1000; return s < 60 ? 'vừa xong' : s < 3600 ? Math.floor(s / 60) + ' phút trước' : s < 86400 ? Math.floor(s / 3600) + ' giờ trước' : fmtDT(d); };
@@ -18,7 +18,7 @@ export const getP = (o, p) => keys(p).reduce((a, k) => a == null ? a : a[k], o);
 export function setP(o, p, v) { const ks = keys(p); let a = o; ks.slice(0, -1).forEach((k, i) => { if (a[k] == null || typeof a[k] !== 'object') a[k] = /^\d+$/.test(ks[i + 1]) ? [] : {}; a = a[k]; }); a[ks[ks.length - 1]] = v; }
 
 // ===================== VIỆC CHUNG: tạo, AI, xuất =====================
-async function needAI(ctx) { if (ctx.ai.cfg.key) return true; const ok = await askKey(ctx.ai); ctx.render(); return ok; }
+async function needAI(ctx) { if (ctx.ai.hasAny) return true; const ok = await askKey(ctx.ai); ctx.render(); return ok; }
 // tạo mới theo MỤC (gid): chọn loại (nếu mục có nhiều loại) → thả nguồn → AI phân tích & dựng khung đúng mẫu
 export async function newDocFlow(ctx, gid, o = {}) {
   const G = GROUPS.find(g => g.id === gid) || GROUPS.find(g => g.kinds.includes(gid)), S = ctx.store, ev = o.event_id ? S.eventOf(o.event_id) : null;
@@ -65,7 +65,7 @@ const dueTag = d => { const t = d.handoff && d.handoff.deadline; if (!t) return 
 export function home(ctx) {
   const S = ctx.store, recent = S.docs.slice(0, 6), progs = S.events.filter(e => !e.archived).slice(0, 4);
   const due = S.docs.filter(d => d.handoff && d.handoff.deadline && !['approved', 'published'].includes(d.status)).sort((a, b) => a.handoff.deadline.localeCompare(b.handoff.deadline)).slice(0, 5);
-  const setup = [!ctx.ai.cfg.key && h('div', {class: 'wr-banner'}, icon('spark'), 'Chưa bật AI. ', btn('Bật AI (1 phút)', async () => { await askKey(ctx.ai); ctx.render(); }, {sm: 1}))].filter(Boolean);
+  const setup = [!ctx.ai.hasAny && h('div', {class: 'wr-banner'}, icon('spark'), 'Chưa bật AI. ', btn('Bật AI (1 phút)', async () => { await askKey(ctx.ai); ctx.render(); }, {sm: 1}))].filter(Boolean);
   return h('div', {class: 'wr-wrap'}, ...setup,
     h('div', {class: 'wr-h'}, h('h2', {}, 'Hôm nay làm gì?')),
     h('div', {class: 'wr-tiles'}, GROUPS.map(g => h('button', {class: 'wr-tile', onclick: () => newDocFlow(ctx, g.id)}, icon(g.icon), g.id === 'schedule' ? 'Phân công (lịch tuần)' : g.name, h('small', {}, TILE[g.id])))),
@@ -111,7 +111,7 @@ export function docMenu(ctx, d) {
     {label: 'Nhân bản', icon: 'copy', run: async () => { const n = await duplicateDoc(ctx, d); ctx.go({screen: 'doc', id: n.id}); }},
     {label: d.event_id ? 'Chuyển chương trình / về việc thường ngày' : 'Đưa vào chương trình…', icon: 'flag', run: () => moveDoc(ctx, d)}, '-', {head: 'Trạng thái'},
     ...STATUS.map(([k, l]) => ({label: l, on: d.status === k, run: () => S.saveDoc(d.id, {status: k})})), '-',
-    {label: 'Xuất…', icon: 'down', kbd: '⌘⇧E', run: () => exportDialog(ctx, d)}, {label: 'Bàn giao…', icon: 'send', kbd: '⌘⇧B', run: () => handoffDialog(ctx, d)},
+    {label: 'Xuất…', icon: 'down', kbd: '⌘⇧E', run: () => exportDialog(ctx, d)}, {label: 'Đẩy lên Google…', icon: 'drive', kbd: '⌘⇧G', run: () => pushDialog(ctx, d).catch(e => ctx.note(e.message))}, {label: 'Bàn giao…', icon: 'send', kbd: '⌘⇧B', run: () => handoffDialog(ctx, d)},
     d.gdoc && d.gdoc.url && {label: 'Mở bản Google', icon: 'ext', run: () => window.open(d.gdoc.url, '_blank', 'noopener')},
     {label: 'Sao chép link Google', icon: 'link', disabled: !(d.gdoc && d.gdoc.url), run: () => navigator.clipboard.writeText(d.gdoc.url).then(() => ctx.note('Đã sao chép link'))}, '-',
     {label: 'Xoá', icon: 'trash', danger: true, run: () => deleteDoc(ctx, d, () => { if (ctx.view.screen === 'doc' && ctx.view.id === d.id) ctx.go(d.event_id ? {screen: 'program', id: d.event_id} : {screen: 'group', id: groupOf(d.kind).id}); })}];
@@ -157,6 +157,7 @@ export function editor(ctx, id) {
   };
   // phím tắt của trình soạn (index.js gọi qua ctx.ui)
   const step = dir => { const x = dir < 0 ? Hs.undo(D) : Hs.redo(D); if (!x) return ctx.note(dir < 0 ? 'Không còn gì để hoàn tác' : 'Không còn gì để làm lại'); doc.data = x; S.saveDoc(doc.id, {data: x, title: plain(K.titleOf(x) || '')}, {silent: true}); ctx.render(); };
+  ctx.ui.push = () => pushDialog(ctx, doc).catch(e => { err.textContent = e.message; });
   Object.assign(ctx.ui, {undo: () => step(-1), redo: () => step(1), exportMenu: () => exportDialog(ctx, doc), handoff: () => handoffDialog(ctx, doc), aiWrite: () => aiWrite(ctx, doc),
     download: () => exportDoc(ctx, doc, 'download'), toDrive: run(err, async () => { const u = await saveGoogle(ctx, doc); if (u) ctx.note('Đã cập nhật bản Google'); }), pdf: run(err, () => savePdf(ctx, doc))});
   paint();
@@ -168,7 +169,8 @@ export function editor(ctx, id) {
     h('select', {class: 'wr-in wr-status st-' + doc.status, style: 'width:auto', 'aria-label': 'Trạng thái', onchange: run(err, async e => { await S.saveDoc(doc.id, {status: e.target.value}); })}, STATUS.map(([k, l]) => h('option', {value: k, selected: doc.status === k}, l))),
     h('span', {class: 'sp', style: 'flex:1'}),
     btn('Lịch sử', () => history(ctx, doc), {ghost: true, icon: 'clock'}),
-    btn('Xuất', () => exportDialog(ctx, doc), {ghost: true, icon: 'down', title: 'Word, Excel, PDF, Google Docs/Sheets, sao chép để đăng (⌘⇧E)'}),
+    btn('Xuất', () => exportDialog(ctx, doc), {ghost: true, icon: 'down', title: 'Tải Word/Excel/PDF, sao chép để đăng (⌘⇧E)'}),
+    btn('Đẩy lên Google', () => pushDialog(ctx, doc).catch(e => { err.textContent = e.message; }), {ghost: true, icon: 'drive', title: 'Google Docs/Sheets, Word/Excel, PDF vào thư mục bạn chọn (⌘⇧G)'}),
     btn('Bàn giao', () => handoffDialog(ctx, doc), {icon: 'send', cls: 'dark', title: 'Gửi duyệt, hạn nộp, góp ý'}), moreBtn(() => edMenu()),
     doc.gdoc && doc.gdoc.url && h('a', {class: 'wr-btn ghost', href: doc.gdoc.url, target: '_blank', rel: 'noopener', title: 'Mở bản Google'}, icon('ext'), doc.kind === 'timeline' ? 'Sheets' : 'Docs'));
   const edMenu = () => [...docMenu(ctx, doc).filter(Boolean).filter(x => x === '-' || x.head || !/^Mở$/.test(x.label)).slice(0, 4), '-',
@@ -381,7 +383,7 @@ export async function newProgram(ctx) {
   const v = await dialog({title: 'Tạo chương trình lớn', body: h('div', {class: 'wr-stack'}, name, brief), buttons: [['Huỷ', null], ['Tạo', 'go', 'primary']]});
   if (!v) return;
   let row = {name: name.value.trim(), brief: brief.value.trim()};
-  if (brief.value.trim() && ctx.ai.cfg.key) {
+  if (brief.value.trim() && ctx.ai.hasAny) {
     ctx.busy('AI đang đọc thông tin chương trình…');
     try { const x = await extractProgram(ctx, brief.value); row = {...x, name: row.name || x.name, brief: brief.value.trim()}; if (!/^\d{4}-\d{2}-\d{2}$/.test(row.event_date || '')) delete row.event_date; } catch (e) { ctx.note(e.message); }
     ctx.busy(null);
@@ -437,16 +439,25 @@ export function settings(ctx) {
   const staffName = h('input', {class: 'wr-in', placeholder: 'Tên (vd Ngọc Ninh)', 'aria-label': 'Tên nhân sự'}), staffRole = h('select', {class: 'wr-in', 'aria-label': 'Vai trò'}, ['Content', 'Media', 'Biên tập', 'MC', 'Thiết kế'].map(x => h('option', {}, x)));
   return h('div', {class: 'wr-wrap'}, h('div', {class: 'wr-h'}, h('h2', {}, 'Cài đặt')), err,
     h('div', {class: 'wr-stack'},
-      Box(h('span', {}, 'AI (Google Gemini) ', aiStatus),
+      Box(h('span', {}, 'AI chính — Google Gemini ', aiStatus),
         !A.cfg.key ? keyGuide() : null,
-        h('div', {class: 'wr-row'}, btn(A.cfg.key ? 'Đổi khoá' : 'Dán khoá', run(err, async () => { await askKey(A); ctx.render(); })), A.cfg.key && btn('Kiểm tra', run(err, async () => { await A.probe(); ctx.render(); }), {ghost: true}),
-          st.models.length > 1 && h('select', {class: 'wr-in', style: 'width:auto', 'aria-label': 'Model AI', onchange: e => { A.setCfg({model: e.target.value}); ctx.render(); }}, st.models.map(m => h('option', {value: m.name, selected: m.name === A.model}, m.label + (m === st.models[0] ? ' (mới nhất)' : '')))),
-          A.cfg.key && btn('Gỡ khoá', () => { A.setCfg({key: '', model: ''}); A.probe(); ctx.render(); }, {ghost: true})),
-        h('p', {class: 'wr-mute'}, 'Khoá chỉ lưu trên trình duyệt máy này. Gói miễn phí của Google có giới hạn lượt/ngày và Google có thể dùng nội dung gửi lên để cải thiện dịch vụ — đừng đưa thông tin mật.')),
+        h('div', {class: 'wr-row'}, btn(A.cfg.key ? 'Đổi khoá' : 'Dán khoá', run(err, async () => { await askKey(A); ctx.render(); })), A.cfg.key && btn('Kiểm tra', run(err, async () => { await A.probe('gemini'); ctx.render(); }), {ghost: true}),
+          st.models.length > 1 && h('select', {class: 'wr-in', style: 'width:auto', 'aria-label': 'Model Gemini', onchange: e => { A.setCfg({model: e.target.value}); ctx.render(); }}, st.models.map(m => h('option', {value: m.name, selected: m.name === A.model}, m.label + (m === st.models[0] ? ' (mới nhất)' : '')))),
+          A.cfg.key && btn('Gỡ khoá', () => { A.setKey('gemini', ''); A.probe('gemini'); ctx.render(); }, {ghost: true})),
+        h('p', {class: 'wr-mute'}, PROVIDERS.gemini.note + '. Khoá chỉ lưu trên trình duyệt máy này.')),
+      Box('AI dự phòng — để không bao giờ bị gián đoạn (miễn phí, khuyên thêm ít nhất 1)',
+        h('p', {class: 'wr-mute'}, 'Khi Gemini quá tải hoặc hết lượt, Workroom tự chuyển sang dịch vụ kế tiếp và làm tiếp — bạn không phải làm gì. Thứ tự: Gemini → ' + BACKUPS.map(p => PROVIDERS[p].name).join(' → ') + '.'),
+        ...BACKUPS.map(p => { const x = (st.extra || {})[p] || {}, has = !!A.cfg.keys[p];
+          return h('div', {class: 'wr-li'}, h('header', {}, h('b', {}, PROVIDERS[p].name), has ? (x.status === 'ok' ? h('span', {class: 'wr-tag ok'}, 'Sẵn sàng') : x.status === 'bad' ? h('span', {class: 'wr-tag warn', title: x.error || ''}, 'Lỗi khoá') : h('span', {class: 'wr-tag'}, 'Chưa kiểm tra')) : h('span', {class: 'wr-tag'}, 'Chưa thêm')),
+            h('small', {class: 'wr-mute'}, PROVIDERS[p].note),
+            h('div', {class: 'wr-row'}, btn(has ? 'Đổi khoá' : 'Thêm khoá', run(err, async () => { await askKey(A, p); ctx.render(); }), {sm: 1, ghost: has}),
+              h('a', {class: 'wr-btn ghost sm', href: PROVIDERS[p].keyUrl, target: '_blank', rel: 'noopener'}, 'Lấy khoá'),
+              has && (x.models || []).length ? h('select', {class: 'wr-in', style: 'width:auto;max-width:280px', 'aria-label': 'Model ' + PROVIDERS[p].name, onchange: e => A.setCfg({models: {...A.cfg.models, [p]: e.target.value}})}, x.models.slice(0, 25).map(m => h('option', {value: m.name, selected: m.name === A.cfg.models[p]}, m.name.replace(/:free$/, '') + (m === x.models[0] ? ' (gợi ý)' : '')))) : null,
+              has && btn('Kiểm tra', run(err, async () => { await A.probe(p); ctx.render(); }), {ghost: true, sm: 1}), has && btn('Gỡ', () => { A.setKey(p, ''); A.probe(p); ctx.render(); }, {ghost: true, sm: 1}))); })),
       Box(h('span', {}, 'Google Drive ', G.status === 'connected' ? h('span', {class: 'wr-tag ok'}, 'Đã kết nối') : h('span', {class: 'wr-tag warn'}, G.status === 'expired' ? 'Cần kết nối lại' : 'Chưa kết nối')),
         h('div', {class: 'wr-row'}, G.status === 'connected' ? btn('Ngắt kết nối', run(err, async () => { await G.disconnect(); ctx.render(); }), {ghost: true}) : btn('Kết nối Google', run(err, () => G.connect(['drive'])))),
         S.settings.drive_root && h('a', {href: S.settings.drive_root.url, target: '_blank', rel: 'noopener'}, 'Mở thư mục “PHÒNG VY — Workroom” trên Drive'),
-        h('p', {class: 'wr-mute'}, 'Dùng để lưu file lên Drive. Phiên Google hết hạn sau ~1 giờ — bấm Kết nối lại khi được nhắc.')),
+        h('p', {class: 'wr-mute'}, 'Dùng để đẩy file lên Drive/Docs/Sheets. Phiên Google hết hạn sau ~1 giờ — bấm Kết nối lại khi được nhắc. Lần đầu nếu báo “API chưa được bật”: bấm nút “Bật … API” trong thông báo lỗi → Enable → đợi 1–2 phút rồi Thử lại (cần Google Drive API; Gmail API nếu muốn tạo thư nháp).')),
       Box('Nhân sự (AI dùng khi phân công)',
         h('div', {class: 'wr-stack'}, S.staff.filter(x => x.active !== false).map(x => { const items = () => [{label: 'Đổi tên', icon: 'pen', run: async () => { const v = await ask('Đổi tên', 'Tên', x.name); if (v) await S.set('staff', x.id, {name: v}); }},
             {head: 'Vai trò'}, ...['Content', 'Media', 'Biên tập', 'MC', 'Thiết kế'].map(r => ({label: r, on: (x.roles || []).includes(r), run: () => S.set('staff', x.id, {roles: (x.roles || []).includes(r) ? x.roles.filter(y => y !== r) : [...(x.roles || []), r]})})), '-',

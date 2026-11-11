@@ -22,7 +22,7 @@ export async function ingestFile(ctx, f) {
     if (f.size > 15e6) throw new Error(f.name + ': PDF quá lớn (tối đa 15 MB).');
     const data = b64(await f.arrayBuffer());
     let text = '';
-    if (ctx.ai.cfg.key) { try { text = (await ctx.ai.generate({task: 'Đọc PDF', prompt: 'Chép lại TOÀN BỘ chữ trong tài liệu PDF này (giữ đúng tên người, chức danh, số liệu, ngày giờ). Bảng thì ghi mỗi dòng một hàng, ngăn cột bằng " | ". Không bình luận.', parts: [{inlineData: {mimeType: 'application/pdf', data}}], temperature: 0})).text; } catch (e) { text = ''; } }
+    if (ctx.ai.hasAny) { try { text = (await ctx.ai.generate({task: 'Đọc PDF', prompt: 'Chép lại TOÀN BỘ chữ trong tài liệu PDF này (giữ đúng tên người, chức danh, số liệu, ngày giờ). Bảng thì ghi mỗi dòng một hàng, ngăn cột bằng " | ". Không bình luận.', parts: [{inlineData: {mimeType: 'application/pdf', data}}], temperature: 0})).text; } catch (e) { text = ''; } }
     return {id: id(), name: f.name, type: 'text', text: (text || '[Chưa đọc được chữ trong PDF này]').slice(0, MAX_TEXT), from: 'pdf'};
   }
   const r = await readAnyFile(f);

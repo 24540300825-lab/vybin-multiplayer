@@ -95,14 +95,15 @@ export function createCopilot(ctx) {
 
   C.send = async text => {
     text = String(text || '').trim(); if (!text || C.busy) return;
-    if (!AI.cfg.key && !await askKey(AI)) { ctx.render(); return; }
+    if (!AI.hasAny && !await askKey(AI)) { ctx.render(); return; }
     ctx.attach = C.attach.splice(0); paintAtt();
     if (ctx.attach.length) text += '\n[Vy gửi kèm ' + ctx.attach.length + ' nguồn: ' + ctx.attach.map(s => s.name).join(', ') + ' — dùng khi tạo/sửa tài liệu.]';
     C.msgs.push({role: 'user', text}); const m = {role: 'model', text: '', did: [], busy: true}; C.msgs.push(m); C.busy = true; paint();
     const contents = C.msgs.slice(0, -1).slice(-14).filter(x => x.text).map(x => ({role: x.role, parts: [{text: x.text + (x.did && x.did.length ? '\n[đã làm: ' + x.did.map(d => d.t).join('; ') + ']' : '')}]}));
+    let via = null;
     try {
-      for (let round = 0; round < 6; round++) {
-        const r = await AI.generate({task: 'Trợ lý', system: system(), contents, tools: TOOLS, temperature: 0.4});
+      for (let round = 0; round < 8; round++) {
+        const r = await AI.generate({task: 'Trợ lý', system: system(), contents, tools: TOOLS, temperature: 0.4, prefer: via}); via = r.via;   // giữ cùng model trong 1 lượt nhiều bước
         contents.push(r.content);
         if (!r.calls.length) { m.text = r.text || (m.did.length ? 'Xong.' : '…'); break; }
         if (r.text) m.text = r.text;
@@ -110,10 +111,10 @@ export function createCopilot(ctx) {
         for (const c of r.calls) {
           m.text = '⏳ ' + ({create_doc: 'Đang tạo và viết theo mẫu…', rewrite_doc: 'Đang viết lại…', edit_fields: 'Đang sửa…', save_to_drive: 'Đang lưu lên Drive…'}[c.name] || 'Đang xử lý…'); paint();
           let out; try { out = await exec(c.name, c.args, m.did); } catch (e) { out = {error: e.message}; }
-          resp.push({functionResponse: {name: c.name, response: {result: out}}});
+          resp.push({functionResponse: {name: c.name, id: c.id, response: {result: out}}});
         }
         contents.push({role: 'user', parts: resp});
-        if (round === 5) m.text = 'Đã làm xong các bước trên.';
+        if (round === 7) m.text = 'Đã làm xong các bước trên.';
       }
     } catch (e) { m.text = '⚠️ ' + e.message; }
     m.busy = false; C.busy = false; paint(); persist();

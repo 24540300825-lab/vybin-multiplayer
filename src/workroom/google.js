@@ -13,7 +13,7 @@ export const SCOPES = {
 };
 const MIME = {doc: 'application/vnd.google-apps.document', sheet: 'application/vnd.google-apps.spreadsheet', folder: 'application/vnd.google-apps.folder',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'};
-class GError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
+class GError extends Error { constructor(code, msg, o = {}) { super(msg); this.code = code; Object.assign(this, o); } }
 
 export function createGoogle(SH, store) {
   const hs = [];
@@ -51,7 +51,11 @@ export function createGoogle(SH, store) {
     if ((r.status === 429 || r.status >= 500) && tries < 2) { await new Promise(s => setTimeout(s, 700 * (tries + 1))); return api(url, o, tries + 1); }   // tự thử lại khi Google bận
     if (!r.ok) {
       let m = ''; try { m = (await r.json()).error.message; } catch (e) {}
-      if (r.status === 403 && /has not been used|is disabled|accessNotConfigured/i.test(m)) throw new GError('api_off', 'API này chưa được bật trong Google Cloud của dự án (Drive / Docs / Sheets / Calendar / Gmail API). Xem WORKROOM_INTEGRATIONS.md.');
+      if (r.status === 403 && /has not been used|is disabled|accessNotConfigured|SERVICE_DISABLED/i.test(m)) {
+        const api = /gmail/i.test(url) ? 'Gmail API' : /sheets/i.test(url) ? 'Google Sheets API' : /calendar/i.test(url) ? 'Google Calendar API' : 'Google Drive API';
+        const link = (m.match(/https:\/\/console\.(?:developers|cloud)\.google\.com\/[^\s"')]+/) || [])[0] || 'https://console.cloud.google.com/apis/library';
+        throw new GError('api_off', `${api} chưa được bật trong dự án Google Cloud mà game dùng để đăng nhập. Bấm “Bật ${api}” → Enable, đợi 1–2 phút rồi thử lại.`, {url: link, urlLabel: 'Bật ' + api});
+      }
       if (r.status === 403 && /insufficient|scope/i.test(m)) throw new GError('scope', 'Chưa cấp quyền này. Vào Cài đặt & Kết nối để cấp thêm quyền.');
       throw new GError('http', 'Google báo lỗi ' + r.status + (m ? ': ' + m : ''));
     }
@@ -85,6 +89,8 @@ export function createGoogle(SH, store) {
     return api(id ? `https://www.googleapis.com/upload/drive/v3/files/${id}?${q({uploadType: 'multipart', fields: FIELDS})}` : `https://www.googleapis.com/upload/drive/v3/files?${q({uploadType: 'multipart', fields: FIELDS})}`,
       {method: id ? 'PATCH' : 'POST', headers: {'Content-Type': 'multipart/related; boundary=' + b}, body});
   };
+  // duyệt thư mục để chọn nơi đẩy lên (chỉ thư mục, không đọc nội dung file)
+  G.drive.folders = (parent = 'root', shared = false) => api(`${D}/files?${q({q: shared ? `sharedWithMe = true and mimeType = '${MIME.folder}' and trashed = false` : `'${parent}' in parents and mimeType = '${MIME.folder}' and trashed = false`, fields: `files(${FIELDS})`, pageSize: 200, orderBy: 'name', includeItemsFromAllDrives: 'true'})}`).then(r => r.files || []);
   // chia sẻ cho người nhận (Google tự gửi email báo — chỉ chạy khi Vy bấm và xác nhận)
   G.drive.share = (id, email, role = 'commenter', message = '') => api(`${D}/files/${id}/permissions?${q({sendNotificationEmail: 'true', ...(message ? {emailMessage: message} : {})})}`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({type: 'user', role, emailAddress: email})});
   // góp ý (bình luận) trên Google Docs/Sheets
