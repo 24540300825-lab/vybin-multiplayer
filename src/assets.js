@@ -21,6 +21,11 @@ def('map-game', {owner: 'game', priority: 1});
 def('map-workshop', {owner: 'workshop', priority: 1});
 def('map-memory', {owner: 'memory', priority: 1});
 def('map-greenhouse', {owner: 'greenhouse', priority: 1});
+def('map-exterior-l3', {owner: null, priority: 1});  // nhà L3: = map-exterior-l2 + đất mới, vườn rải lại, nhà vườn / tháp / hoạt động ngoài vườn
+def('map-karaoke', {owner: 'karaoke', priority: 1});
+def('map-spa', {owner: 'spa', priority: 1});
+def('map-library', {owner: 'library', priority: 1});
+def('map-cinema', {owner: 'cinema', priority: 1});
 def('char-vy', {owner: null, priority: 2});
 def('char-bin', {owner: null, priority: 2});
 
