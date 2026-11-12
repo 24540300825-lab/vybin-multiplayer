@@ -22,8 +22,8 @@ export const FILES = {
  },
  "map-exterior-l2": {
   "file": "map-exterior-l2.glb",
-  "v": "8c0cc7d9",
-  "size": 7416172
+  "v": "65f10cd7",
+  "size": 7593912
  },
  "map-exterior": {
   "file": "map-exterior.glb",
@@ -32,13 +32,13 @@ export const FILES = {
  },
  "map-game": {
   "file": "map-game.glb",
-  "v": "21d92b57",
-  "size": 496476
+  "v": "721b0f4c",
+  "size": 884456
  },
  "map-greenhouse": {
   "file": "map-greenhouse.glb",
-  "v": "276826b6",
-  "size": 274208
+  "v": "d1e5644a",
+  "size": 274224
  },
  "map-living": {
   "file": "map-living.glb",

@@ -32,7 +32,7 @@ export default {
     ctx.ui.addButton({icon: '🏡', label: lv < HOUSE_RULES.maxLevel ? 'Nâng nhà L' + (lv + 1) : 'Về nhà L1', onClick: () => {
       const cur = houseLevel(), next = cur < HOUSE_RULES.maxLevel ? cur + 1 : 1;
       const msg = next > cur
-        ? 'BẢN THỬ: nâng nhà lên L' + next + ' miễn phí?\n\nMở tầng trên: Phòng Game, Bếp & hiên ăn, Phòng kỷ niệm, Vườn kính + sân thượng.\n(Bản chính: phải tới ngày mở và đủ Điểm Kiến Tạo.)'
+        ? 'BẢN THỬ: nâng nhà lên L' + next + ' miễn phí?\n\nMở tầng trên: Phòng Game 2 tầng (khúc côn cầu, caro, bóng rổ, Ai hiểu ai hơn), Xưởng thủ công, Phòng kỷ niệm, Vườn kính.\n(Bản chính: phải tới ngày mở và đủ Điểm Kiến Tạo.)'
         : 'BẢN THỬ: đưa nhà về L1 để xem lại?';
       if (!confirm(msg)) return;
       ctx.send('lv', {lv: next});

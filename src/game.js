@@ -1216,9 +1216,11 @@ ${FRAG_COLOR}
       return {key:'door'+i,icon:'door',label:d.label,at:()=>p,act:()=>{if(window.__switchMap)window.__switchMap(d.to)}}}),
     // điểm hoạt động (minigame / tiện ích nhà L2) — MC.spots [{node|at, label}]: đi tới gần rồi báo "Sắp có" (trò chơi làm sau, mỗi trò 1 file trong src/features/)
     ...(MC.spots||[]).map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+0.25,(b.min.z+b.max.z)/2):null;
-      return {key:'spot'+i,icon:'star',label:d.label,at:()=>p,act:()=>{if(window.__vySpot&&window.__vySpot(d.id||d.label,d)===true)return;
+      return {key:'spot'+i,icon:'star',label:d.label,at:()=>p,act:()=>{
+        // đi tới cạnh máy (máy trên gác → tầng 1) rồi mới mở trò (window.__vySpot: src/arena/ — trả true = đã mở)
+        if(p){const c=b?b.getCenter(new THREE.Vector3()):p,lvS=(b?b.min.y:p.y-1)>(A.L1||2.4)-0.6?1:0,dx=P0.pos.x-c.x,dz=P0.pos.z-c.z,dd=Math.hypot(dx,dz)||1,r=b?Math.max(b.max.x-b.min.x,b.max.z-b.min.z)/2+0.55:0.8;cmdMove(c.x+dx/dd*r,c.z+dz/dd*r,lvS,false)}
+        if(window.__vySpot&&window.__vySpot(d.id||d.label,d)===true)return;
         if(d.open==='craft'&&window.__vyQuests&&window.__vyQuests.openBag){window.__vyQuests.openBag('craft');return}   // Xưởng thủ công: mở bảng Chế tạo có sẵn
-        if(p){const c=b?b.getCenter(new THREE.Vector3()):p,dx=P0.pos.x-c.x,dz=P0.pos.z-c.z,dd=Math.hypot(dx,dz)||1,r=b?Math.max(b.max.x-b.min.x,b.max.z-b.min.z)/2+0.55:0.8;cmdMove(c.x+dx/dd*r,c.z+dz/dd*r,0,false)}
         if(!d.open)toast('✨ '+d.label+' — Sắp có!')}}})];
    const pn=initPins({camera,items:items.filter(i=>i.at())});pinsUpd=pn.update;api.pins=pn;}
   // phím tắt (src/ui/shortcuts.js) → cùng các lệnh với nút ẩn ở trên
