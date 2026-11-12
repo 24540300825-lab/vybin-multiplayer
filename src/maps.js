@@ -23,7 +23,7 @@ import {houseLevel} from './house.js';
 export const mapOpen = id => isMap(id) && (MAP_LIST[id].minHouse || 1) <= houseLevel();
 // asset thật sự cần nạp cho map (nhà ≥ L2: nạp thêm phần tầng trên)
 // nhà ≥ L2: ngoại cảnh (vườn + vỏ nhà) đổi sang map-exterior-l2 = map-exterior bản chính, chỉ thay phần nhà bằng nhà L2
-export const extAsset = () => (houseLevel() >= 3 ? 'map-exterior-l3' : houseLevel() >= 2 ? 'map-exterior-l2' : 'map-exterior');
+export const extAsset = () => (houseLevel() >= 4 ? 'map-exterior-l4' : houseLevel() >= 3 ? 'map-exterior-l3' : houseLevel() >= 2 ? 'map-exterior-l2' : 'map-exterior');
 export const mapAssets = id => MAP_LIST[id].assets.map(a => (a === 'map-exterior' ? extAsset() : a));
 
 // Quản lý chuyển map: nạp trước (HTTP cache) + fade + tải lại có giữ phiên.

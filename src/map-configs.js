@@ -125,3 +125,28 @@ const EXTERIOR_L3 = {
     {node:'Facade_L3_Screen',label:'Chiếu phim ngoài trời',id:'outdoor_movie'},{node:'L3_Flower_Arch',label:'Chụp ảnh cổng hoa',id:'photo_arch'}],
 };
 if (houseLevel() >= 3) Object.assign(MAP_CONFIGS.exterior, EXTERIOR_L3);
+
+// ===== Nhà L4 "Một ngày ở VIBE LAB": đất 130 × 80 m quanh vườn L3 (giữ nguyên ở giữa; hàng rào L3 thành hàng cây thấp có 5 cổng hoa).
+// Trang trại (trái), khu vui chơi (phải), hồ lớn + bãi cát (sau), đồi hoa + khinh khí cầu (sau trái), rừng nhỏ (sau phải), đường tàu chữ U + 3 ga.
+// walkAreas: vùng bắn tia lấy độ cao mặt đi (đồi hoa thật cao 3 m, sân ga, cầu tàu). Mọi hoạt động mới = ghim ⭐ "Sắp có".
+const EXTERIOR_L4 = {
+  walk0:[-59.4,69.4,-65.5,13.55],camBox:[-67,77,-73,21],grid:{x0:-61,z0:-67,c:0.15,W:880,H:547},
+  fence:[-60.41,70.41,-66.51,14.31,5],dropTrees:[],
+  noPlant:[...EXTERIOR_L3.noPlant,
+    [-54.2,-38.6,1.9,8.2],[-52.6,-51.0,7.8,9.0],[-54.2,-45.6,-7.8,-1.4],[-54.0,-38.5,-23.5,-12.5],[-54.6,-46.4,-32.0,-25.0],
+    [-46.6,-44.0,-32.6,-31.2],[-46.0,-37.8,-35.0,-23.2],[-38.0,-36.8,-9.4,-7.2],[50.4,59.6,-1.2,8.0],[48.8,63.2,-28.4,-16.0],
+    [46.0,48.8,-8.4,-5.6],[50.2,52.4,-1.4,0.2],[59.6,62.4,-8.0,-5.6],[47.4,64.0,-2.8,-1.6],[-0.3,9.3,-45.6,-36.7],
+    [8.2,25.8,-45.6,-40.2],[14.0,16.2,-50.4,-43.4],[-56.5,-53.8,-13.4,-6.6],[0.6,9.4,-62.7,-60.0],[63.8,66.5,-7.2,-0.4],
+    [-58.3,-56.5,-11.0,-3.8],[-15.9,25.9,-59.6,-43.4],[-58.4,-56.4,-63.0,8.4],[-56.4,68.4,-64.6,-62.6],[66.4,68.4,-63.0,8.4]],
+  walkAreas:[[-54.2,-28.8,-59.7,-39.3,3.3,0.4],[-56.5,-53.7,-13.2,-6.8,0.6,0.2],[0.8,9.2,-62.7,-59.9,0.6,0.2],[63.7,66.5,-7.0,-0.6,0.6,0.2],[14.3,15.9,-50.1,-43.9,0.5,0.2]],
+  spotsL3:[...EXTERIOR_L3.spotsL3,
+    {node:'Facade_L4_Bed_00',label:'Trang trại tự tưới (xem)',id:'farm_auto'},{node:'Facade_L4_Coop',label:'Chuồng gà',id:'hens'},
+    {node:'L4_Farm_Cows',label:'Bãi bò',id:'cows'},{node:'L4_Farm_Orchard',label:'Vườn trái cây',id:'orchard'},
+    {node:'Facade_L4_Carousel',label:'Đu quay ngựa',id:'carousel'},{node:'Facade_L4_Ferris_Platform',label:'Vòng quay',id:'ferris'},
+    {node:'Facade_L4_IceCream_Cart',label:'Xe kem',id:'icecream'},{node:'Path_L4_Dock',label:'Câu cá hồ lớn',id:'fishing_lake'},
+    {node:'L4_Lake_Boats',label:'Chèo thuyền đôi',id:'boats'},{node:'L4_Beach_Things',label:'Nằm bãi cát',id:'beach'},
+    {node:'Facade_L4_Balloon_Basket',label:'Khinh khí cầu',id:'balloon'},{node:'Facade_L4_Hill_Bench',label:'Chụp ảnh đồi hoa',id:'photo_hill'},
+    {node:'L4_Wood_Swing',label:'Xích đu trong rừng',id:'wood_swing'},{node:'Facade_L4_Train',label:'Đi tàu lửa',id:'train'},
+    {node:'Path_L4_Station_Lake',label:'Ga Bờ hồ',id:'st_lake'},{node:'Path_L4_Station_Park',label:'Ga Khu vui chơi',id:'st_park'}],
+};
+if (houseLevel() >= 4) Object.assign(MAP_CONFIGS.exterior, EXTERIOR_L4);

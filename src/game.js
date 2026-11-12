@@ -279,11 +279,11 @@ ${FRAG_COLOR}
       if(inHouse&&!roof)[].concat(o.material).forEach(mm=>{if(mm&&!mm.userData.noOcc&&!/Roof|Tile/i.test(mm.name||''))mm.userData.occW=true})});
     toonify(extG);markOcc(extG);console.log('[sty] ngoại cảnh: '+api.stylize(extG));scene.add(extG);extG.updateMatrixWorld(true);
     const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
-    const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null,indoor:true,floorY:(E0.floorY||0)+(X.dy||0)};   // dy: phòng tầng trên (nhà L2) → mặt đất vườn nằm thấp hơn sàn phòng
+    const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null,walkAreas:null,indoor:true,floorY:(E0.floorY||0)+(X.dy||0)};   // dy: phòng tầng trên (nhà L2) → mặt đất vườn nằm thấp hơn sàn phòng
     EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat,ultra:wantUltra()});api.stylize(EXTV.group);EXTV.setLevel(TP.quality==='low'?'low':'indoor');
     // cây/bụi lẻ (không nằm trong ô instancing) ở XA nhà: bỏ hẳn — từ camera trên cao nhìn xuống chỉ thấy khối thô xấu; gần nhà giữ nguyên
     {const C=new THREE.Vector3(5,0,-4),sp=new THREE.Sphere();let n=0;extG.updateMatrixWorld(true);env.updateMatrixWorld(true);
-     [extG,env].forEach(R=>R&&R.traverse(o=>{if(!o.isMesh||!o.visible)return;for(let p=o;p;p=p.parent)if(p.name==='EXT_CELLS'||/^(HOUSE_L|SITE_L3|FENCE)/.test(p.name))return;   // công trình nhà/vườn L3 (gỗ) không phải cây lẻ
+     [extG,env].forEach(R=>R&&R.traverse(o=>{if(!o.isMesh||!o.visible)return;for(let p=o;p;p=p.parent)if(p.name==='EXT_CELLS'||/^(HOUSE_L|SITE_L\d|FENCE)/.test(p.name))return;   // công trình nhà/vườn L3 (gỗ) không phải cây lẻ
        const fol=[].concat(o.material).some(m=>m&&/^Poly(Foliage|Shader)|Stylized\s+wood|^ROCK$/i.test(m.name||''));if(!fol)return;
        const g=o.geometry;if(!g.boundingSphere)g.computeBoundingSphere();sp.copy(g.boundingSphere).applyMatrix4(o.matrixWorld);
        if(o.isInstancedMesh){if(sp.radius>40)return}           // instancing rải rộng: để nguyên (ô của setupExterior đã lo)
@@ -1392,6 +1392,11 @@ ${FRAG_COLOR}
   const ground=new THREE.Mesh(new THREE.CircleGeometry(650,48),new THREE.MeshStandardMaterial({map:gTex,color:(MC.gtex&&grassCol)||0xffffff,roughness:1,metalness:0}));ground.material.userData.ground=true;if(OUTD||extG){FU.uGTint.value.setRGB(0.68,0.8,0.52);ground.material.userData.desat=0.95}toonify(ground);
   ground.rotation.x=-Math.PI/2;/* dy: phòng tầng trên → mặt đất vườn nằm dưới sàn phòng */ground.position.set(0,OUTD?A.L0-0.03:extG?MAPS.exterior.floorY-0.03+((MC.ext&&MC.ext.dy)||0):-0.3,0);ground.renderOrder=-999;if(MC.noGround)ground.visible=false;   /* rạp phim tầng hầm: không có mặt đất vườn */ground.receiveShadow=OUTD||!!extG;scene.add(ground);
   if(OUTD){envMeshes.push(ground)}if(OUTD||extG)FU.uGMap.value=gTex;
+  // nhà L4: đồi hoa = mặt đất thật (đi lên được) → dùng chung vật liệu + toạ độ UV của mặt đất vườn để liền màu/texture với nền
+  {const gp=ground.position;[extG,env].forEach(R=>R&&R.traverse(o=>{if(!o.isMesh||!/^L4_Hill_Ground/.test(o.name))return;o.updateMatrixWorld(true);
+    const P=o.geometry.attributes.position,uv=new Float32Array(P.count*2),v=new THREE.Vector3();
+    for(let i=0;i<P.count;i++){v.fromBufferAttribute(P,i).applyMatrix4(o.matrixWorld);uv[i*2]=((v.x-gp.x)/650+1)/2;uv[i*2+1]=(-(v.z-gp.z)/650+1)/2}
+    o.geometry.setAttribute('uv',new THREE.BufferAttribute(uv,2));o.material=ground.material;o.receiveShadow=ground.receiveShadow}))}
 
   // ===== TỐI ƯU: gộp mesh tĩnh theo material (batching), tắt matrix auto, ngoại cảnh: bỏ bóng + cull theo khoảng cách =====
   const OPT={far:[],inst:[]};

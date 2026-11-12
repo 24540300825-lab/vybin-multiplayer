@@ -492,18 +492,27 @@ export function setupExterior(c) {
 // Bắn tia thẳng xuống 1 lần lúc dựng map trong MC.porch=[x0,x1,z0,z1] (+ MC.porchMax = trần cao tối đa), lưu lưới thưa; trả (x,z)=>y nội suy.
 // Ngoài vùng này (hoặc không có MC.porch) trả null → game dùng mặt đất phẳng floorY. Thêm bục/bậc mới: chỉ cần mở rộng MC.porch.
 function buildWalkHeight(scene, MC) {
-  if (!MC.porch) return () => null;
-  const [x0, x1, z0, z1] = MC.porch, C = 0.2, base = MC.floorY || 0, top = base + (MC.porchMax || 0.6);
+  // nhiều vùng: MC.porch (hiên, trần porchMax) + MC.walkAreas = [[x0,x1,z0,z1,maxH,C], ...] (nhà L4: đồi hoa, sân ga, cầu tàu…)
+  const areas = [];
+  if (MC.porch) areas.push([...MC.porch, MC.porchMax || 0.6, 0.2]);
+  for (const w of MC.walkAreas || []) areas.push([w[0], w[1], w[2], w[3], w[4] || 0.6, w[5] || 0.25]);
+  if (!areas.length) return () => null;
+  const fns = areas.map(a => walkArea(scene, MC, a));
+  return (x, z) => { for (const f of fns) { const y = f(x, z); if (y != null) return y; } return null; };
+}
+
+function walkArea(scene, MC, area) {
+  const [x0, x1, z0, z1, maxH, C] = area, base = MC.floorY || 0, top = base + maxH;
   const W = Math.ceil((x1 - x0) / C) + 1, H = Math.ceil((z1 - z0) / C) + 1, g = new Float32Array(W * H).fill(base);
   // lần vào sau: lấy lưới đã đo từ localStorage (khoá theo phiên bản file map + vùng) → khỏi bắn tia lại
-  const f = FILES['map-' + window.MAPID], ck = 'vyWH:' + (f ? f.v : '') + ':' + MC.porch.join(',') + ':' + top;
+  const f = FILES['map-' + window.MAPID], ck = 'vyWH:' + (f ? f.v : '') + ':' + area.join(',') + ':' + top;
   let cached = null;
   try { const t = localStorage.getItem(ck); if (t) { const a = JSON.parse(t); if (a.length === W * H) cached = a; } } catch (e) {}
   if (cached) g.set(cached); else {
   const meshes = [];
   scene.updateMatrixWorld(true);
   scene.traverse(o => {
-    if (!o.isMesh || o.isInstancedMesh || !o.visible || o.isSkinnedMesh || /Foliage|Shader|Wind|LazyRig|^GEO_|^Sphere|^mesh_|^$/.test(o.name)) return;
+    if (!o.isMesh || o.isInstancedMesh || !o.visible || o.isSkinnedMesh || /Foliage|Shader|Wind|LazyRig|^GEO_|^Sphere|^mesh_|^$|Firefl|Lantern/.test(o.name)) return;
     const b = new THREE.Box3().setFromObject(o);
     if (b.max.x > x0 && b.min.x < x1 && b.max.z > z0 && b.min.z < z1 && b.max.y > base && b.min.y < top) meshes.push(o);
   });
@@ -513,7 +522,8 @@ function buildWalkHeight(scene, MC) {
     const h = rc.intersectObjects(meshes, false)[0];
     if (h) g[j * W + i] = Math.max(base, Math.min(top, h.point.y));
   }
-  try { for (let k = 0; k < localStorage.length; k++) { const key = localStorage.key(k); if (key && key.startsWith('vyWH:') && key !== ck) localStorage.removeItem(key); }
+  try { const keep = new Set(); for (let k = 0; k < localStorage.length; k++) { const key = localStorage.key(k); if (key && key.startsWith('vyWH:') && !key.startsWith('vyWH:' + (f ? f.v : '') + ':')) keep.add(key); }
+        keep.forEach(k => localStorage.removeItem(k));
         localStorage.setItem(ck, JSON.stringify(Array.from(g, v => Math.round(v * 1000) / 1000))); } catch (e) {}
   }
   return (x, z) => {

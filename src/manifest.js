@@ -35,6 +35,11 @@ export const FILES = {
   "v": "09f88d2a",
   "size": 12564684
  },
+ "map-exterior-l4": {
+  "file": "map-exterior-l4.glb",
+  "v": "d000021e",
+  "size": 17950968
+ },
  "map-exterior": {
   "file": "map-exterior.glb",
   "v": "f1238e01",
