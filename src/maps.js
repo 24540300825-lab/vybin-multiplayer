@@ -15,6 +15,11 @@ export const MAP_LIST = {
   spa:        {name: 'Spa / onsen', icon: '♨️', desc: 'Nhà vườn cạnh phòng Vy: bồn onsen, giường massage', assets: ['map-spa', 'map-exterior'], minHouse: 3},
   library:    {name: 'Thư viện', icon: '📚', desc: 'Tháp trên Phòng kỷ niệm: kệ sách, góc đọc, sân ngắm sao', assets: ['map-library', 'map-exterior'], minHouse: 3},
   cinema:     {name: 'Rạp phim', icon: '🎬', desc: 'Tầng hầm dưới phòng khách: màn chiếu lớn, ghế đôi, bắp nước', assets: ['map-cinema'], minHouse: 3},
+  // ===== nhà L4 — khu nghỉ dưỡng (src/house.js) =====
+  master:     {name: 'Phòng ngủ master', icon: '🛏️', desc: 'Tháp trên Xưởng thủ công: giường đôi, ban công, bồn tắm cạnh cửa sổ', assets: ['map-master', 'map-exterior'], minHouse: 4},
+  pets:       {name: 'Phòng thú cưng', icon: '🐾', desc: 'Nhà vườn cạnh đồi hoa: ổ nằm, bát ăn, bồn tắm thú, sân chơi có rào', assets: ['map-pets', 'map-exterior'], minHouse: 4},
+  cafe:       {name: 'Café bên hồ', icon: '☕', desc: 'Sau khu BBQ: quầy, tủ bánh, lò nướng, hiên gỗ nhô ra mặt hồ', assets: ['map-cafe', 'map-exterior'], minHouse: 4},
+  bowling:    {name: 'Hầm bowling & bể cá', icon: '🎳', desc: 'Tầng hầm dưới cánh Vy, cửa thông Rạp phim: 2 làn bowling, bể cá lớn, quầy nước', assets: ['map-bowling'], minHouse: 4},
 };
 export const DEFAULT_MAP = 'living';
 export const isMap = id => Object.prototype.hasOwnProperty.call(MAP_LIST, id);

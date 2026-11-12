@@ -22,7 +22,11 @@ def('map-workshop', {owner: 'workshop', priority: 1});
 def('map-memory', {owner: 'memory', priority: 1});
 def('map-greenhouse', {owner: 'greenhouse', priority: 1});
 def('map-exterior-l3', {owner: null, priority: 1});
-def('map-exterior-l4', {owner: null, priority: 1});  // nhà L4: = map-exterior-l3 + khu nghỉ dưỡng 130 × 80 m (trang trại, khu vui chơi, hồ, đồi hoa, rừng, tàu)  // nhà L3: = map-exterior-l2 + đất mới, vườn rải lại, nhà vườn / tháp / hoạt động ngoài vườn
+def('map-exterior-l4', {owner: null, priority: 1});
+def('map-master', {owner: 'master', priority: 1});
+def('map-pets', {owner: 'pets', priority: 1});
+def('map-cafe', {owner: 'cafe', priority: 1});
+def('map-bowling', {owner: 'bowling', priority: 1});  // nhà L4: = map-exterior-l3 + khu nghỉ dưỡng 130 × 80 m (trang trại, khu vui chơi, hồ, đồi hoa, rừng, tàu)  // nhà L3: = map-exterior-l2 + đất mới, vườn rải lại, nhà vườn / tháp / hoạt động ngoài vườn
 def('map-karaoke', {owner: 'karaoke', priority: 1});
 def('map-spa', {owner: 'spa', priority: 1});
 def('map-library', {owner: 'library', priority: 1});

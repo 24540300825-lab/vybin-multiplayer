@@ -218,7 +218,7 @@ ${FRAG_COLOR}
   // mái ngói cánh Vy/Bin: GLB ngoại cảnh chỉ có mái cánh phòng khách (Roof_Living) → nhân bản sang 2 cánh kia
   // (khớp kích thước mái gốc Roof_Vy/Roof_Bin trong LIVING_ROOM.glb: rộng 10.85, lệch tâm ±0.425, cao 6.4). skipX = x tâm cánh đang ở (giữ hở để nhìn vào)
   // ===== nhà L2: cả nhà dùng 1 ngoại cảnh map-exterior-l2.glb (= map-exterior của bản chính, chỉ thay phần NHÀ). main.js nạp đúng file theo cấp nhà.
-  const L2=!!ctx.houseL2;window.__houseL2=L2;const HLV=ctx.houseLv||(L2?2:1),L3=HLV>=3;window.__houseLv=HLV;   // nhà L3: map-exterior-l3 (vườn + nhà vườn/tháp), MC.hideL3/doorsL3/spotsL3
+  const L2=!!ctx.houseL2;window.__houseL2=L2;const HLV=ctx.houseLv||(L2?2:1),L3=HLV>=3,L4=HLV>=4;window.__houseLv=HLV;   // nhà L3: map-exterior-l3 (vườn + nhà vườn/tháp), MC.hideL3/doorsL3/spotsL3
   function addWingRoofs(root,skipX){const L=root.getObjectByName('Roof_Living');if(!L)return;
     const fit={WING_VY:[0.575,15],WING_BIN:[-0.575,-5]};   // mép trong lùi 0.3 m khỏi tường cánh phòng khách (trước đây mái chĩa xuyên đỉnh tường → lộ răng cưa ngói trong phòng)
     for(const w in fit){const W=root.getObjectByName(w);if(!W||W.getObjectByName('Roof_'+w.slice(5,6)+w.slice(6).toLowerCase()))continue;if(skipX!=null&&Math.abs(fit[w][1]-skipX)<3)continue;
@@ -229,7 +229,8 @@ ${FRAG_COLOR}
     root.updateMatrixWorld(true)}
   if(MAP_CONFIGS[MAPID]&&MAP_CONFIGS[MAPID].outdoor)addWingRoofs(envG.scene,null);
   // env
-  const env=envG.scene;toonify(env);markOcc(env);scene.add(env);env.updateMatrixWorld(true);
+  const env=envG.scene;{const LVN=(MAP_CONFIGS[MAPID]||{}).lvNodes;if(LVN){const rm=[];env.traverse(o=>{for(const [lv,rx] of LVN)if(HLV<lv&&rx.test(o.name))rm.push(o)});rm.forEach(o=>o.parent&&o.parent.remove(o))}}   // MC.lvNodes=[[cấp,/tên/]]: cầu thang lên tầng chưa xây thì ẩn
+  toonify(env);markOcc(env);scene.add(env);env.updateMatrixWorld(true);
   // mẫu Scatter (SF_BiomeProxy_* / SF_SourceProxy_* / SF_BiomeSurface_*: đá, cỏ Plant_01, hoa, bụi, cây) nằm ở gốc toạ độ GLB = góc trước-trái phòng khách → hiện thành cụm đá + lá phẳng dính tường. Chỉ là mẫu cho instancing → ẩn (mesh thường, không đụng InstancedMesh).
   {const wp=new THREE.Vector3();let n=0;env.traverse(o=>{if(!o.isMesh||o.isInstancedMesh||!o.visible)return;let tpl=false;for(let q=o;q&&q!==scene;q=q.parent)if(/^\.?SF_(Biome|Source)/.test(q.name||'')){tpl=true;break}
     if(!tpl)return;o.getWorldPosition(wp);env.worldToLocal(wp);if(Math.abs(wp.x)<0.01&&Math.abs(wp.z)<0.01){o.visible=false;n++}});if(n)console.log('env: ẩn '+n+' mẫu scatter ở gốc toạ độ')}
@@ -264,7 +265,7 @@ ${FRAG_COLOR}
   // MC.ext = {dx,dz: dời ngoại cảnh cho khớp toạ độ phòng; hide: regex node vỏ nhà phải ẩn (cánh nhà đang ở bị cắt); roofX: x tâm mái (instancing) cần ẩn}
   let EXTV=null,extG=null;
   if(!OUTD&&MC.ext&&ctx.ext){const X=MC.ext,_t0=performance.now();extG=ctx.ext.scene;extG.name='__EXTERIOR__';
-    extG.traverse(o=>{if((X.hide&&X.hide.test(o.name))||(L2&&X.hideL2&&X.hideL2.test(o.name))||(L3&&X.hideL3&&X.hideL3.test(o.name))||/^Interior_(Bin|Living|Vy)/.test(o.name))o.visible=false});   // hộp tối giả nội thất sau cửa sổ: kính đã đặc nên không cần, và để chỗ 'khoét' tường hàng xóm không lộ mảng đen
+    extG.traverse(o=>{if((X.hide&&X.hide.test(o.name))||(L2&&X.hideL2&&X.hideL2.test(o.name))||(L3&&X.hideL3&&X.hideL3.test(o.name))||(L4&&X.hideL4&&X.hideL4.test(o.name))||/^Interior_(Bin|Living|Vy)/.test(o.name))o.visible=false});   // hộp tối giả nội thất sau cửa sổ: kính đã đặc nên không cần, và để chỗ 'khoét' tường hàng xóm không lộ mảng đen
     addWingRoofs(extG,X.roofX);
     extG.position.set(X.dx||0,X.dy||0,X.dz||0);extG.updateMatrixWorld(true);
     if(X.roofX!=null){const c=new THREE.Vector3(),M=new THREE.Matrix4();extG.traverse(o=>{if(!o.isInstancedMesh)return;let p=o.parent,inHouse=false;for(;p;p=p.parent)if(/^HOUSE_L[123]/.test(p.name))inHouse=true;if(!inHouse)return;
@@ -1241,10 +1242,10 @@ ${FRAG_COLOR}
     {key:'bed',icon:'sleep',label:'Ngủ',at:()=>bedPt,state:()=>P0.mode==='bed'?{on:true,label:'Thức dậy'}:null,act:()=>{if(P0.mode==='bed')cmdWake();else cmdSleep()}},
     ...(MC.doors?[]:[{key:'door',icon:'door',label:MC.doorLabel||'Bản đồ',at:()=>doorPt,act:()=>{if(MC.doorTo&&window.__switchMap){window.__switchMap(MC.doorTo);return}const b=$('iMap');if(b)b.click()}}]),
     // cửa sang phòng khác: MC.doors (+ MC.doorsL2 khi nhà ≥ L2: lối lên tầng trên). d.at = [x,y,z] đặt ghim theo toạ độ khi không có node
-    ...[...(MC.doors||[]),...(L2&&MC.doorsL2?MC.doorsL2:[]),...(L3&&MC.doorsL3?MC.doorsL3:[])].map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+(b.max.y-b.min.y>0.5?-0.8:0.15),(b.min.z+b.max.z)/2):null;
+    ...[...(MC.doors||[]),...(L2&&MC.doorsL2?MC.doorsL2:[]),...(L3&&MC.doorsL3?MC.doorsL3:[]),...(L4&&MC.doorsL4?MC.doorsL4:[])].map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+(b.max.y-b.min.y>0.5?-0.8:0.15),(b.min.z+b.max.z)/2):null;
       return {key:'door'+i,icon:'door',label:d.label,at:()=>p,act:()=>{if(window.__switchMap)window.__switchMap(d.to)}}}),
     // điểm hoạt động (minigame / tiện ích nhà L2) — MC.spots [{node|at, label}]: đi tới gần rồi báo "Sắp có" (trò chơi làm sau, mỗi trò 1 file trong src/features/)
-    ...[...(MC.spots||[]),...(L3&&MC.spotsL3?MC.spotsL3:[])].map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+0.25,(b.min.z+b.max.z)/2):null;
+    ...[...(MC.spots||[]),...(L3&&MC.spotsL3?MC.spotsL3:[]),...(L4&&MC.spotsL4?MC.spotsL4:[])].map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+0.25,(b.min.z+b.max.z)/2):null;
       return {key:'spot'+i,icon:'star',label:d.label,at:()=>p,act:()=>{
         // đi tới cạnh máy (máy trên gác → tầng 1) rồi mới mở trò (window.__vySpot: trò chơi sau này — trả true = đã mở; chưa có thì báo "Sắp có")
         if(p){const c=b?b.getCenter(new THREE.Vector3()):p,lvS=(b?b.min.y:p.y-1)>(A.L1||2.4)-0.6?1:0,dx=P0.pos.x-c.x,dz=P0.pos.z-c.z,dd=Math.hypot(dx,dz)||1,r=b?Math.max(b.max.x-b.min.x,b.max.z-b.min.z)/2+0.55:0.8;cmdMove(c.x+dx/dd*r,c.z+dz/dd*r,lvS,false)}
