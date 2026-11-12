@@ -27,7 +27,7 @@ export const MAP_CONFIGS = {
   // ===== NHÀ L2 — tầng trên (chỉ mở khi nhà ≥ L2, xem src/house.js). Phòng 1 tầng (không gác/cầu thang), sàn y=0, mặt trước z=0 mở về camera.
   // Cùng 1 ngoại cảnh map-exterior-l2 cho mọi map; ext.dx/dy/dz đặt phòng đúng vị trí trong nhà L2 (dy = cao độ tầng). hide: tường trước/vỏ của chính phòng + phần nhà phía trên; roofX: mái ngói (instancing) của chính phòng.
   // spots: điểm hoạt động (ghim ⭐) — trò chơi/tiện ích làm sau, hiện tại báo "Sắp có".
-  // Phòng Game: phủ hết mái phòng khách, cao 2 tầng (gác lửng phía sau ở +2.8 m, cầu thang thẳng bên phải). Các máy có id → mở trò chơi thật (src/arena/).
+  // Phòng Game: phủ hết mái phòng khách, cao 2 tầng (gác lửng phía sau ở +2.8 m, cầu thang thẳng bên phải). Các máy: ghim ⭐ "Sắp có" (trò chơi làm sau).
   game:{name:'Phòng Game',triCol:true,flat:true,wallMats:['L2_Wall_Plaster','L2_Wall_Teal'],glass:{front:{x0:0.2,x1:10.3,z:0.02,y0:0,y1:5.6},top:{x0:0.2,x1:10.3,z0:-8.93,z1:0.02,y:5.6}},
     tv:{node:'TV_Unit',mat:'CH_screen',inset:0},sofa:{node:'Sofa',seatY:0.45},treadNames:['Stair'],mezz:['Mezzanine'],
     walk0:[0.35,10.15,-8.85,-0.3],l1:[0.25,10.25,-8.85,-5.05],cl1:[0.4,10.1,-8.8,-5.1],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,

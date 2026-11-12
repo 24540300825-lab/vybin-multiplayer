@@ -5,6 +5,5 @@ export const FEATURES = [
   () => import('./khoai-nong.js'),   // minigame Khoai nóng (🥔) — rượt nhau ngoài vườn
   () => import('./tat-den-di-tron.js'),   // minigame Tắt đèn đi trốn (🔦) — trong nhà
   () => import('./workroom.js'),
-  () => import('./arena.js'),   // PHÒNG GAME (nhà L2): khúc côn cầu, cờ caro, bóng rổ, Ai hiểu ai hơn — Giao hữu / Thách đấu xu + bảng điểm VY–BIN
   () => import('./house-upgrade.js'),   // NHÀ L2: nút 🏡 nâng cấp nhà (bản test: miễn phí) + đồng bộ cấp nhà 2 người   // PHÒNG VY — Workroom: ghim START WORKING ở bàn phòng Vy (chỉ chủ phòng)
 ];
