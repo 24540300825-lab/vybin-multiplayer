@@ -37,8 +37,8 @@ export const FILES = {
  },
  "map-house-l2": {
   "file": "map-house-l2.glb",
-  "v": "ce991323",
-  "size": 1327276
+  "v": "2430f193",
+  "size": 1326336
  },
  "map-kitchen": {
   "file": "map-kitchen.glb",
