@@ -1,5 +1,6 @@
 // Cấu hình "hình học/gameplay" riêng cho từng map — DỮ LIỆU THUẦN, không có logic.
 // Thêm map mới: thêm 1 khối vào đây (cùng id với MAP_LIST trong maps.js). Ý nghĩa các trường: xem docs/EXTENDING.md.
+import {houseLevel} from './house.js';
 export const MAP_CONFIGS = {
   // ===== 3 phòng trong nhà (đi vào từ vườn). Toạ độ phòng luôn x 0..10, z -8..0 (mặt cắt mở về phía camera +z) =====
   // ext: dùng lại map ngoài vườn quanh nhà — dx/dz dời ngoại cảnh cho khớp (phòng Vy/Bin nằm lệch ±10m so với phòng khách),
@@ -9,21 +10,24 @@ export const MAP_CONFIGS = {
   living:{name:'Phòng khách',wallMats:['CH_wall','CH_plaster'],hide:/^Plane002$/,chairFlip:true,glass:{front:{x0:0.15,x1:9.85,z:0.25,y0:0,y1:5.9},top:{x0:0.15,x1:9.85,z0:-7.85,z1:0.25,y:5.9}},treadNames:['Stair_Treads','StairR_Treads'],mezz:['Mezz_Floor','Mezz_Ext_Floor'],seat:'Chair_Seat',chair:/^Desk_Chair\d*$/,walk0:[0.3,9.7,-7.6,-0.2],l1:[0.22,9.78,-7.6,-4.25],cl1:[0.4,9.6,-7.6,-4.3],garden:false,tint:{CH_floor:0xdcb88e},gtex:'Plane',out:/^__none__$/,lift:0,
     ext:{dx:0,dz:0,hide:/^(Door_Main|Entrance_Hood|Facade_Living_Front|Glass_Living_Front|Interior_Living|Roof_Living)/,roofX:5,hideL2:/^(L2_Living$|L2_Upgrade_Living_Front|L2_Upgrade_Entrance)/},
     doorsL2:[{at:[5.0,4.9,-7.35],to:'game',label:'Lên Phòng Game'}],
+    doorsL3:[{at:[0.9,1.0,-4.0],to:'cinema',label:'Xuống Rạp phim (tầng hầm)'}],
     spots:[{node:'Cooktop',label:'Nấu ăn cùng nhau'}],
     doors:[{node:'Doormat',to:'exterior',label:'Ra vườn'},{node:'GD_Door_Entrance_Leaf',to:'bin',label:'Phòng Bin'},{node:'GD_Door_Entrance_Leaf001',to:'vy',label:'Phòng Vy'}],
     spawnFrom:{exterior:[4.2,-0.9,Math.PI,0],bin:[0.85,-6.95,Math.PI/2,1],vy:[9.15,-6.95,-Math.PI/2,1],game:[0.85,-6.95,Math.PI/2,1]}},
   vy:{name:'Phòng Vy',triCol:true,wallMats:['FWS_wall'],glass:{front:{x0:0.15,x1:9.85,z:1.12,y0:0,y1:5.9},top:{x0:0.15,x1:9.85,z0:-7.85,z1:1.12,y:5.9}},seam:[{x0:0,x1:0.15,z0:-0.02,z1:1.12,y0:0,y1:6.28,inner:'FWS_wall',side:'px'},{x0:9.85,x1:10.05,z0:-0.02,z1:1.12,y0:0,y1:6.28,inner:'FWS_wall',side:'nx'}],tv:{node:'TV_Unit001',inset:0},sofa:{node:'Sofa',seatY:0.45},treadNames:['Stair'],mezz:['Mezzanine'],seat:'Desk_Chair',chair:/^Desk_Chair$/,chairToward:'Desk',walk0:[0.3,9.7,-7.6,0.85],l1:[0.22,9.78,-7.6,-4.0],cl1:[0.4,9.6,-7.6,-4.05],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
-    ext:{dx:-10,dz:2,hide:/^(Facade_Vy_Front|Facade_Vy_Nook|Facade_Vy_Sides_Back|Glass_Vy_Front|Glass_Vy_Nook|Glass_Vy_Sides_Back|Interior_Vy)/,roofX:15,hideL2:/^(L2_Vy$|L2_Upgrade_Vy_Front)/},
+    ext:{dx:-10,dz:2,hide:/^(Facade_Vy_Front|Facade_Vy_Nook|Facade_Vy_Sides_Back|Glass_Vy_Front|Glass_Vy_Nook|Glass_Vy_Sides_Back|Interior_Vy)/,roofX:15,hideL2:/^(L2_Vy$|L2_Upgrade_Vy_Front)/,hideL3:/^L3_Library/},
     doorsL2:[{at:[5.0,4.9,-7.35],to:'memory',label:'Lên Phòng kỷ niệm'}],
+    doorsL3:[{at:[9.6,1.4,-1.6],to:'spa',label:'Hành lang sang Spa / onsen'}],
     spots:[{node:'Cooktop',label:'Nấu ăn cùng nhau'}],
     doors:[{node:'Door_Entrance_Leaf',to:'living',label:'Phòng khách'}],
-    spawnFrom:{default:[0.85,-4.95,Math.PI/2,1]}},
+    spawnFrom:{spa:[9.2,-1.6,-Math.PI/2,0],default:[0.85,-4.95,Math.PI/2,1]}},
   bin:{name:'Phòng Bin',camMirror:true,triCol:true,wallMats:['CH_wall'],glass:{front:{x0:0.15,x1:9.85,z:0.45,y0:0,y1:5.9},top:{x0:0.15,x1:9.85,z0:-7.85,z1:0.45,y:5.9}},seam:[{x0:9.85,x1:10.05,z0:-0.02,z1:0.88,y0:0,y1:6.28,inner:'CH_wall',side:'nx'},{x0:-0.05,x1:0.15,z0:-0.02,z1:0.45,y0:0,y1:6.28,inner:'CH_wall',side:'px'}],hide:/^Roof$/,cutTop:{node:/^Front_Frame$/,y:5.5},tv:{node:'TV_Unit',mat:'CH_screen',inset:0},sofa:{node:'Sofa',seatY:0.45},treadNames:['Stair'],mezz:['Mezzanine'],seat:'Desk_Chair',chair:/^Desk_Chair$/,chairToward:'Desk',walk0:[0.3,9.7,-7.6,0.18],l1:[0.22,9.78,-7.6,-4.0],cl1:[0.4,9.6,-7.6,-4.05],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
     ext:{dx:10,dz:2,hide:/^(Facade_Bin_Front|Facade_Bin_Nook|Facade_Bin_Sides_Back|Glass_Bin_Front|Glass_Bin_Nook|Glass_Bin_Sides_Back|Interior_Bin)/,roofX:-5,hideL2:/^(L2_Bin$|L2_Upgrade_Bin_Front)/},
     doorsL2:[{at:[5.0,4.9,-7.35],to:'workshop',label:'Lên Xưởng thủ công'}],
+    doorsL3:[{at:[0.4,1.4,-1.6],to:'karaoke',label:'Hành lang sang Karaoke'}],
     spots:[{node:'Cooktop',label:'Nấu ăn cùng nhau'}],
     doors:[{node:'Door_Entrance_Leaf',to:'living',label:'Phòng khách'}],
-    spawnFrom:{default:[9.15,-4.95,-Math.PI/2,1]}},
+    spawnFrom:{karaoke:[0.8,-1.6,Math.PI/2,0],default:[9.15,-4.95,-Math.PI/2,1]}},
   // ===== NHÀ L2 — tầng trên (chỉ mở khi nhà ≥ L2, xem src/house.js). Phòng 1 tầng (không gác/cầu thang), sàn y=0, mặt trước z=0 mở về camera.
   // Cùng 1 ngoại cảnh map-exterior-l2 cho mọi map; ext.dx/dy/dz đặt phòng đúng vị trí trong nhà L2 (dy = cao độ tầng). hide: tường trước/vỏ của chính phòng + phần nhà phía trên; roofX: mái ngói (instancing) của chính phòng.
   // spots: điểm hoạt động (ghim ⭐) — trò chơi/tiện ích làm sau, hiện tại báo "Sắp có".
@@ -49,16 +53,44 @@ export const MAP_CONFIGS = {
   memory:{name:'Phòng kỷ niệm',triCol:true,flat:true,wallMats:['L2_Wall_Plaster','L2_Wall_Blush'],glass:{front:{x0:0.2,x1:8.3,z:0.02,y0:0,y1:3.25},top:{x0:0.2,x1:8.3,z0:-5.05,z1:0.02,y:3.25}},
     sofa:{node:'Sofa',seatY:0.45},treadNames:[],mezz:[],seat:'Desk_Chair',chair:/^Desk_Chair$/,chairToward:'Desk',
     walk0:[0.35,8.15,-4.85,3.8],l1:[0,0,0,0],cl1:[0,0,0,0],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
-    ext:{dx:-10.85,dy:-6.52,dz:5.0,hide:/^L2_Memory_/,},
+    ext:{dx:-10.85,dy:-6.52,dz:5.0,hide:/^L2_Memory_/,hideL3:/^L3_Library/},
+    doorsL3:[{at:[7.6,1.6,-4.6],to:'library',label:'Lên Thư viện'}],
     doors:[{node:'Door_Entrance_Leaf',to:'vy',label:'Phòng Vy'}],
     spots:[{node:'Memory_Wall',label:'Tường kỷ niệm'},{node:'Mailbox',label:'Hộp thư'},{node:'Savings_Jar',label:'Quỹ chung'}],
-    spawnFrom:{default:[7.55,-0.85,-Math.PI/2,0]}},
+    spawnFrom:{library:[7.3,-3.9,-Math.PI/2,0],default:[7.55,-0.85,-Math.PI/2,0]}},
   greenhouse:{name:'Vườn kính',triCol:true,flat:true,wallMats:[],glass:{front:{x0:0.1,x1:6.1,z:0.02,y0:0,y1:2.9},top:{x0:0.1,x1:6.1,z0:-3.75,z1:0.02,y:2.9}},
     treadNames:[],mezz:[],walk0:[0.3,5.9,-3.1,2.0],l1:[0,0,0,0],cl1:[0,0,0,0],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
     ext:{dx:-1.9,dy:-12.94,dz:4.3,hide:/^L2_Greenhouse/},
     doors:[{node:'Doormat',to:'game',label:'Xuống Phòng Game'}],
     spots:[{node:'Planter_Beds',label:'Tưới cây'},{node:'Record_Player',label:'Nghe nhạc cùng nhau'}],
     spawnFrom:{default:[3.1,-0.9,Math.PI,0]}},
+  // ===== NHÀ L3 (src/house.js): 2 nhà vườn cạnh 2 cánh nhà (mặt trước nhìn ra vườn), tháp thư viện trên Phòng kỷ niệm, rạp phim tầng hầm.
+  // Màn hình karaoke / rạp dùng vật liệu CH_screen → tính năng xem TV / rạp có sẵn phát video lên đó. Ghim ⭐ = hoạt động "Sắp có".
+  karaoke:{name:'Karaoke & phòng nhạc',triCol:true,flat:true,wallMats:['L2_Wall_Plaster','L2_Wall_Teal'],glass:{front:{x0:0.2,x1:7.8,z:0.02,y0:0,y1:3.4},top:{x0:0.2,x1:7.8,z0:-4.8,z1:0.02,y:3.4}},
+    tv:{node:'TV_Unit',mat:'CH_screen',inset:0},sofa:{node:'Sofa',seatY:0.45},treadNames:[],mezz:[],
+    walk0:[0.35,7.65,-4.6,-0.3],l1:[0,0,0,0],cl1:[0,0,0,0],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
+    ext:{dx:21.4,dy:-0.1,dz:1.6,hide:/^(Facade_L3_Karaoke|L3_Karaoke_)/},
+    doors:[{node:'Door_Entrance_Leaf',to:'bin',label:'Hành lang về phòng Bin'},{at:[4.0,1.2,0.4],to:'exterior',label:'Ra vườn'}],
+    spots:[{node:'Karaoke_Stage',label:'Hát karaoke cùng nhau',id:'karaoke'},{node:'Piano',label:'Đàn & hát',id:'piano'}],
+    spawnFrom:{exterior:[2.4,-0.6,Math.PI,0],default:[7.3,-2.0,-Math.PI/2,0]}},
+  spa:{name:'Spa / onsen',triCol:true,flat:true,wallMats:['L2_Wall_Plaster','L2_Floor_Terracotta'],glass:{front:{x0:0.2,x1:7.8,z:0.02,y0:0,y1:3.4},top:{x0:0.2,x1:7.8,z0:-4.8,z1:0.02,y:3.4}},
+    treadNames:[],mezz:[],walk0:[0.35,7.65,-4.6,-0.3],l1:[0,0,0,0],cl1:[0,0,0,0],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
+    ext:{dx:-23.4,dy:-0.1,dz:1.6,hide:/^(Facade_L3_Spa|L3_Spa_)/},
+    doors:[{node:'Door_Entrance_Leaf',to:'vy',label:'Hành lang về phòng Vy'},{at:[4.0,1.2,0.4],to:'exterior',label:'Ra vườn'}],
+    spots:[{node:'Onsen_Tub',label:'Ngâm onsen cùng nhau',id:'onsen'},{node:'Massage_Beds',label:'Massage thư giãn',id:'massage'}],
+    spawnFrom:{exterior:[4.0,-0.6,Math.PI,0],default:[0.7,-2.0,Math.PI/2,0]}},
+  library:{name:'Thư viện',triCol:true,flat:true,wallMats:['L2_Wall_Plaster','L2_Wall_Blush'],glass:{front:{x0:0.2,x1:8.3,z:0.02,y0:0,y1:3.5},top:{x0:0.2,x1:8.3,z0:-5.05,z1:0.02,y:3.5}},
+    treadNames:[],mezz:[],walk0:[0.35,8.15,-4.85,-0.3],l1:[0,0,0,0],cl1:[0,0,0,0],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
+    ext:{dx:-10.85,dy:-9.99,dz:5.0,hide:/^L3_Library_/},
+    doors:[{at:[0.9,1.4,-4.3],to:'memory',label:'Xuống Phòng kỷ niệm'}],
+    spots:[{node:'Reading_Corner',label:'Đọc sách cùng nhau',id:'reading'},{node:'Roof_Stair',label:'Lên sân ngắm sao',id:'stargazing'}],
+    spawnFrom:{default:[1.4,-3.9,Math.PI/2,0]}},
+  cinema:{name:'Rạp phim',triCol:true,flat:true,noGround:true,wallMats:['L3_Velvet_Dark','L2_Carpet_Navy'],glass:{front:{x0:0.2,x1:9.4,z:0.02,y0:0,y1:3.2},top:{x0:0.2,x1:9.4,z0:-8.0,z1:0.02,y:3.2}},
+    tv:{node:'TV_Unit',mat:'CH_screen',inset:0},sofa:{node:'Sofa',seatY:0.45},treadNames:[],mezz:[],
+    walk0:[0.35,9.25,-7.4,-0.3],l1:[0,0,0,0],cl1:[0,0,0,0],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
+    doors:[{node:'Cinema_Stair',to:'living',label:'Lên phòng khách'}],
+    spots:[{node:'Popcorn_Bar',label:'Bắp nước',id:'popcorn'}],
+    spawnFrom:{default:[7.6,-3.9,Math.PI,0]}},
   // Sân vườn ngoài nhà: 1 mặt phẳng, không cầu thang/gác/ghế/giường. Số liệu đo từ EXTERIOR.glb (mét, hệ toạ độ thế giới).
   exterior:{name:'Vườn ngoài nhà',outdoor:true,floorY:-0.2,
     walk0:[-23.8,33.8,-24.2,13.55],l1:[0,0,0,0],cl1:[0,0,0,0],camBox:[-31,41,-32,21],
@@ -72,3 +104,23 @@ export const MAP_CONFIGS = {
     garden:false,hideFlat:false,out:/^__none__$/,gtex:'Plane',lift:0,farR:150,
     doorTo:'living',doorLabel:'Vào nhà'}
 };
+
+// ===== Vườn nhà L3: đất nới 80 × 49.5 m (hàng rào mới, cổng giữ nguyên), vườn rải lại; hoạt động ngoài vườn = ghim ⭐ "Sắp có".
+// Toạ độ glTF (x, y cao, z = -y thế giới). noPlant: khối nhà / nhà vườn / hồ bơi / sân… (cỏ, cây không mọc vào).
+const EXTERIOR_L3 = {
+  walk0:[-34.4,44.4,-35.0,13.55],camBox:[-41,51,-42,21],grid:{x0:-36,z0:-36.5,c:0.15,W:560,H:357},
+  fence:[-35.41,45.41,-36.01,14.31,5],dropTrees:[],
+  noPlant:[[-10.3,-0.05,-10.4,-1.05],[-0.25,10.25,-8.35,0.95],[10.05,20.3,-10.4,-1.05],
+    [-21.5,-13.3,-6.7,-1.5],[23.3,31.5,-6.7,-1.5],[-13.4,-10.4,-4.45,-2.75],[20.4,23.4,-4.45,-2.75],
+    [-2.4,12.4,-22.8,-12.6],[0,10,-27.6,-23.6],[-34.2,-31.6,10.5,12.9],[-31,-16,0.6,9.6],[27.5,40.9,4.9,11.0],
+    [25,31,-29.5,-25],[29,32.6,-22.2,-18.6],[32.4,39.6,-31.2,-24],[-31.4,-16.6,-25.5,-20.5],[-28.8,-19.2,-27.5,-18.5]],
+  doorsL3:[{at:[-17.4,2.6,-1.0],to:'karaoke',label:'Karaoke & phòng nhạc'},{at:[27.4,2.6,-1.0],to:'spa',label:'Spa / onsen'}],
+  spotsL3:[{node:'Facade_L3_Pool',label:'Bơi cùng nhau',id:'pool'},{node:'Facade_L3_BBQ_Grill',label:'Nướng BBQ',id:'bbq'},
+    {node:'Facade_L3_Bed_05',label:'Trồng & thu hoạch rau',id:'farm'},{node:'Path_L3_Dock',label:'Câu cá',id:'fishing'},
+    {node:'Path_L3_Picnic',label:'Picnic',id:'picnic'},{node:'L3_Treehouse',label:'Nhà trên cây',id:'treehouse'},
+    {node:'Facade_L3_Swing',label:'Xích đu đôi',id:'swing'},{node:'L3_Hammock',label:'Nằm võng',id:'hammock'},
+    {node:'Path_L3_Court',label:'Đánh cầu lông',id:'badminton'},{node:'Facade_L3_Trampoline',label:'Bạt nhún',id:'trampoline'},
+    {node:'Path_L3_MiniGolf',label:'Golf mini',id:'minigolf'},{node:'Facade_L3_Campfire',label:'Đốt lửa trại',id:'campfire'},
+    {node:'Facade_L3_Screen',label:'Chiếu phim ngoài trời',id:'outdoor_movie'},{node:'L3_Flower_Arch',label:'Chụp ảnh cổng hoa',id:'photo_arch'}],
+};
+if (houseLevel() >= 3) Object.assign(MAP_CONFIGS.exterior, EXTERIOR_L3);

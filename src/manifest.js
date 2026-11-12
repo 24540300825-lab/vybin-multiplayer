@@ -20,10 +20,20 @@ export const FILES = {
   "v": "a6c3beaa",
   "size": 934052
  },
+ "map-cinema": {
+  "file": "map-cinema.glb",
+  "v": "9f560a91",
+  "size": 197588
+ },
  "map-exterior-l2": {
   "file": "map-exterior-l2.glb",
   "v": "65f10cd7",
   "size": 7593912
+ },
+ "map-exterior-l3": {
+  "file": "map-exterior-l3.glb",
+  "v": "793850fe",
+  "size": 12369716
  },
  "map-exterior": {
   "file": "map-exterior.glb",
@@ -40,6 +50,16 @@ export const FILES = {
   "v": "d1e5644a",
   "size": 274224
  },
+ "map-karaoke": {
+  "file": "map-karaoke.glb",
+  "v": "30606bdd",
+  "size": 188320
+ },
+ "map-library": {
+  "file": "map-library.glb",
+  "v": "95c61d3a",
+  "size": 934816
+ },
  "map-living": {
   "file": "map-living.glb",
   "v": "7f2cfeff",
@@ -49,6 +69,11 @@ export const FILES = {
   "file": "map-memory.glb",
   "v": "1a119636",
   "size": 408472
+ },
+ "map-spa": {
+  "file": "map-spa.glb",
+  "v": "97073930",
+  "size": 218168
  },
  "map-vy": {
   "file": "map-vy.glb",

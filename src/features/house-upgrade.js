@@ -4,8 +4,8 @@ import {HOUSE_RULES, houseLevel, setHouseLevel} from '../house.js';
 
 // tải lại map đang đứng (có trang vỏ: chỉ nạp lại khung game → cuộc gọi / nhạc / chat không đứt). Map tầng trên bị khoá khi hạ cấp → về phòng khách.
 const reloadMap = (id) => {
-  const L2ONLY = ['game', 'workshop', 'memory', 'greenhouse'];
-  if (houseLevel() < 2 && L2ONLY.includes(id)) id = 'living';
+  const NEED = {game: 2, workshop: 2, memory: 2, greenhouse: 2, karaoke: 3, spa: 3, library: 3, cinema: 3};
+  if ((NEED[id] || 1) > houseLevel()) id = 'living';
   try { sessionStorage.setItem('vyFrom', ''); localStorage.setItem('vyMap', id); } catch (e) {}
   let sh = null; try { sh = window.parent && window.parent !== window ? window.parent.VYSHELL : null; } catch (e) {}
   if (sh && sh.go) { sh.go(id); return; }
@@ -31,8 +31,10 @@ export default {
     const lv = houseLevel();
     ctx.ui.addButton({icon: '🏡', label: lv < HOUSE_RULES.maxLevel ? 'Nâng nhà L' + (lv + 1) : 'Về nhà L1', onClick: () => {
       const cur = houseLevel(), next = cur < HOUSE_RULES.maxLevel ? cur + 1 : 1;
+      const OPEN = {2: 'Mở tầng trên: Phòng Game 2 tầng, Xưởng thủ công, Phòng kỷ niệm, Vườn kính.',
+        3: 'Đất rộng gấp ~1.7 + vườn mới: hồ bơi, BBQ, vườn rau, ao cá, nhà trên cây, cầu lông, lửa trại…\nMở: Karaoke & phòng nhạc, Spa / onsen, Thư viện (tháp), Rạp phim (tầng hầm).'};
       const msg = next > cur
-        ? 'BẢN THỬ: nâng nhà lên L' + next + ' miễn phí?\n\nMở tầng trên: Phòng Game 2 tầng (khúc côn cầu, caro, bóng rổ, Ai hiểu ai hơn), Xưởng thủ công, Phòng kỷ niệm, Vườn kính.\n(Bản chính: phải tới ngày mở và đủ Điểm Kiến Tạo.)'
+        ? 'BẢN THỬ: nâng nhà lên L' + next + ' miễn phí?\n\n' + OPEN[next] + '\n(Bản chính: phải tới ngày mở và đủ Điểm Kiến Tạo.)'
         : 'BẢN THỬ: đưa nhà về L1 để xem lại?';
       if (!confirm(msg)) return;
       ctx.send('lv', {lv: next});

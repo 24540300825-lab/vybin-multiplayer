@@ -10,6 +10,11 @@ export const MAP_LIST = {
   workshop:   {name: 'Xưởng thủ công', icon: '🧵', desc: 'Tầng 2 trên phòng Bin: bàn chế tạo, tường dụng cụ, giá vẽ + hiên ăn ngoài trời', assets: ['map-workshop', 'map-exterior'], minHouse: 2},
   memory:     {name: 'Phòng kỷ niệm', icon: '💌', desc: 'Tầng 2 trên phòng Vy: tường ảnh, hộp thư, quỹ chung', assets: ['map-memory', 'map-exterior'], minHouse: 2},
   greenhouse: {name: 'Vườn kính', icon: '🌿', desc: 'Nhà kính trên sân thượng: trồng cây + góc nghe nhạc', assets: ['map-greenhouse', 'map-exterior'], minHouse: 2},
+  // ===== nhà L3 — nhà vườn, tháp, tầng hầm (src/house.js) =====
+  karaoke:    {name: 'Karaoke & phòng nhạc', icon: '🎤', desc: 'Nhà vườn cạnh phòng Bin: sân khấu, màn hình karaoke, đàn', assets: ['map-karaoke', 'map-exterior'], minHouse: 3},
+  spa:        {name: 'Spa / onsen', icon: '♨️', desc: 'Nhà vườn cạnh phòng Vy: bồn onsen, giường massage', assets: ['map-spa', 'map-exterior'], minHouse: 3},
+  library:    {name: 'Thư viện', icon: '📚', desc: 'Tháp trên Phòng kỷ niệm: kệ sách, góc đọc, sân ngắm sao', assets: ['map-library', 'map-exterior'], minHouse: 3},
+  cinema:     {name: 'Rạp phim', icon: '🎬', desc: 'Tầng hầm dưới phòng khách: màn chiếu lớn, ghế đôi, bắp nước', assets: ['map-cinema'], minHouse: 3},
 };
 export const DEFAULT_MAP = 'living';
 export const isMap = id => Object.prototype.hasOwnProperty.call(MAP_LIST, id);
@@ -18,7 +23,7 @@ import {houseLevel} from './house.js';
 export const mapOpen = id => isMap(id) && (MAP_LIST[id].minHouse || 1) <= houseLevel();
 // asset thật sự cần nạp cho map (nhà ≥ L2: nạp thêm phần tầng trên)
 // nhà ≥ L2: ngoại cảnh (vườn + vỏ nhà) đổi sang map-exterior-l2 = map-exterior bản chính, chỉ thay phần nhà bằng nhà L2
-export const extAsset = () => (houseLevel() >= 2 ? 'map-exterior-l2' : 'map-exterior');
+export const extAsset = () => (houseLevel() >= 3 ? 'map-exterior-l3' : houseLevel() >= 2 ? 'map-exterior-l2' : 'map-exterior');
 export const mapAssets = id => MAP_LIST[id].assets.map(a => (a === 'map-exterior' ? extAsset() : a));
 
 // Quản lý chuyển map: nạp trước (HTTP cache) + fade + tải lại có giữ phiên.

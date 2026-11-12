@@ -189,7 +189,7 @@ ${FRAG_COLOR}
   // mái ngói cánh Vy/Bin: GLB ngoại cảnh chỉ có mái cánh phòng khách (Roof_Living) → nhân bản sang 2 cánh kia
   // (khớp kích thước mái gốc Roof_Vy/Roof_Bin trong LIVING_ROOM.glb: rộng 10.85, lệch tâm ±0.425, cao 6.4). skipX = x tâm cánh đang ở (giữ hở để nhìn vào)
   // ===== nhà L2: cả nhà dùng 1 ngoại cảnh map-exterior-l2.glb (= map-exterior của bản chính, chỉ thay phần NHÀ). main.js nạp đúng file theo cấp nhà.
-  const L2=!!ctx.houseL2;window.__houseL2=L2;
+  const L2=!!ctx.houseL2;window.__houseL2=L2;const HLV=ctx.houseLv||(L2?2:1),L3=HLV>=3;window.__houseLv=HLV;   // nhà L3: map-exterior-l3 (vườn + nhà vườn/tháp), MC.hideL3/doorsL3/spotsL3
   function addWingRoofs(root,skipX){const L=root.getObjectByName('Roof_Living');if(!L)return;
     const fit={WING_VY:[0.575,15],WING_BIN:[-0.575,-5]};   // mép trong lùi 0.3 m khỏi tường cánh phòng khách (trước đây mái chĩa xuyên đỉnh tường → lộ răng cưa ngói trong phòng)
     for(const w in fit){const W=root.getObjectByName(w);if(!W||W.getObjectByName('Roof_'+w.slice(5,6)+w.slice(6).toLowerCase()))continue;if(skipX!=null&&Math.abs(fit[w][1]-skipX)<3)continue;
@@ -235,18 +235,18 @@ ${FRAG_COLOR}
   // MC.ext = {dx,dz: dời ngoại cảnh cho khớp toạ độ phòng; hide: regex node vỏ nhà phải ẩn (cánh nhà đang ở bị cắt); roofX: x tâm mái (instancing) cần ẩn}
   let EXTV=null,extG=null;
   if(!OUTD&&MC.ext&&ctx.ext){const X=MC.ext,_t0=performance.now();extG=ctx.ext.scene;extG.name='__EXTERIOR__';
-    extG.traverse(o=>{if((X.hide&&X.hide.test(o.name))||(L2&&X.hideL2&&X.hideL2.test(o.name))||/^Interior_(Bin|Living|Vy)/.test(o.name))o.visible=false});   // hộp tối giả nội thất sau cửa sổ: kính đã đặc nên không cần, và để chỗ 'khoét' tường hàng xóm không lộ mảng đen
+    extG.traverse(o=>{if((X.hide&&X.hide.test(o.name))||(L2&&X.hideL2&&X.hideL2.test(o.name))||(L3&&X.hideL3&&X.hideL3.test(o.name))||/^Interior_(Bin|Living|Vy)/.test(o.name))o.visible=false});   // hộp tối giả nội thất sau cửa sổ: kính đã đặc nên không cần, và để chỗ 'khoét' tường hàng xóm không lộ mảng đen
     addWingRoofs(extG,X.roofX);
     extG.position.set(X.dx||0,X.dy||0,X.dz||0);extG.updateMatrixWorld(true);
-    if(X.roofX!=null){const c=new THREE.Vector3(),M=new THREE.Matrix4();extG.traverse(o=>{if(!o.isInstancedMesh)return;let p=o.parent,inHouse=false;for(;p;p=p.parent)if(/^HOUSE_L[12]/.test(p.name))inHouse=true;if(!inHouse)return;
+    if(X.roofX!=null){const c=new THREE.Vector3(),M=new THREE.Matrix4();extG.traverse(o=>{if(!o.isInstancedMesh)return;let p=o.parent,inHouse=false;for(;p;p=p.parent)if(/^HOUSE_L[123]/.test(p.name))inHouse=true;if(!inHouse)return;
       o.geometry.computeBoundingBox();const gc=o.geometry.boundingBox.getCenter(new THREE.Vector3());
       for(let i=0;i<o.count;i++){o.getMatrixAt(i,M);c.copy(gc).applyMatrix4(M).applyMatrix4(o.matrixWorld);if(Math.abs(c.x-(X.roofX+(X.dx||0)))<3){M.makeScale(0,0,0);o.setMatrixAt(i,M);o.instanceMatrix.needsUpdate=true}}})}
     // chỉ khoét TƯỜNG khi chắn camera — mái ngói (instancing / tên Roof) luôn giữ nguyên: khoét mái lộ ra bên trong rỗng, rất xấu
     // vật liệu mái dùng CHUNG với tường (vd 'Stylized  wood') → nhân bản riêng cho mái (instancing + node Roof*) để cờ khoét không lan sang mái
     {const cl=new Map(),isRoof=o=>{if(o.isInstancedMesh)return true;for(let p=o;p;p=p.parent)if(/Roof/i.test(p.name))return true;return false};
-     extG.traverse(o=>{if(!o.isMesh)return;let inHouse=false;for(let p=o.parent;p;p=p.parent)if(/^HOUSE_L[12]/.test(p.name))inHouse=true;if(!inHouse||!isRoof(o))return;
+     extG.traverse(o=>{if(!o.isMesh)return;let inHouse=false;for(let p=o.parent;p;p=p.parent)if(/^HOUSE_L[123]/.test(p.name))inHouse=true;if(!inHouse||!isRoof(o))return;
        const f=m=>{if(!m)return m;let c=cl.get(m);if(!c){c=m.clone();c.userData={...m.userData,noOcc:true};cl.set(m,c)}return c};o.material=Array.isArray(o.material)?o.material.map(f):f(o.material)})}
-    extG.traverse(o=>{if(!o.isMesh||!o.visible||o.isInstancedMesh)return;let p=o.parent,inHouse=false,roof=/Roof|Tile/i.test(o.name);for(;p;p=p.parent){if(/^HOUSE_L[12]/.test(p.name))inHouse=true;if(/Roof|Tile/i.test(p.name))roof=true}
+    extG.traverse(o=>{if(!o.isMesh||!o.visible||o.isInstancedMesh)return;let p=o.parent,inHouse=false,roof=/Roof|Tile/i.test(o.name);for(;p;p=p.parent){if(/^HOUSE_L[123]/.test(p.name))inHouse=true;if(/Roof|Tile/i.test(p.name))roof=true}
       if(inHouse&&!roof)[].concat(o.material).forEach(mm=>{if(mm&&!mm.userData.noOcc&&!/Roof|Tile/i.test(mm.name||''))mm.userData.occW=true})});
     toonify(extG);console.log('[sty] ngoại cảnh: '+api.stylize(extG));scene.add(extG);extG.updateMatrixWorld(true);
     const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
@@ -254,7 +254,7 @@ ${FRAG_COLOR}
     EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat,ultra:wantUltra()});api.stylize(EXTV.group);EXTV.setLevel(TP.quality==='low'?'low':'indoor');
     // cây/bụi lẻ (không nằm trong ô instancing) ở XA nhà: bỏ hẳn — từ camera trên cao nhìn xuống chỉ thấy khối thô xấu; gần nhà giữ nguyên
     {const C=new THREE.Vector3(5,0,-4),sp=new THREE.Sphere();let n=0;extG.updateMatrixWorld(true);env.updateMatrixWorld(true);
-     [extG,env].forEach(R=>R&&R.traverse(o=>{if(!o.isMesh||!o.visible)return;for(let p=o;p;p=p.parent)if(p.name==='EXT_CELLS')return;
+     [extG,env].forEach(R=>R&&R.traverse(o=>{if(!o.isMesh||!o.visible)return;for(let p=o;p;p=p.parent)if(p.name==='EXT_CELLS'||/^(HOUSE_L|SITE_L3|FENCE)/.test(p.name))return;   // công trình nhà/vườn L3 (gỗ) không phải cây lẻ
        const fol=[].concat(o.material).some(m=>m&&/^Poly(Foliage|Shader)|Stylized\s+wood|^ROCK$/i.test(m.name||''));if(!fol)return;
        const g=o.geometry;if(!g.boundingSphere)g.computeBoundingSphere();sp.copy(g.boundingSphere).applyMatrix4(o.matrixWorld);
        if(o.isInstancedMesh){if(sp.radius>40)return}           // instancing rải rộng: để nguyên (ô của setupExterior đã lo)
@@ -1212,10 +1212,10 @@ ${FRAG_COLOR}
     {key:'bed',icon:'sleep',label:'Ngủ',at:()=>bedPt,state:()=>P0.mode==='bed'?{on:true,label:'Thức dậy'}:null,act:()=>{if(P0.mode==='bed')cmdWake();else cmdSleep()}},
     ...(MC.doors?[]:[{key:'door',icon:'door',label:MC.doorLabel||'Bản đồ',at:()=>doorPt,act:()=>{if(MC.doorTo&&window.__switchMap){window.__switchMap(MC.doorTo);return}const b=$('iMap');if(b)b.click()}}]),
     // cửa sang phòng khác: MC.doors (+ MC.doorsL2 khi nhà ≥ L2: lối lên tầng trên). d.at = [x,y,z] đặt ghim theo toạ độ khi không có node
-    ...[...(MC.doors||[]),...(L2&&MC.doorsL2?MC.doorsL2:[])].map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+(b.max.y-b.min.y>0.5?-0.8:0.15),(b.min.z+b.max.z)/2):null;
+    ...[...(MC.doors||[]),...(L2&&MC.doorsL2?MC.doorsL2:[]),...(L3&&MC.doorsL3?MC.doorsL3:[])].map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+(b.max.y-b.min.y>0.5?-0.8:0.15),(b.min.z+b.max.z)/2):null;
       return {key:'door'+i,icon:'door',label:d.label,at:()=>p,act:()=>{if(window.__switchMap)window.__switchMap(d.to)}}}),
     // điểm hoạt động (minigame / tiện ích nhà L2) — MC.spots [{node|at, label}]: đi tới gần rồi báo "Sắp có" (trò chơi làm sau, mỗi trò 1 file trong src/features/)
-    ...(MC.spots||[]).map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+0.25,(b.min.z+b.max.z)/2):null;
+    ...[...(MC.spots||[]),...(L3&&MC.spotsL3?MC.spotsL3:[])].map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+0.25,(b.min.z+b.max.z)/2):null;
       return {key:'spot'+i,icon:'star',label:d.label,at:()=>p,act:()=>{
         // đi tới cạnh máy (máy trên gác → tầng 1) rồi mới mở trò (window.__vySpot: trò chơi sau này — trả true = đã mở; chưa có thì báo "Sắp có")
         if(p){const c=b?b.getCenter(new THREE.Vector3()):p,lvS=(b?b.min.y:p.y-1)>(A.L1||2.4)-0.6?1:0,dx=P0.pos.x-c.x,dz=P0.pos.z-c.z,dd=Math.hypot(dx,dz)||1,r=b?Math.max(b.max.x-b.min.x,b.max.z-b.min.z)/2+0.55:0.8;cmdMove(c.x+dx/dd*r,c.z+dz/dd*r,lvS,false)}
@@ -1361,7 +1361,7 @@ ${FRAG_COLOR}
   let grassCol=null;const grassTex=(()=>{let t=null;const gn=MC.gtex||'Plane001';(extG||env).traverse(o=>{if(o.isMesh&&o.name===gn&&o.material.map){t=o.material.map;grassCol=o.material.color.clone()}});return t})();
   const gTex=grassTex?grassTex.clone():null;if(gTex){gTex.channel=0;gTex.wrapS=gTex.wrapT=THREE.RepeatWrapping;gTex.repeat.set(110,110);gTex.needsUpdate=true}
   const ground=new THREE.Mesh(new THREE.CircleGeometry(650,48),new THREE.MeshStandardMaterial({map:gTex,color:(MC.gtex&&grassCol)||0xffffff,roughness:1,metalness:0}));ground.material.userData.ground=true;if(OUTD||extG){FU.uGTint.value.setRGB(0.68,0.8,0.52);ground.material.userData.desat=0.95}toonify(ground);
-  ground.rotation.x=-Math.PI/2;/* dy: phòng tầng trên → mặt đất vườn nằm dưới sàn phòng */ground.position.set(0,OUTD?A.L0-0.03:extG?MAPS.exterior.floorY-0.03+((MC.ext&&MC.ext.dy)||0):-0.3,0);ground.renderOrder=-999;ground.receiveShadow=OUTD||!!extG;scene.add(ground);
+  ground.rotation.x=-Math.PI/2;/* dy: phòng tầng trên → mặt đất vườn nằm dưới sàn phòng */ground.position.set(0,OUTD?A.L0-0.03:extG?MAPS.exterior.floorY-0.03+((MC.ext&&MC.ext.dy)||0):-0.3,0);ground.renderOrder=-999;if(MC.noGround)ground.visible=false;   /* rạp phim tầng hầm: không có mặt đất vườn */ground.receiveShadow=OUTD||!!extG;scene.add(ground);
   if(OUTD){envMeshes.push(ground)}if(OUTD||extG)FU.uGMap.value=gTex;
 
   // ===== TỐI ƯU: gộp mesh tĩnh theo material (batching), tắt matrix auto, ngoại cảnh: bỏ bóng + cull theo khoảng cách =====

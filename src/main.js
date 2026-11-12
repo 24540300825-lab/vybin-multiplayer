@@ -63,7 +63,7 @@ async function boot() {
   LB(75, 'Dựng cảnh...');
   await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
   const EXT = extAsset(), mapKey = mapId === 'exterior' ? EXT : 'map-' + mapId;
-  eng.init({env: files[mapKey], ext: mapId !== 'exterior' ? files[EXT] || null : null, houseL2: EXT === 'map-exterior-l2', localGlb: files['char-' + slot], localSlot: slot, mapId});
+  eng.init({env: files[mapKey], ext: mapId !== 'exterior' ? files[EXT] || null : null, houseL2: EXT !== 'map-exterior', houseLv: EXT === 'map-exterior-l3' ? 3 : EXT === 'map-exterior-l2' ? 2 : 1, localGlb: files['char-' + slot], localSlot: slot, mapId});
   const api = eng.api;
   LB(88, 'Biên dịch shader...');
   let warmed = false; try { warmed = localStorage.getItem('vyWarm') === mapId; } catch (e) {}   // lần sau: trình duyệt đã cache shader → chờ ngắn hơn
@@ -75,7 +75,7 @@ async function boot() {
   window.__prefetchMap = prefetchMap;
   window.__switchMap = async m => {
     if (!isMap(m) || m === mapId) return;
-    if (!mapOpen(m)) { try { window.__vyToast && window.__vyToast('🏡 Cần nâng nhà lên L2 để mở ' + MAP_LIST[m].name); } catch (e) {} return; }
+    if (!mapOpen(m)) { try { window.__vyToast && window.__vyToast('🏡 Cần nâng nhà lên L' + (MAP_LIST[m].minHouse || 2) + ' để mở ' + MAP_LIST[m].name); } catch (e) {} return; }
     prefetchMap(m);
     goToMap(m);        // chỉ mình đổi map; người kia ở lại map của họ
   };
