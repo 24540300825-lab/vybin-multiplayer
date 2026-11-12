@@ -25,10 +25,35 @@ export const FILES = {
   "v": "f1238e01",
   "size": 5700440
  },
+ "map-game": {
+  "file": "map-game.glb",
+  "v": "21d92b57",
+  "size": 496476
+ },
+ "map-greenhouse": {
+  "file": "map-greenhouse.glb",
+  "v": "276826b6",
+  "size": 274208
+ },
+ "map-house-l2": {
+  "file": "map-house-l2.glb",
+  "v": "59723494",
+  "size": 1326524
+ },
+ "map-kitchen": {
+  "file": "map-kitchen.glb",
+  "v": "796b89d7",
+  "size": 269628
+ },
  "map-living": {
   "file": "map-living.glb",
   "v": "7f2cfeff",
   "size": 3367756
+ },
+ "map-memory": {
+  "file": "map-memory.glb",
+  "v": "1a119636",
+  "size": 408472
  },
  "map-vy": {
   "file": "map-vy.glb",

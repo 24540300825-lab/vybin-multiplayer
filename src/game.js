@@ -181,7 +181,15 @@ ${FRAG_COLOR}
 
   // mái ngói cánh Vy/Bin: GLB ngoại cảnh chỉ có mái cánh phòng khách (Roof_Living) → nhân bản sang 2 cánh kia
   // (khớp kích thước mái gốc Roof_Vy/Roof_Bin trong LIVING_ROOM.glb: rộng 10.85, lệch tâm ±0.425, cao 6.4). skipX = x tâm cánh đang ở (giữ hở để nhìn vào)
-  function addWingRoofs(root,skipX){const L=root.getObjectByName('Roof_Living');if(!L)return;
+  // ===== nhà L2: phần tầng trên (assets/map-house-l2.glb) xếp chồng lên vỏ L1 — map-exterior giữ nguyên, chỉ ẩn mái phòng khách =====
+  // vật liệu cùng TÊN với map-exterior (Stylized Concrete, Stylized Brick Wall, Stylized  wood, Stylized Wood Planks…) → dùng lại vật liệu có texture của map-exterior
+  const L2=ctx.l2&&ctx.l2.scene?ctx.l2.scene:null;window.__houseL2=!!L2;
+  function attachL2(root){if(!L2||!root||L2.parent===root)return;
+    const mats={};root.traverse(o=>{if(!o.isMesh||o.isInstancedMesh)return;[].concat(o.material).forEach(m=>{if(m&&m.name&&!mats[m.name])mats[m.name]=m})});
+    L2.traverse(o=>{if(!o.isMesh)return;if(Array.isArray(o.material))o.material=o.material.map(m=>mats[m.name]||m);else if(o.material&&mats[o.material.name])o.material=mats[o.material.name]});
+    ['Roof_Living','Roof_Living_Gable'].forEach(n=>{const r=root.getObjectByName(n);if(r)r.visible=false});
+    root.add(L2);root.updateMatrixWorld(true)}
+  function addWingRoofs(root,skipX){if(L2)return;const L=root.getObjectByName('Roof_Living');if(!L)return;
     const fit={WING_VY:[0.575,15],WING_BIN:[-0.575,-5]};   // mép trong lùi 0.3 m khỏi tường cánh phòng khách (trước đây mái chĩa xuyên đỉnh tường → lộ răng cưa ngói trong phòng)
     for(const w in fit){const W=root.getObjectByName(w);if(!W||W.getObjectByName('Roof_'+w.slice(5,6)+w.slice(6).toLowerCase()))continue;if(skipX!=null&&Math.abs(fit[w][1]-skipX)<3)continue;
       const R=new THREE.Group();R.name='Roof_'+w.slice(5,6)+w.slice(6).toLowerCase();R.position.set(fit[w][0],6.4,0.015);R.scale.set(10.55/11,1,1);
@@ -189,7 +197,7 @@ ${FRAG_COLOR}
       parts.forEach(m=>{const c=new THREE.Mesh(m.geometry,m.material);c.name=R.name+'_'+m.name.split('_').pop();c.position.copy(m.position);c.quaternion.copy(m.quaternion);c.scale.copy(m.scale);c.castShadow=m.castShadow;c.receiveShadow=m.receiveShadow;R.add(c)});
       W.add(R)}
     root.updateMatrixWorld(true)}
-  if(MAP_CONFIGS[MAPID]&&MAP_CONFIGS[MAPID].outdoor)addWingRoofs(envG.scene,null);
+  if(MAP_CONFIGS[MAPID]&&MAP_CONFIGS[MAPID].outdoor){attachL2(envG.scene);addWingRoofs(envG.scene,null)}
   // env
   const env=envG.scene;toonify(env);scene.add(env);env.updateMatrixWorld(true);
   // mẫu Scatter (SF_BiomeProxy_* / SF_SourceProxy_* / SF_BiomeSurface_*: đá, cỏ Plant_01, hoa, bụi, cây) nằm ở gốc toạ độ GLB = góc trước-trái phòng khách → hiện thành cụm đá + lá phẳng dính tường. Chỉ là mẫu cho instancing → ẩn (mesh thường, không đụng InstancedMesh).
@@ -223,22 +231,23 @@ ${FRAG_COLOR}
   // MC.ext = {dx,dz: dời ngoại cảnh cho khớp toạ độ phòng; hide: regex node vỏ nhà phải ẩn (cánh nhà đang ở bị cắt); roofX: x tâm mái (instancing) cần ẩn}
   let EXTV=null,extG=null;
   if(!OUTD&&MC.ext&&ctx.ext){const X=MC.ext,_t0=performance.now();extG=ctx.ext.scene;extG.name='__EXTERIOR__';
-    extG.traverse(o=>{if((X.hide&&X.hide.test(o.name))||/^Interior_(Bin|Living|Vy)/.test(o.name))o.visible=false});   // hộp tối giả nội thất sau cửa sổ: kính đã đặc nên không cần, và để chỗ 'khoét' tường hàng xóm không lộ mảng đen
+    attachL2(extG);
+    extG.traverse(o=>{if((X.hide&&X.hide.test(o.name))||(L2&&X.hideL2&&X.hideL2.test(o.name))||/^Interior_(Bin|Living|Vy)/.test(o.name))o.visible=false});   // hộp tối giả nội thất sau cửa sổ: kính đã đặc nên không cần, và để chỗ 'khoét' tường hàng xóm không lộ mảng đen
     addWingRoofs(extG,X.roofX);
-    extG.position.set(X.dx||0,0,X.dz||0);extG.updateMatrixWorld(true);
-    if(X.roofX!=null){const c=new THREE.Vector3(),M=new THREE.Matrix4();extG.traverse(o=>{if(!o.isInstancedMesh)return;let p=o.parent,inHouse=false;for(;p;p=p.parent)if(/^HOUSE_L1/.test(p.name))inHouse=true;if(!inHouse)return;
+    extG.position.set(X.dx||0,X.dy||0,X.dz||0);extG.updateMatrixWorld(true);
+    if(X.roofX!=null){const c=new THREE.Vector3(),M=new THREE.Matrix4();extG.traverse(o=>{if(!o.isInstancedMesh)return;let p=o.parent,inHouse=false;for(;p;p=p.parent)if(/^HOUSE_L[12]/.test(p.name))inHouse=true;if(!inHouse)return;
       o.geometry.computeBoundingBox();const gc=o.geometry.boundingBox.getCenter(new THREE.Vector3());
       for(let i=0;i<o.count;i++){o.getMatrixAt(i,M);c.copy(gc).applyMatrix4(M).applyMatrix4(o.matrixWorld);if(Math.abs(c.x-(X.roofX+(X.dx||0)))<3){M.makeScale(0,0,0);o.setMatrixAt(i,M);o.instanceMatrix.needsUpdate=true}}})}
     // chỉ khoét TƯỜNG khi chắn camera — mái ngói (instancing / tên Roof) luôn giữ nguyên: khoét mái lộ ra bên trong rỗng, rất xấu
     // vật liệu mái dùng CHUNG với tường (vd 'Stylized  wood') → nhân bản riêng cho mái (instancing + node Roof*) để cờ khoét không lan sang mái
     {const cl=new Map(),isRoof=o=>{if(o.isInstancedMesh)return true;for(let p=o;p;p=p.parent)if(/Roof/i.test(p.name))return true;return false};
-     extG.traverse(o=>{if(!o.isMesh)return;let inHouse=false;for(let p=o.parent;p;p=p.parent)if(/^HOUSE_L1/.test(p.name))inHouse=true;if(!inHouse||!isRoof(o))return;
+     extG.traverse(o=>{if(!o.isMesh)return;let inHouse=false;for(let p=o.parent;p;p=p.parent)if(/^HOUSE_L[12]/.test(p.name))inHouse=true;if(!inHouse||!isRoof(o))return;
        const f=m=>{if(!m)return m;let c=cl.get(m);if(!c){c=m.clone();c.userData={...m.userData,noOcc:true};cl.set(m,c)}return c};o.material=Array.isArray(o.material)?o.material.map(f):f(o.material)})}
-    extG.traverse(o=>{if(!o.isMesh||!o.visible||o.isInstancedMesh)return;let p=o.parent,inHouse=false,roof=/Roof|Tile/i.test(o.name);for(;p;p=p.parent){if(/^HOUSE_L1/.test(p.name))inHouse=true;if(/Roof|Tile/i.test(p.name))roof=true}
+    extG.traverse(o=>{if(!o.isMesh||!o.visible||o.isInstancedMesh)return;let p=o.parent,inHouse=false,roof=/Roof|Tile/i.test(o.name);for(;p;p=p.parent){if(/^HOUSE_L[12]/.test(p.name))inHouse=true;if(/Roof|Tile/i.test(p.name))roof=true}
       if(inHouse&&!roof)[].concat(o.material).forEach(mm=>{if(mm&&!mm.userData.noOcc&&!/Roof|Tile/i.test(mm.name||''))mm.userData.occW=true})});
     toonify(extG);console.log('[sty] ngoại cảnh: '+api.stylize(extG));scene.add(extG);extG.updateMatrixWorld(true);
     const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
-    const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null,indoor:true};
+    const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null,indoor:true,floorY:(E0.floorY||0)+(X.dy||0)};   // dy: phòng tầng trên (nhà L2) → mặt đất vườn nằm thấp hơn sàn phòng
     EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat});api.stylize(EXTV.group);EXTV.setLevel(TP.quality==='low'?'low':'indoor');
     // cây/bụi lẻ (không nằm trong ô instancing) ở XA nhà: bỏ hẳn — từ camera trên cao nhìn xuống chỉ thấy khối thô xấu; gần nhà giữ nguyên
     {const C=new THREE.Vector3(5,0,-4),sp=new THREE.Sphere();let n=0;extG.updateMatrixWorld(true);env.updateMatrixWorld(true);
@@ -255,7 +264,8 @@ ${FRAG_COLOR}
   const _gc1=new THREE.Color(),_gc2=new THREE.Color();
   const updGlass=(day,dim,des)=>{if(!WGLASS.length)return;_gc1.setRGB(0.55,0.78,0.97).multiplyScalar(0.28+0.72*day*(0.55+0.45*dim));_gc2.setRGB(0.5,0.56,0.62).multiplyScalar(0.3+0.5*day*dim);_gc1.lerp(_gc2,Math.min(1,des*0.9));
     WGLASS.forEach(m=>{m.color.copy(_gc1);if(m.emissive){m.emissive.copy(_gc1).multiplyScalar(0.22);m.emissiveIntensity=1}if('roughness' in m)m.roughness=0.12;if('metalness' in m)m.metalness=0.35})};
-  const A={};A.L0=OUTD?(MC.floorY||0):0;A.L1=OUTD?A.L0+3:box(MC.mezz[0]).max.y;
+  const A={};A.L0=OUTD?(MC.floorY||0):0;A.L1=(OUTD||!(MC.mezz&&MC.mezz.length&&byName[MC.mezz[0]]))?A.L0+3:box(MC.mezz[0]).max.y;
+  const NOCH=OUTD||!MC.seat||!byName[MC.seat];   // phòng không có ghế làm việc (bếp, vườn kính)
   // cầu thang: gom thành danh sách; profile độ cao lấy bằng raycast rồi làm mượt
   const stairs=[];
   {const groups=OUTD?[]:MC.treadNames?MC.treadNames.filter(n=>byName[n]).map(n=>[byName[n]]):[Object.keys(byName).filter(n=>MC.tread.test(n)).map(n=>byName[n])];
@@ -302,10 +312,10 @@ ${FRAG_COLOR}
    studioO.forEach(o=>addAt(o,/Floor/.test(o.name)?2.0:1.3,b=>b.max.y-0.15));
    LAMPS.length=Math.min(LAMPS.length,10);
    LAMPS.forEach((v,i)=>TU.uLP.value[i].copy(v));TU.uLN.value=LAMPS.length;window.__LAMPS=LAMPS}
-  const seat=OUTD?null:box(MC.seat);A.seatC=seat?seat.getCenter(new THREE.Vector3()):null;A.seatTop=seat?seat.max.y:0;
+  const seat=NOCH?null:box(MC.seat);A.seatC=seat?seat.getCenter(new THREE.Vector3()):null;A.seatTop=seat?seat.max.y:0;
   A.chairL=A.seatC&&A.seatC.y>(A.L0+A.L1)/2?1:0;A.CY=[A.L0,A.L1][A.chairL];
-  const CHAIR=OUTD?Object.assign(new THREE.Object3D(),{name:'__NO_CHAIR__'}):(Object.values(byName).find(o=>MC.chair.test(o.name)&&!o.isMesh)||byName['Desk_Chair']);
-  const q=new THREE.Quaternion();if(!OUTD)CHAIR.getWorldQuaternion(q);
+  const CHAIR=NOCH?Object.assign(new THREE.Object3D(),{name:'__NO_CHAIR__'}):(Object.values(byName).find(o=>MC.chair.test(o.name)&&!o.isMesh)||byName['Desk_Chair']);
+  const q=new THREE.Quaternion();if(!NOCH)CHAIR.getWorldQuaternion(q);
   const fw=new THREE.Vector3(0,0,1).applyQuaternion(q);fw.y=0;fw.normalize();if(MC.chairFlip)fw.negate();if(MC.chairToward&&byName[MC.chairToward]){const dc=box(MC.chairToward).getCenter(new THREE.Vector3()),cc=new THREE.Box3().setFromObject(CHAIR).getCenter(new THREE.Vector3());fw.set(dc.x-cc.x,0,dc.z-cc.z).normalize()}   // ghế nhà 2 tầng dựng quay lưng về phía +z: mặt ghế hướng -z (về phía bàn)
   A.chairYaw=Math.atan2(fw.x,fw.z);A.fwd=fw;
   A.bedBox=OUTD||!byName['Bed']?new THREE.Box3():box('Bed');A.mattress=OUTD?new THREE.Box3():byName['Bed_Mattress']?box('Bed_Mattress'):(()=>{const b=A.bedBox.clone();b.max.y=b.min.y+0.55;return b})();   // giường gộp 1 mesh: đệm ≈ 0.55m trên sàn
@@ -350,7 +360,7 @@ ${FRAG_COLOR}
       for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;if((x-cc.x)**2+(z-cc.z)**2<=rr*rr){blocked[0][j*G.W+i]=1;const hh=Math.min(255,Math.round((cc.h==null?99:cc.h)*100));if(hh>jh[0][j*G.W+i])jh[0][j*G.W+i]=hh}}
       cols[0].push(new THREE.Box3(new THREE.Vector3(cc.x-cc.r,A.L0,cc.z-cc.r),new THREE.Vector3(cc.x+cc.r,A.L0+1,cc.z+cc.r)))}
     {const w=MC.walk0;for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;if(x<w[0]||x>w[1]||z<w[2]||z>w[3]){blocked[0][j*G.W+i]=1;blocked[1][j*G.W+i]=1;hard[0][j*G.W+i]=1;hard[1][j*G.W+i]=1}}}}
-  if(!OUTD){const fl=MC.mezz.map(n=>box(n));
+  if(!OUTD){const fl=(MC.mezz||[]).filter(n=>byName[n]).map(n=>box(n));
     for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;let ok=false;for(const b of fl)if(x>b.min.x+0.12&&x<b.max.x-0.12&&z>b.min.z+0.12&&z<b.max.z-0.12){ok=true;break}if(!ok){blocked[1][j*G.W+i]=1;hard[1][j*G.W+i]=1}}}
   for(let lv=0;lv<2;lv++)for(let j=0;j<G.H;j++)for(let i=0;i<G.W;i++){const x=G.x0+(i+.5)*G.c,z=G.z0+(j+.5)*G.c;
     for(const S of stairs)if(x>S.x0-0.02&&x<S.x1+0.02&&z>S.z0-0.4&&z<S.z1+0.2)blocked[lv][j*G.W+i]=0;}
@@ -791,7 +801,7 @@ ${FRAG_COLOR}
   }
   function cmdSleep(){if(OUTD)return;em('sleep');if(P.mode==='bed')return;const p0=startPos();const sides=['L','R'].filter(x=>!occ['bed'+x]||occ['bed'+x]===DEF.id).sort((a,b)=>{const va=bedPose(a),vb=bedPose(b);return Math.hypot(va.x-p0.x,va.z-p0.z)-Math.hypot(vb.x-p0.x,vb.z-p0.z)});if(!sides.length){toast('Giường đã có 2 người');return}const side=sides[0],s=bedPose(side);occ['bed'+side]=DEF.id;
     plan=[...leave(),...route(s.x,s.z,1,false,true),{t:'face',yaw:0},{t:'climbBed',side}];}
-  function cmdSit(type){if(OUTD)return;em('sit',type||0);if(P.mode==='sit'||P.mode==='type'){if(type)plan=[{t:type==='type'?'type':'sitidle'}];return}
+  function cmdSit(type){if(OUTD||!A.seatC)return;em('sit',type||0);if(P.mode==='sit'||P.mode==='type'){if(type)plan=[{t:type==='type'?'type':'sitidle'}];return}
     if(occ.chair&&occ.chair!==DEF.id){toast('Ghế đang có người');return}
     const side=pickSide(chairStandOf),s=chairStandOf(side);
     plan=[...leave(),...route(s.x,s.z,A.chairL,false,true),{t:'face',yaw:A.chairYaw},{t:'climbChair',side}];if(type==='type')plan.push({t:'type'});}
@@ -1027,7 +1037,7 @@ ${FRAG_COLOR}
       if(P.mode==='bed'){plan=[{t:'offBed'}];return}
       if(P.mode==='sit'||P.mode==='type'){plan=[{t:'offChair'}];return}
       if(P.mode==='watch'){cmdUnwatch();return}
-      const dB=nearestDist(bedPose),dC=nearestDist(chairStandOf),bOK=P.level===1&&dB<2.2,cOK=P.level===A.chairL&&dC<2.2;
+      const dB=nearestDist(bedPose),dC=A.seatC?nearestDist(chairStandOf):1e9,bOK=P.level===1&&dB<2.2,cOK=P.level===A.chairL&&dC<2.2;
       if(cOK&&(!bOK||dC<=dB)){cmdSit();return}if(bOK){cmdSleep();return}}
     if(P.mode==='bed'||P.mode==='sit'||P.mode==='type'||P.mode==='watch'){
       if(inp.mag>0.1){if(P.mode==='watch')cmdUnwatch();else plan=[{t:P.mode==='bed'?'offBed':'offChair'}]}
@@ -1198,8 +1208,14 @@ ${FRAG_COLOR}
     {key:'chair',icon:'chair',label:'Ngồi',at:()=>chairPt,state:()=>P0.mode==='sit'||P0.mode==='type'?{on:true,label:'Đứng dậy'}:(api.chairPin?{label:api.chairPin.label}:null),act:()=>{if(P0.mode==='sit'||P0.mode==='type')cmdOffChair();else if(api.chairPin)api.chairPin.act();else cmdSit()}},
     {key:'bed',icon:'sleep',label:'Ngủ',at:()=>bedPt,state:()=>P0.mode==='bed'?{on:true,label:'Thức dậy'}:null,act:()=>{if(P0.mode==='bed')cmdWake();else cmdSleep()}},
     ...(MC.doors?[]:[{key:'door',icon:'door',label:MC.doorLabel||'Bản đồ',at:()=>doorPt,act:()=>{if(MC.doorTo&&window.__switchMap){window.__switchMap(MC.doorTo);return}const b=$('iMap');if(b)b.click()}}]),
-    ...(MC.doors||[]).map((d,i)=>{const b=ctr(d.node),p=b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+(b.max.y-b.min.y>0.5?-0.8:0.15),(b.min.z+b.max.z)/2):null;
-      return {key:'door'+i,icon:'door',label:d.label,at:()=>p,act:()=>{if(window.__switchMap)window.__switchMap(d.to)}}})];
+    // cửa sang phòng khác: MC.doors (+ MC.doorsL2 khi nhà ≥ L2: lối lên tầng trên). d.at = [x,y,z] đặt ghim theo toạ độ khi không có node
+    ...[...(MC.doors||[]),...(L2&&MC.doorsL2?MC.doorsL2:[])].map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+(b.max.y-b.min.y>0.5?-0.8:0.15),(b.min.z+b.max.z)/2):null;
+      return {key:'door'+i,icon:'door',label:d.label,at:()=>p,act:()=>{if(window.__switchMap)window.__switchMap(d.to)}}}),
+    // điểm hoạt động (minigame / tiện ích nhà L2) — MC.spots [{node|at, label}]: đi tới gần rồi báo "Sắp có" (trò chơi làm sau, mỗi trò 1 file trong src/features/)
+    ...(MC.spots||[]).map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+0.25,(b.min.z+b.max.z)/2):null;
+      return {key:'spot'+i,icon:'star',label:d.label,at:()=>p,act:()=>{if(window.__vySpot&&window.__vySpot(d.id||d.label,d)===true)return;
+        if(p){const c=b?b.getCenter(new THREE.Vector3()):p,dx=P0.pos.x-c.x,dz=P0.pos.z-c.z,dd=Math.hypot(dx,dz)||1,r=b?Math.max(b.max.x-b.min.x,b.max.z-b.min.z)/2+0.55:0.8;cmdMove(c.x+dx/dd*r,c.z+dz/dd*r,0,false)}
+        toast('✨ '+d.label+' — Sắp có!')}}})];
    const pn=initPins({camera,items:items.filter(i=>i.at())});pinsUpd=pn.update;api.pins=pn;}
   // phím tắt (src/ui/shortcuts.js) → cùng các lệnh với nút ẩn ở trên
   {const ACT={walk:'bWalk',run:'bRun',sit:'bSit',type:'bType',off:'bOff',sleep:'bSleep',wake:'bWake'};window.__runMode=runMode;addEventListener('vy:act',e=>{let id=e.detail;if(id==='run'&&runMode.v)id='walk';   // R bật/tắt chế độ chạy — dùng chung cho cả WASD lẫn bấm chọn điểm

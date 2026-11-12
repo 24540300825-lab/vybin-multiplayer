@@ -8,7 +8,7 @@
 // Iframe dùng thẳng các đối tượng trên (cùng origin → chia sẻ được object JS). Khi iframe cũ bị gỡ, mọi callback nó đã đăng ký
 // vào các đối tượng chung được dọn (purge) để không gọi vào trang đã chết.
 import {CONFIG} from './config.js';
-import {MAP_LIST, isMap} from './maps.js';
+import {MAP_LIST, isMap, mapOpen, mapAssets} from './maps.js';
 import {FILES} from './manifest.js';
 import {connectStep} from './boot-session.js';
 import {APP_NAME} from './version.js';
@@ -21,9 +21,9 @@ export async function bootShell() {
   document.documentElement.classList.add('shell');
   // tải sẵn BYTE (HTTP cache) của map + nhân vật đoán trước — iframe sẽ parse; vỏ không parse để khỏi tốn CPU 2 lần
   {
-    let gm = (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap'); if (!isMap(gm)) gm = 'living';
+    let gm = (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap'); if (!mapOpen(gm)) gm = 'living';
     const gc = (CONFIG.as === 'bin' || CONFIG.as === 'vy') ? CONFIG.as : (localStorage.getItem('vyChar') || '');
-    const ids = [...MAP_LIST[gm].assets, ...(gc ? ['char-' + gc] : [])];
+    const ids = [...mapAssets(gm), ...(gc ? ['char-' + gc] : [])];
     ids.forEach(a => { const f = FILES[a]; if (f) fetch(`assets/${f.file}?v=${f.v}`).then(r => r.arrayBuffer()).catch(() => {}); });
   }
   const {mountGate, toast: ownToast} = await import('./ui/mp-ui.js');
@@ -119,7 +119,7 @@ export async function bootShell() {
   f.addEventListener('load', () => { try { f.focus(); f.contentWindow.focus(); } catch (e) {} });
   SH.setTitle = t => { document.title = t; };
   SH.go = id => {
-    if (!isMap(id)) return;
+    if (!mapOpen(id)) return;
     mapId = SH.mapId = id; SH.first = false;
     try { localStorage.setItem('vyMap', id); } catch (e) {}
     history.replaceState(null, '', location.pathname + location.search + '#map=' + id);

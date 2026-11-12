@@ -16,6 +16,11 @@ def('map-living', {owner: 'living', priority: 1});
 def('map-vy', {owner: 'vy', priority: 1});
 def('map-bin', {owner: 'bin', priority: 1});
 def('map-exterior', {owner: null, priority: 1});     // dùng chung: map vườn + ngoại cảnh của 3 phòng
+def('map-house-l2', {owner: null, priority: 1});     // nhà L2: phần tầng trên xếp chồng lên vỏ L1 (chỉ nạp khi nhà ≥ L2)
+def('map-game', {owner: 'game', priority: 1});
+def('map-kitchen', {owner: 'kitchen', priority: 1});
+def('map-memory', {owner: 'memory', priority: 1});
+def('map-greenhouse', {owner: 'greenhouse', priority: 1});
 def('char-vy', {owner: null, priority: 2});
 def('char-bin', {owner: null, priority: 2});
 

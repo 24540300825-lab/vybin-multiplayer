@@ -9,6 +9,7 @@ const IMG = {   // [file, left, top, width, height] (px thiết kế)
   tv: ['tv', 8, 10, 48, 48],
   sleep: ['sleep', 8, 0, 52, 52],
   door: ['door', 12.5, 8.5, 40, 41],
+  star: ['star', 11.5, 9, 40, 40],
 };
 const rem = n => (n / 16) + 'rem';
 const icon = k => { const [f, l, t, w, h] = IMG[k]; return '<img class="pi" alt="" draggable="false" src="assets/ui/pins/' + f + '.svg" style="left:' + rem(l) + ';top:' + rem(t) + ';width:' + rem(w) + ';height:' + rem(h) + '">'; };

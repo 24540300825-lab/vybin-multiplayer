@@ -2,7 +2,7 @@
 import {APP_VERSION} from './version.js';
 import {CONFIG} from './config.js';
 import * as Assets from './assets.js';
-import {MAP_LIST, DEFAULT_MAP, isMap, goToMap, prefetchMap} from './maps.js';
+import {MAP_LIST, DEFAULT_MAP, isMap, mapOpen, mapAssets, goToMap, prefetchMap} from './maps.js';
 import {FILES} from './manifest.js';
 import {SFX} from './sfx.js';
 import {MAP_CONFIGS} from './map-configs.js';
@@ -29,9 +29,9 @@ async function boot() {
   // KHỞI ĐỘNG SỚM, SONG SONG với bước chọn nhân vật / kết nối phòng: đoán map + nhân vật (hash/localStorage) rồi tải & parse ngay GLB (engine JS đã được modulepreload trong index.html).
   // Đoán đúng (gần như luôn đúng ở lần vào sau) → tới bước 2 mọi thứ đã sẵn; đoán sai chỉ tốn một ít băng thông (asset có cache bền).
   {
-    let gm = (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap'); if (!isMap(gm)) gm = DEFAULT_MAP;
+    let gm = (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap'); if (!mapOpen(gm)) gm = DEFAULT_MAP;
     const gc = (CONFIG.as === 'bin' || CONFIG.as === 'vy') ? CONFIG.as : (localStorage.getItem('vyChar') || '');
-    const pre = [gm]; for (const id of pre) MAP_LIST[id].assets.forEach(a => Assets.load(a).catch(() => {}));
+    const pre = [gm]; for (const id of pre) mapAssets(id).forEach(a => Assets.load(a).catch(() => {}));
     if (gc === 'bin' || gc === 'vy') Assets.load('char-' + gc).catch(() => {});
   }
   const {mountGate} = await import('./ui/mp-ui.js');
@@ -45,7 +45,7 @@ async function boot() {
   // ?as=bin|vy ép nhân vật (dùng khi test), không lưu.
   if (SH) {
     sess = SH.sess; slot = SH.slot;
-    mapId = (location.hash.match(/map=(\w+)/) || [])[1] || SH.mapId; if (!isMap(mapId)) mapId = DEFAULT_MAP;
+    mapId = (location.hash.match(/map=(\w+)/) || [])[1] || SH.mapId; if (!mapOpen(mapId)) mapId = DEFAULT_MAP;
   } else {
     const {connectStep} = await import('./boot-session.js');
     const r = await connectStep({gate, hide, LB}); if (!r) return;
@@ -57,13 +57,13 @@ async function boot() {
   // ---------- 2) nạp song song: engine (JS) + asset map + nhân vật của mình ----------
   LB(10, 'Đang tải bản đồ & nhân vật ' + slot.toUpperCase() + '...');
   const enginePromise = import('./game.js');   // KHÔNG import sớm: hud.js/game.js đọc LOCAL_SLOT/MAPID lúc nạp module (file đã được modulepreload nên vẫn nhanh)
-  const ids = [...MAP_LIST[mapId].assets, 'char-' + slot];
+  const ids = [...mapAssets(mapId), 'char-' + slot];
   const files = await Assets.loadGroup(ids, p => LB(10 + p * 60));
   const eng = await enginePromise;
   LB(75, 'Dựng cảnh...');
   await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
   const mapKey = 'map-' + mapId;
-  eng.init({env: files[mapKey], ext: mapId !== 'exterior' ? files['map-exterior'] || null : null, localGlb: files['char-' + slot], localSlot: slot, mapId});
+  eng.init({env: files[mapKey], ext: mapId !== 'exterior' ? files['map-exterior'] || null : null, l2: files['map-house-l2'] || null, localGlb: files['char-' + slot], localSlot: slot, mapId});
   const api = eng.api;
   LB(88, 'Biên dịch shader...');
   let warmed = false; try { warmed = localStorage.getItem('vyWarm') === mapId; } catch (e) {}   // lần sau: trình duyệt đã cache shader → chờ ngắn hơn
@@ -75,6 +75,7 @@ async function boot() {
   window.__prefetchMap = prefetchMap;
   window.__switchMap = async m => {
     if (!isMap(m) || m === mapId) return;
+    if (!mapOpen(m)) { try { window.__vyToast && window.__vyToast('🏡 Cần nâng nhà lên L2 để mở ' + MAP_LIST[m].name); } catch (e) {} return; }
     prefetchMap(m);
     goToMap(m);        // chỉ mình đổi map; người kia ở lại map của họ
   };

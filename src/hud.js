@@ -1,4 +1,5 @@
 import {$} from './shared.js';
+import {houseLevel} from './house.js';
 import {SFX} from './sfx.js';
 import {Lofi as Lofi0} from './lofi.js';
 import {createYTMusic} from './music-yt.js';
@@ -30,8 +31,10 @@ import {Fx} from './ui/fx.js';
    $('sChg').onclick=async()=>{const s=acc();
     if(s){if(!confirm('Đăng xuất khỏi tài khoản này? Tiến trình vẫn được lưu — đăng nhập lại là vào đúng nhân vật.'))return;await s.signOut();(window.top||window).location.reload();return}
     if(!confirm('Đổi nhân vật? Trang sẽ tải lại và hiện màn chọn Bin / Vy.'))return;try{localStorage.removeItem('vyChar')}catch(e){}const W=window.top||window,u=new URL(W.location.href);u.searchParams.delete('as');u.searchParams.delete('g');W.location.href=u.toString()}}
-  {const MAPID=window.MAPID,MI={living:['home','Phòng khách','Phòng khách 2 tầng, cửa sang phòng Vy & Bin'],vy:['home','Phòng Vy','Studio của Vy (gác lửng)'],bin:['home','Phòng Bin','Studio của Bin (gác lửng)'],exterior:['building','Vườn ngoài nhà','Sân vườn quanh nhà, cổng & hàng rào']};
-   $('mpList').innerHTML=Object.keys(MI).map(k=>`<div class="mapc${k===MAPID?' cur':''}" data-m="${k}"><span class="ic">${ic(MI[k][0])}</span><div><b>${MI[k][1]}${k===MAPID?' · đang ở':''}</b><small>${MI[k][2]}</small></div></div>`).join('');
+  {const MAPID=window.MAPID,MI={living:['home','Phòng khách','Phòng khách 2 tầng, cửa sang phòng Vy & Bin'],vy:['home','Phòng Vy','Studio của Vy (gác lửng)'],bin:['home','Phòng Bin','Studio của Bin (gác lửng)'],exterior:['building','Vườn ngoài nhà','Sân vườn quanh nhà, cổng & hàng rào'],
+     game:['home','Phòng Game','Tầng 2 · arcade, bi lắc, cờ, sofa xem TV'],kitchen:['home','Bếp & hiên ăn','Tầng 2 · bếp chung + hiên ăn giàn gỗ'],memory:['home','Phòng kỷ niệm','Tầng 2 · tường ảnh, hộp thư, quỹ chung'],greenhouse:['home','Vườn kính','Sân thượng · trồng cây + góc nghe nhạc']};
+   const HL=houseLevel(),L2M=['game','kitchen','memory','greenhouse'];
+   $('mpList').innerHTML=Object.keys(MI).map(k=>{const lk=L2M.includes(k)&&HL<2;return `<div class="mapc${k===MAPID?' cur':''}${lk?' lock':''}" data-m="${k}"${lk?' style="opacity:.5"':''}><span class="ic">${ic(MI[k][0])}</span><div><b>${MI[k][1]}${k===MAPID?' · đang ở':''}${lk?' · 🔒 cần nhà L2':''}</b><small>${MI[k][2]}</small></div></div>`}).join('');
    $('iMap').onclick=()=>$('hMap').classList.add('on');$('mX').onclick=()=>$('hMap').classList.remove('on');$('hMap').onclick=e=>{if(e.target.id==='hMap')$('hMap').classList.remove('on')};
    $('mpList').onclick=e=>{const c=e.target.closest('.mapc');if(!c||c.classList.contains('cur'))return;const m=c.dataset.m;$('hMap').classList.remove('on');window.__switchMap&&window.__switchMap(m)}
    $('mpList').onmouseover=e=>{const c=e.target.closest('.mapc');if(c&&window.__prefetchMap)window.__prefetchMap(c.dataset.m)}}

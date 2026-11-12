@@ -2,7 +2,7 @@
 // Dùng chung cho trang vỏ (shell.js — chạy 1 lần, giữ phiên suốt khi đổi map) và chế độ không vỏ (?noshell).
 // Trả về {sess, slot, mapId} hoặc null nếu đang dừng ở một màn chờ (đăng nhập / phòng đầy / lỗi).
 import {CONFIG} from './config.js';
-import {DEFAULT_MAP, isMap} from './maps.js';
+import {DEFAULT_MAP, isMap, mapOpen} from './maps.js';
 
 const $ = id => document.getElementById(id);
 const mapFromUrl = () => (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap');
@@ -62,7 +62,7 @@ export async function connectStep({gate, hide, LB}) {
         pref = await pickChar({taken, note}); note = '';
         if (!forced) saveChar(pref);
       }
-      try { const r = await sess.connect(pref); slot = r.slot; mapId = mapFromUrl(); if (!isMap(mapId)) mapId = r.map; break; }   // map là của RIÊNG từng người
+      try { const r = await sess.connect(pref); slot = r.slot; mapId = mapFromUrl(); if (!mapOpen(mapId)) mapId = r.map; break; }   // map là của RIÊNG từng người
       catch (e) {
         if (e.code === 'taken' && sess.account) { fatal(new Error((pref === 'bin' ? 'Bin' : 'Vy') + ' đang được một phiên khác giữ chỗ. Thử lại sau ít phút.')); return null; }
         if (e.code === 'taken') { note = (pref === 'bin' ? 'Bin' : 'Vy') + ' đang có người khác dùng — hãy chọn nhân vật còn lại.'; pref = null; continue; }
@@ -75,6 +75,6 @@ export async function connectStep({gate, hide, LB}) {
     if (!forced) saveChar(slot);
     mapId = mapFromUrl();
   }
-  if (!isMap(mapId)) mapId = DEFAULT_MAP;
+  if (!mapOpen(mapId)) mapId = DEFAULT_MAP;
   return {sess, slot, mapId};
 }
