@@ -1348,7 +1348,7 @@ ${FRAG_COLOR}
   let grassCol=null;const grassTex=(()=>{let t=null;const gn=MC.gtex||'Plane001';(extG||env).traverse(o=>{if(o.isMesh&&o.name===gn&&o.material.map){t=o.material.map;grassCol=o.material.color.clone()}});return t})();
   const gTex=grassTex?grassTex.clone():null;if(gTex){gTex.channel=0;gTex.wrapS=gTex.wrapT=THREE.RepeatWrapping;gTex.repeat.set(110,110);gTex.needsUpdate=true}
   const ground=new THREE.Mesh(new THREE.CircleGeometry(650,48),new THREE.MeshStandardMaterial({map:gTex,color:(MC.gtex&&grassCol)||0xffffff,roughness:1,metalness:0}));ground.material.userData.ground=true;if(OUTD||extG){FU.uGTint.value.setRGB(0.68,0.8,0.52);ground.material.userData.desat=0.95}toonify(ground);
-  ground.rotation.x=-Math.PI/2;ground.position.set(0,OUTD?A.L0-0.03:extG?MAPS.exterior.floorY-0.03:-0.3,0);ground.renderOrder=-999;ground.receiveShadow=OUTD||!!extG;scene.add(ground);
+  ground.rotation.x=-Math.PI/2;ground.position.set(0,OUTD?A.L0-0.03:extG?MAPS.exterior.floorY-0.03+((MC.ext&&MC.ext.dy)||0):-0.3,0);   // dy: phòng tầng trên → mặt đất vườn nằm dưới sàn phòngground.renderOrder=-999;ground.receiveShadow=OUTD||!!extG;scene.add(ground);
   if(OUTD){envMeshes.push(ground)}if(OUTD||extG)FU.uGMap.value=gTex;
 
   // ===== TỐI ƯU: gộp mesh tĩnh theo material (batching), tắt matrix auto, ngoại cảnh: bỏ bóng + cull theo khoảng cách =====
@@ -2094,6 +2094,6 @@ ${FRAG_COLOR}
    const cell=aoGrid(bb,0.15);{const cf={bounds:bb,cell,R:0.9,rays:OUTD?24:36};if((TP.ao==null?0.7:TP.ao)>0)setTimeout(()=>ao.bake(cf),400);else ao.bake(Object.assign({},cf,{sync:false,defer:true}));window.__aoEnsure=()=>ao.ensure();}window.__aoDirty=()=>ao.dirty();}
   api.toonMat=toonMat;   // để nội thất đặt thêm (src/build/furniture.js) cùng kiểu đổ bóng toon với nhà
   // cây người chơi rải ngoài vườn đi chung đường ống cây cối của vườn (exterior.js setUser); map trong nhà: ngoại cảnh dời theo MC.ext
-  api.ext=EXT||EXTV;api.extOff=extG?{dx:extG.position.x,dz:extG.position.z}:{dx:0,dz:0};
+  api.ext=EXT||EXTV;api.extOff=extG?{dx:extG.position.x,dy:extG.position.y,dz:extG.position.z}:{dx:0,dy:0,dz:0};
   window.__FU=FU;window.VY={EXT,Perf,local,get remote(){return remote},api,A,scene,camera,renderer,controls,tick,THREE,doorList,toggleDoor,occ,TP,envApply,rain,ripples,garden,WC};
 }

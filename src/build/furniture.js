@@ -209,7 +209,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
   // ---------- vẽ cây vườn: 1 InstancedMesh cho mỗi (loại, biến thể, mảnh mesh) ----------
   const instRoot = new THREE.Group(); instRoot.name = 'PlacedGarden'; scene.add(instRoot);
   let instMeshes = [];
-  const EXT = api.ext && api.ext.setUser ? api.ext : null, OFF = api.extOff || {dx: 0, dz: 0};
+  const EXT = api.ext && api.ext.setUser ? api.ext : null, OFF = api.extOff || {dx: 0, dy: 0, dz: 0};
   let outdoorView = [];     // map trong nhà: cây đã rải ngoài vườn (chỉ để vẽ qua khung cửa — không chặn, không chọn)
   function rebuildInst() {
     instMeshes.forEach(m => { instRoot.remove(m); m.dispose && m.dispose(); }); instMeshes = [];
@@ -220,7 +220,7 @@ export async function mountFurniture({prog, sess, api, mapId, slot, toast}) {
     const want = new Set();
     groups.forEach((G0, key) => {
       const parts = partsOf(G0.def, G0.v); if (!parts || !parts.length) return;
-      const mats = G0.list.map(({rec, dx, dz}) => { rec.obj.updateMatrix(); const m = rec.obj.matrix.clone(); if (dx || dz) m.premultiply(T.makeTranslation(dx, 0, dz)); m.pid = rec.id; return m; });
+      const mats = G0.list.map(({rec, dx, dz}) => { rec.obj.updateMatrix(); const m = rec.obj.matrix.clone(); if (dx || dz || OFF.dy) m.premultiply(T.makeTranslation(dx, OFF.dy || 0, dz)); m.pid = rec.id; return m; });
       if (EXT) {      // đi chung đường ống cây cối của vườn
         EXT.setUser('u:' + key, parts.map(p => ({geometry: p.geometry, material: p.raw ? toonOf(p.material, G0.def) : p.material, raw: p.raw})), clsOf(G0.def), mats); want.add('u:' + key);
         return;
