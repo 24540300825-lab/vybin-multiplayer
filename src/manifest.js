@@ -22,8 +22,8 @@ export const FILES = {
  },
  "map-cinema": {
   "file": "map-cinema.glb",
-  "v": "e32b8243",
-  "size": 203196
+  "v": "a6399993",
+  "size": 209632
  },
  "map-exterior-l2": {
   "file": "map-exterior-l2.glb",
@@ -32,8 +32,8 @@ export const FILES = {
  },
  "map-exterior-l3": {
   "file": "map-exterior-l3.glb",
-  "v": "ee1faa86",
-  "size": 12596288
+  "v": "09f88d2a",
+  "size": 12564684
  },
  "map-exterior": {
   "file": "map-exterior.glb",
@@ -42,23 +42,23 @@ export const FILES = {
  },
  "map-game": {
   "file": "map-game.glb",
-  "v": "01cc9043",
+  "v": "46453578",
   "size": 912088
  },
  "map-greenhouse": {
   "file": "map-greenhouse.glb",
-  "v": "d1e5644a",
+  "v": "33ed1829",
   "size": 274224
  },
  "map-karaoke": {
   "file": "map-karaoke.glb",
-  "v": "30606bdd",
-  "size": 188320
+  "v": "9ec4a24f",
+  "size": 188376
  },
  "map-library": {
   "file": "map-library.glb",
-  "v": "59bf75d0",
-  "size": 998264
+  "v": "cf2409eb",
+  "size": 945688
  },
  "map-living": {
   "file": "map-living.glb",
@@ -67,13 +67,13 @@ export const FILES = {
  },
  "map-memory": {
   "file": "map-memory.glb",
-  "v": "c3c978a2",
-  "size": 514528
+  "v": "86a9f1a7",
+  "size": 514640
  },
  "map-spa": {
   "file": "map-spa.glb",
-  "v": "97073930",
-  "size": 218168
+  "v": "6398ebcf",
+  "size": 193052
  },
  "map-vy": {
   "file": "map-vy.glb",
@@ -82,7 +82,7 @@ export const FILES = {
  },
  "map-workshop": {
   "file": "map-workshop.glb",
-  "v": "e5dea17d",
+  "v": "bf831a07",
   "size": 736256
  }
 };
