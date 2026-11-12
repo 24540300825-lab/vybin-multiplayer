@@ -18,7 +18,7 @@ def('map-bin', {owner: 'bin', priority: 1});
 def('map-exterior', {owner: null, priority: 1});     // dùng chung: map vườn + ngoại cảnh của 3 phòng
 def('map-exterior-l2', {owner: null, priority: 1});  // nhà L2: = map-exterior bản chính (vườn giữ nguyên), chỉ thay phần nhà bằng nhà L2
 def('map-game', {owner: 'game', priority: 1});
-def('map-kitchen', {owner: 'kitchen', priority: 1});
+def('map-workshop', {owner: 'workshop', priority: 1});
 def('map-memory', {owner: 'memory', priority: 1});
 def('map-greenhouse', {owner: 'greenhouse', priority: 1});
 def('char-vy', {owner: null, priority: 2});

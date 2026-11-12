@@ -7,7 +7,7 @@ export const MAP_LIST = {
   exterior: {name: 'Vườn ngoài nhà', icon: '🌳', desc: 'Sân vườn quanh nhà, cổng & hàng rào', assets: ['map-exterior']},
   // ===== nhà L2 (tầng trên) — chỉ vào được khi nhà đã lên cấp 2 (src/house.js) =====
   game:       {name: 'Phòng Game', icon: '🕹️', desc: 'Tầng 2 trên phòng khách: arcade, bi lắc, cờ, sofa xem TV', assets: ['map-game', 'map-exterior'], minHouse: 2},
-  kitchen:    {name: 'Bếp & hiên ăn', icon: '🍳', desc: 'Tầng 2 trên phòng Bin: bếp chung + hiên ăn có giàn gỗ', assets: ['map-kitchen', 'map-exterior'], minHouse: 2},
+  workshop:   {name: 'Xưởng thủ công', icon: '🧵', desc: 'Tầng 2 trên phòng Bin: bàn chế tạo, tường dụng cụ, giá vẽ + hiên ăn ngoài trời', assets: ['map-workshop', 'map-exterior'], minHouse: 2},
   memory:     {name: 'Phòng kỷ niệm', icon: '💌', desc: 'Tầng 2 trên phòng Vy: tường ảnh, hộp thư, quỹ chung', assets: ['map-memory', 'map-exterior'], minHouse: 2},
   greenhouse: {name: 'Vườn kính', icon: '🌿', desc: 'Nhà kính trên sân thượng: trồng cây + góc nghe nhạc', assets: ['map-greenhouse', 'map-exterior'], minHouse: 2},
 };

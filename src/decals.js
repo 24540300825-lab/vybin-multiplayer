@@ -23,13 +23,14 @@ export function patchDecal(sh, m) {
     .replace('#include <begin_vertex>', `#include <begin_vertex>
       vFlip=mod(float(gl_InstanceID),2.0);   // nửa số tấm lật ngang → đỡ lặp
       {float ly=transformed.y*_ct,lz=-transformed.y*_st;transformed=vec3(transformed.x*_c+lz*_s,ly,-transformed.x*_s+lz*_c);}`);
-  sh.fragmentShader = 'uniform vec3 uTgt;uniform vec4 uBox;uniform float uR0,uR1,uM0,uM1,uMist,uFar;varying float vFlip;\n' + (tree ? '' : 'uniform sampler2D uGMap;uniform float uGK;\n') + sh.fragmentShader
+  sh.fragmentShader = 'uniform vec3 uTgt;uniform vec4 uBox;uniform float uR0,uR1,uM0,uM1,uMist,uFar;varying float vFlip;\n' + (tree ? '' : 'uniform sampler2D uGMap;uniform float uGK;uniform vec4 uFen;uniform float uFenK;\n') + sh.fragmentShader
     .replace('#include <map_fragment>', `
       vec2 _uv=vMapUv;${tree ? '' : '_uv.x=vFlip>0.5?1.0-_uv.x:_uv.x;'}vec4 _da=texture2D(map,_uv);float _mk=texture2D(normalMap,_uv).a;
       {// hiện dần theo khoảng cách tới nhân vật (dither ổn định trên màn hình) — gần thì đã có cây cỏ 3D thật
        float dd=distance(vWP.xz,uTgt.xz);if(uBox.y>uBox.x){vec2 _bq=max(max(vec2(uBox.x-vWP.x,uBox.z-vWP.z),vec2(vWP.x-uBox.y,vWP.z-uBox.w)),0.0);dd=length(_bq);}float fz=smoothstep(uR0,uR1,dd)*(1.0-smoothstep(uFar*0.85,uFar,dd));
        float hs=fract(52.9829189*fract(dot(floor(gl_FragCoord.xy),vec2(0.06711056,0.00583715))));
        if(fz<=hs*0.98+0.01)discard;}
+      ${tree ? '' : 'if(uFenK>0.5&&vWP.x>uFen.x&&vWP.x<uFen.y&&vWP.z>uFen.z&&vWP.z<uFen.w)discard;'}   // ULTRA: trong hàng rào đã có thảm cỏ thật (meadow.js)
       ${tree ? `vec3 _lf=mix(uLeafA,uLeafB,smoothstep(0.18,0.95,_da.r))*vec3(0.93,1.0,1.09)*mix(0.82,1.06,_da.r);   // ngả teal như cỏ cây 3D; giữ sáng tối trong tán
       diffuseColor.rgb*=mix(_da.rgb,_lf,_mk);` : `// CỎ: màu lấy THẲNG từ texture thảm ngay dưới (đúng công thức cỏ 3D gần) → luôn tệp màu với thảm ở mọi góc nhìn; chỉ giữ chút sáng tối của cụm
       vec3 _gt=texture2D(uGMap,vec2(55.0+vWP.x*uGK,55.0-vWP.z*uGK)).rgb*uGTint;float _gl=dot(_gt,vec3(0.299,0.587,0.114));
@@ -54,6 +55,7 @@ export function makeFoliageDecals({scene, toonMat, trees = [], grass = [], indoo
     grass: {uTgt: {value: new THREE.Vector3()}, uR0: {value: 11}, uR1: {value: 15.5}, uM0: {value: 25}, uM1: {value: 130}, uMist: {value: 0}, uFar: {value: 150}},   // cỏ: chỉ sương chung như thảm (không mist riêng) → không tách màu
   };
   U.grass.uTgt = U.tree.uTgt; U.grass.uBox = U.tree.uBox;                      // dùng chung 1 vector tâm
+  U.grass.uFen = {value: new THREE.Vector4(0, -1, 0, -1)}; U.grass.uFenK = {value: 0};   // ULTRA: bỏ decal cỏ trong hàng rào (đã có thảm cỏ thật)
   const meshes = [];
   function build(kind, list, base) {
     if (!list.length) return;

@@ -22,8 +22,8 @@ export const FILES = {
  },
  "map-exterior-l2": {
   "file": "map-exterior-l2.glb",
-  "v": "eb94952a",
-  "size": 7410292
+  "v": "8c0cc7d9",
+  "size": 7416172
  },
  "map-exterior": {
   "file": "map-exterior.glb",
@@ -40,11 +40,6 @@ export const FILES = {
   "v": "276826b6",
   "size": 274208
  },
- "map-kitchen": {
-  "file": "map-kitchen.glb",
-  "v": "796b89d7",
-  "size": 269628
- },
  "map-living": {
   "file": "map-living.glb",
   "v": "7f2cfeff",
@@ -59,5 +54,10 @@ export const FILES = {
   "file": "map-vy.glb",
   "v": "e97eb83e",
   "size": 1129644
+ },
+ "map-workshop": {
+  "file": "map-workshop.glb",
+  "v": "dc089723",
+  "size": 682884
  }
 };

@@ -125,6 +125,13 @@ ${FRAG_COLOR}
           float gM=uGS*1.5708,gs=uGM*1.5708;
           Ig=angG<gM?1.0:((gs>0.0001&&angG<gM+gs)?1.0-(angG-gM)/gs:0.0);
           Ig*=step(0.0,ndl);
+          #ifdef VY_ROOF
+          {// mái ngói: điểm loáng tính theo pháp tuyến NỔI của từng viên (stylize.js) + chỉ trên sống viên → không loang cả mảng mái phẳng
+           vec3 nR=dot(vyRN,vyRN)>0.5?vyRN:geometryNormal;if(dot(nR,geometryNormal)<0.0)nR=-nR;
+           vec3 Rr=reflect(-geometryViewDir,nR);float aR=acos(clamp(dot(Rr,Ld),-1.0,1.0));
+           Ig=aR<gM*0.6?1.0:((gs>0.0001&&aR<gM*0.6+gs)?1.0-(aR-gM*0.6)/gs:0.0);
+           Ig*=step(0.0,ndl)*smoothstep(0.62,0.97,vyRH);}
+          #endif
          #endif
          vec3 wn=inverseTransformDirection(geometryNormal,viewMatrix);
          vec3 amb=mix(uAmbG,uAmbS,wn.y*0.5+0.5);
@@ -219,7 +226,7 @@ ${FRAG_COLOR}
     g.setIndex(out);o.geometry=g;console.log('[cutTop] '+o.name+': '+(ix.length-out.length)/3+' tam giác bỏ')})}
   env.updateMatrixWorld(true);
   let EXT=null;
-  if(OUTD){const _t0=performance.now();EXT=setupExterior({scene,env,MC,toonMat});api.stylize(EXT.group);console.log('[ext] setup '+Math.round(performance.now()-_t0)+'ms');if(/[?&]tune\b/.test(location.search))import('./tune.js').then(m=>m.mountTune(EXT,FU));for(let i=envMeshes.length-1;i>=0;i--)if(!envMeshes[i].parent)envMeshes.splice(i,1);
+  if(OUTD){const _t0=performance.now();EXT=setupExterior({scene,env,MC,toonMat,ultra:TP.quality==='ultra'});api.stylize(EXT.group);console.log('[ext] setup '+Math.round(performance.now()-_t0)+'ms');if(/[?&]tune\b/.test(location.search))import('./tune.js').then(m=>m.mountTune(EXT,FU));for(let i=envMeshes.length-1;i>=0;i--)if(!envMeshes[i].parent)envMeshes.splice(i,1);
     env.traverse(o=>{if(o.isMesh&&/^Stylized Grass$/.test((o.material&&o.material.name)||''))o.visible=false;if(o.isMesh&&/^\.SF_/.test(o.name))o.visible=false});env.updateMatrixWorld(true)}
   // ===== map TRONG NHÀ có ngoại cảnh: dùng lại nguyên map ngoài vườn (map-exterior, đúng như bản đang chạy) quanh căn nhà =====
   // MC.ext = {dx,dz: dời ngoại cảnh cho khớp toạ độ phòng; hide: regex node vỏ nhà phải ẩn (cánh nhà đang ở bị cắt); roofX: x tâm mái (instancing) cần ẩn}
@@ -241,7 +248,7 @@ ${FRAG_COLOR}
     toonify(extG);console.log('[sty] ngoại cảnh: '+api.stylize(extG));scene.add(extG);extG.updateMatrixWorld(true);
     const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
     const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null,indoor:true,floorY:(E0.floorY||0)+(X.dy||0)};   // dy: phòng tầng trên (nhà L2) → mặt đất vườn nằm thấp hơn sàn phòng
-    EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat});api.stylize(EXTV.group);EXTV.setLevel(TP.quality==='low'?'low':'indoor');
+    EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat,ultra:TP.quality==='ultra'});api.stylize(EXTV.group);EXTV.setLevel(TP.quality==='low'?'low':'indoor');
     // cây/bụi lẻ (không nằm trong ô instancing) ở XA nhà: bỏ hẳn — từ camera trên cao nhìn xuống chỉ thấy khối thô xấu; gần nhà giữ nguyên
     {const C=new THREE.Vector3(5,0,-4),sp=new THREE.Sphere();let n=0;extG.updateMatrixWorld(true);env.updateMatrixWorld(true);
      [extG,env].forEach(R=>R&&R.traverse(o=>{if(!o.isMesh||!o.visible)return;for(let p=o;p;p=p.parent)if(p.name==='EXT_CELLS')return;
@@ -1207,8 +1214,9 @@ ${FRAG_COLOR}
     // điểm hoạt động (minigame / tiện ích nhà L2) — MC.spots [{node|at, label}]: đi tới gần rồi báo "Sắp có" (trò chơi làm sau, mỗi trò 1 file trong src/features/)
     ...(MC.spots||[]).map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+0.25,(b.min.z+b.max.z)/2):null;
       return {key:'spot'+i,icon:'star',label:d.label,at:()=>p,act:()=>{if(window.__vySpot&&window.__vySpot(d.id||d.label,d)===true)return;
+        if(d.open==='craft'&&window.__vyQuests&&window.__vyQuests.openBag){window.__vyQuests.openBag('craft');return}   // Xưởng thủ công: mở bảng Chế tạo có sẵn
         if(p){const c=b?b.getCenter(new THREE.Vector3()):p,dx=P0.pos.x-c.x,dz=P0.pos.z-c.z,dd=Math.hypot(dx,dz)||1,r=b?Math.max(b.max.x-b.min.x,b.max.z-b.min.z)/2+0.55:0.8;cmdMove(c.x+dx/dd*r,c.z+dz/dd*r,0,false)}
-        toast('✨ '+d.label+' — Sắp có!')}}})];
+        if(!d.open)toast('✨ '+d.label+' — Sắp có!')}}})];
    const pn=initPins({camera,items:items.filter(i=>i.at())});pinsUpd=pn.update;api.pins=pn;}
   // phím tắt (src/ui/shortcuts.js) → cùng các lệnh với nút ẩn ở trên
   {const ACT={walk:'bWalk',run:'bRun',sit:'bSit',type:'bType',off:'bOff',sleep:'bSleep',wake:'bWake'};window.__runMode=runMode;addEventListener('vy:act',e=>{let id=e.detail;if(id==='run'&&runMode.v)id='walk';   // R bật/tắt chế độ chạy — dùng chung cho cả WASD lẫn bấm chọn điểm
@@ -1348,7 +1356,7 @@ ${FRAG_COLOR}
   let grassCol=null;const grassTex=(()=>{let t=null;const gn=MC.gtex||'Plane001';(extG||env).traverse(o=>{if(o.isMesh&&o.name===gn&&o.material.map){t=o.material.map;grassCol=o.material.color.clone()}});return t})();
   const gTex=grassTex?grassTex.clone():null;if(gTex){gTex.channel=0;gTex.wrapS=gTex.wrapT=THREE.RepeatWrapping;gTex.repeat.set(110,110);gTex.needsUpdate=true}
   const ground=new THREE.Mesh(new THREE.CircleGeometry(650,48),new THREE.MeshStandardMaterial({map:gTex,color:(MC.gtex&&grassCol)||0xffffff,roughness:1,metalness:0}));ground.material.userData.ground=true;if(OUTD||extG){FU.uGTint.value.setRGB(0.68,0.8,0.52);ground.material.userData.desat=0.95}toonify(ground);
-  ground.rotation.x=-Math.PI/2;ground.position.set(0,OUTD?A.L0-0.03:extG?MAPS.exterior.floorY-0.03+((MC.ext&&MC.ext.dy)||0):-0.3,0);   // dy: phòng tầng trên → mặt đất vườn nằm dưới sàn phòngground.renderOrder=-999;ground.receiveShadow=OUTD||!!extG;scene.add(ground);
+  ground.rotation.x=-Math.PI/2;/* dy: phòng tầng trên → mặt đất vườn nằm dưới sàn phòng */ground.position.set(0,OUTD?A.L0-0.03:extG?MAPS.exterior.floorY-0.03+((MC.ext&&MC.ext.dy)||0):-0.3,0);ground.renderOrder=-999;ground.receiveShadow=OUTD||!!extG;scene.add(ground);
   if(OUTD){envMeshes.push(ground)}if(OUTD||extG)FU.uGMap.value=gTex;
 
   // ===== TỐI ƯU: gộp mesh tĩnh theo material (batching), tắt matrix auto, ngoại cảnh: bỏ bóng + cull theo khoảng cách =====

@@ -21,6 +21,8 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
   const REF = {wood: 0.47, wooddk: 0.29};
   // độ mạnh vân (đã chia cho hệ số mã hoá log lúc tạo file: concrete 1.6, wood 0.35)
   const roofPH = {value: 0.075};   // độ sâu parallax mái ngói (theo đơn vị UV)
+  // ngói đang bị ngược chiều dốc (mép tròn viên ngói phải chĩa XUỐNG mái hiên) → xoay texture mái 180° (height map đọc cùng vMapUv nên xoay theo)
+  T.roofC.center.set(0.5, 0.5); T.roofC.rotation = Math.PI;
   const DK = {conc: 2.0 / 1.6, wood: 0.75 / 0.35, wall: 2.5 / 1.6};
   const v3 = new THREE.Vector3(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sz = new THREE.Vector3();
 
@@ -162,7 +164,8 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
       #endif`);
     } else if (k === 'roof') {
       sh.uniforms.uHM = {value: m.userData.vyHM}; sh.uniforms.uPH = roofPH;
-      sh.fragmentShader = 'uniform sampler2D uHM;uniform float uPH;\n' + sh.fragmentShader.replace('#include <map_fragment>', `
+      sh.fragmentShader = '#define VY_ROOF\nuniform sampler2D uHM;uniform float uPH;\n' + sh.fragmentShader.replace('#include <map_fragment>', `
+      float vyRH=0.75;vec3 vyRN=vec3(0.0);   // độ cao viên ngói (0 = khe, 1 = sống viên) + pháp tuyến nổi theo từng viên (view space) → game.js VY_ROOF: loáng theo từng viên
       #ifdef USE_MAP
       {// PARALLAX OCCLUSION: dựng hệ trục tiếp tuyến từ đạo hàm màn hình (không cần tangent trong mesh), dò độ sâu theo height map
        vec3 pe=-vViewPosition,q0=dFdx(pe),q1=dFdy(pe);vec2 st0=dFdx(vMapUv),st1=dFdy(vMapUv);
@@ -175,7 +178,9 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
        vec2 pu=cu+dd;float af=hv-cd,bf=(1.0-textureGrad(uHM,pu,st0,st1).r)-cd+dl;float w=af/(af-bf+1e-4);vec2 uvp=mix(cu,pu,clamp(w,0.0,1.0));
        vec4 tc=textureGrad(map,uvp,st0,st1);float h=textureGrad(uHM,uvp,st0,st1).r;
        float l=dot(tc.rgb,vec3(0.299,0.587,0.114));tc.rgb=mix(vec3(l),tc.rgb,0.72)*mix(0.7,1.05,h);   // bớt bão hoà + khe giữa các viên tối lại
-       diffuseColor*=tc;}
+       diffuseColor*=tc;vyRH=h;
+       {float e=0.0035;float hx=textureGrad(uHM,uvp+vec2(e,0.0),st0,st1).r-textureGrad(uHM,uvp-vec2(e,0.0),st0,st1).r,hy=textureGrad(uHM,uvp+vec2(0.0,e),st0,st1).r-textureGrad(uHM,uvp-vec2(0.0,e),st0,st1).r;
+        vyRN=normalize(Nf-(Tt*hx+Bt*hy)*5.0);}}   // mặt cong từng viên ngói (đạo hàm height map) — không còn loáng cả mảng phẳng
       #endif`);
     }
   }

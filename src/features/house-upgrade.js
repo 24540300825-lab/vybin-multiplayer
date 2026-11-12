@@ -4,7 +4,7 @@ import {HOUSE_RULES, houseLevel, setHouseLevel} from '../house.js';
 
 // tải lại map đang đứng (có trang vỏ: chỉ nạp lại khung game → cuộc gọi / nhạc / chat không đứt). Map tầng trên bị khoá khi hạ cấp → về phòng khách.
 const reloadMap = (id) => {
-  const L2ONLY = ['game', 'kitchen', 'memory', 'greenhouse'];
+  const L2ONLY = ['game', 'workshop', 'memory', 'greenhouse'];
   if (houseLevel() < 2 && L2ONLY.includes(id)) id = 'living';
   try { sessionStorage.setItem('vyFrom', ''); localStorage.setItem('vyMap', id); } catch (e) {}
   let sh = null; try { sh = window.parent && window.parent !== window ? window.parent.VYSHELL : null; } catch (e) {}

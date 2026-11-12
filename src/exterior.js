@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import {FILES} from './manifest.js';
 import {makeDepthMat} from './foliage.js';
 import {makeFoliageDecals} from './decals.js';
+import {makeMeadow} from './meadow.js';
 
 // ---- mức chất lượng: mật độ, tầm nhìn, bóng, số lớp sương, hạt mưa -----------------------------------------
 export const LEVELS = {
@@ -370,7 +371,7 @@ export function setupExterior(c) {
     return out.length;
   }
   const farN = {};
-  const F = MC.farDensity || 1;
+  const F = (MC.farDensity || 1) * (c.ultra ? 1.6 : 1);   // ultra: rải dày hơn ngoài hàng rào để không lộ thưa
   farN.tree = scatter('tree', Math.round(1100 * F), 2.2, 150, d => rnd() < 0.95 - d / 260);
   // cỏ/hoa/bụi/đá 3D ngoài hàng rào: chỉ dải sát hàng rào (xa hơn là thảm + decal cỏ)
   farN.bush = scatter('bush', Math.round(110 * F), 1.8, 18, () => true);
@@ -379,7 +380,7 @@ export function setupExterior(c) {
   farN.flower = scatter('flower', Math.round(300 * F), 0.9, 14, d => rnd() < 1.0 - d / 20);
   // ---- 4c) DECAL: dải cỏ um tùm phủ khắp vườn + ra xa (hiện từ ~15 m), cây xa = tấm cây (hiện từ ~30 m) ----
   const decGrass = [];
-  { const step0 = INDOOR ? 2.0 : 1.45, step1 = INDOOR ? 3.6 : 2.35, ext = INDOOR ? 70 : 95, y = MC.floorY || 0, np = MC.noPlant || [];
+  { const UL = !!c.ultra, step0 = INDOOR ? 2.0 : 1.45, step1 = INDOOR ? (UL ? 2.4 : 3.6) : (UL ? 1.5 : 2.35), ext = INDOOR ? 70 : 95, y = MC.floorY || 0, np = MC.noPlant || [];
     for (let z = R0[2] - ext; z < R0[3] + ext; z += 1) {
       const inZ = z > R0[2] && z < R0[3];
       for (let x = R0[0] - ext; x < R0[1] + ext; x += 1) {
@@ -447,7 +448,16 @@ export function setupExterior(c) {
   const IB = [-0.3, 10.3, -8.3, 0.6];   // hộp nội thất (khung camera chỉ pan trong đây) — ngoại cảnh chỉ cần cho vùng nhìn ra từ hộp này
   if (INDOOR) DEC.U.tree.uBox.value.set(IB[0], IB[1], IB[2], IB[3]);
   let level = 'medium', lv = LEVELS.medium;
+  // ULTRA: thảm cỏ thật phủ kín trong hàng rào (src/meadow.js) — dựng lần đầu bật ultra; cỏ LOD cũ + decal cỏ trong hàng rào nhường chỗ
+  let MEAD = null, meadOn = false;
+  const inFence = (x, z) => x > R0[0] && x < R0[1] && z > R0[2] && z < R0[3];
+  function setMeadow(on) {
+    if (on && !MEAD) { try { MEAD = makeMeadow({scene, env, MC, toonMat, colliders}); } catch (e) { console.warn('[meadow]', e); MEAD = null; } }
+    meadOn = !!(on && MEAD); if (MEAD) MEAD.setOn(meadOn);
+    const G = DEC.U.grass; if (G.uFenK) { G.uFenK.value = meadOn ? 1 : 0; G.uFen.value.set(R0[0] + 0.6, R0[1] - 0.6, R0[2] + 0.6, R0[3] - 0.6); }
+  }
   function setLevel(q) { if (!LEVELS[q]) return; level = q; lv = LEVELS[q]; hazes.forEach((h, i) => h.visible = i < lv.haze);
+    setMeadow(q === 'ultra' || q === 'indoorUltra');
     // decal bắt đầu đúng chỗ cây cỏ 3D hết (theo chất lượng)
     const tr = CLASS.tree.maxD * lv.dist, gr = CLASS.grass.maxD * lv.dist; DEC.U.tree.uR0.value = tr - 7; DEC.U.tree.uR1.value = tr - 1.5; DEC.U.grass.uR0.value = gr - 4.5; DEC.U.grass.uR1.value = gr - 0.5; }
   setLevel('medium');
@@ -456,7 +466,7 @@ export function setupExterior(c) {
     for (const ce of cells) {
       const CL = CLASS[ce.cls];
       const d = INDOOR ? Math.max(0, Math.hypot(Math.max(IB[0] - ce.cx, 0, ce.cx - IB[1]), Math.max(IB[2] - ce.cz, 0, ce.cz - IB[3])) - CL.cell * 0.4) : Math.hypot(ce.cx - target.x, ce.cz - target.z);
-      const dist = CL.maxD * lv.dist, vis = d < dist;
+      const dist = CL.maxD * lv.dist, vis = d < dist && !(meadOn && ce.cls === 'grass' && !ce.user && inFence(ce.cx, ce.cz));
       const lod0 = !ce.im1 || d < CL.lod * lv.dist;            // gần: hình đủ chi tiết; xa: hình giảm tam giác
       const v0 = vis && lod0, v1 = vis && !lod0;
       if (ce.im.visible !== v0) ce.im.visible = v0;
@@ -475,7 +485,7 @@ export function setupExterior(c) {
     }
     for (const h of hazes) { h.position.x = target.x; h.position.z = target.z; if (fogColor) h.material.uniforms.uCol.value.copy(fogColor);  }
   }
-  return {decals: DEC, tintMats, colliders, update, setLevel, getLevel: () => level, cells, hazes, group, depthMat, walkHeight: buildWalkHeight(scene, MC), setUser, removeUser, userKeys, userMeshes, indoor: INDOOR};
+  return {decals: DEC, meadow: () => MEAD, tintMats, colliders, update, setLevel, getLevel: () => level, cells, hazes, group, depthMat, walkHeight: buildWalkHeight(scene, MC), setUser, removeUser, userKeys, userMeshes, indoor: INDOOR};
 }
 
 // ---- độ cao mặt đi được (hiên / bục thềm / bậc) -------------------------------------------------------------
