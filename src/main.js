@@ -2,7 +2,7 @@
 import {APP_VERSION} from './version.js';
 import {CONFIG} from './config.js';
 import * as Assets from './assets.js';
-import {MAP_LIST, DEFAULT_MAP, isMap, mapOpen, mapAssets, goToMap, prefetchMap} from './maps.js';
+import {MAP_LIST, DEFAULT_MAP, isMap, mapOpen, mapAssets, extAsset, goToMap, prefetchMap} from './maps.js';
 import {FILES} from './manifest.js';
 import {SFX} from './sfx.js';
 import {MAP_CONFIGS} from './map-configs.js';
@@ -62,8 +62,8 @@ async function boot() {
   const eng = await enginePromise;
   LB(75, 'Dựng cảnh...');
   await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
-  const mapKey = 'map-' + mapId;
-  eng.init({env: files[mapKey], ext: mapId !== 'exterior' ? files['map-exterior'] || null : null, l2: files['map-house-l2'] || null, localGlb: files['char-' + slot], localSlot: slot, mapId});
+  const EXT = extAsset(), mapKey = mapId === 'exterior' ? EXT : 'map-' + mapId;
+  eng.init({env: files[mapKey], ext: mapId !== 'exterior' ? files[EXT] || null : null, houseL2: EXT === 'map-exterior-l2', localGlb: files['char-' + slot], localSlot: slot, mapId});
   const api = eng.api;
   LB(88, 'Biên dịch shader...');
   let warmed = false; try { warmed = localStorage.getItem('vyWarm') === mapId; } catch (e) {}   // lần sau: trình duyệt đã cache shader → chờ ngắn hơn

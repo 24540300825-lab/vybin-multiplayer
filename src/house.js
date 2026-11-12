@@ -1,5 +1,6 @@
 // Cấp nhà (L1 → L2 → …). Nhà bắt đầu ở L1; lên L2 thì mở tầng trên: Phòng Game, Bếp + hiên ăn, Phòng kỷ niệm, Vườn kính.
-// L2 = file riêng assets/map-house-l2.glb (chỉ phần XẾP CHỒNG lên nhà L1) — map-exterior.glb giữ nguyên, không bị thay.
+// L2 = assets/map-exterior-l2.glb: chính map-exterior của bản chính (vườn, cây, cỏ… giữ nguyên) chỉ thay phần NHÀ bằng nhà L2.
+// Lên L2 → mọi map (vườn + mọi phòng) dùng file này; L1 → map-exterior.glb như cũ.
 //
 // HOUSE_RULES.mode:
 //   'test' — bản thử (nhánh test): nút 🏡 nâng / hạ cấp MIỄN PHÍ, lưu trên máy (localStorage) + báo cho người kia.

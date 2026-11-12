@@ -6,10 +6,10 @@ export const MAP_LIST = {
   bin:      {name: 'Phòng Bin', icon: '🛠️', desc: 'Studio của Bin (gác lửng)', assets: ['map-bin', 'map-exterior']},
   exterior: {name: 'Vườn ngoài nhà', icon: '🌳', desc: 'Sân vườn quanh nhà, cổng & hàng rào', assets: ['map-exterior']},
   // ===== nhà L2 (tầng trên) — chỉ vào được khi nhà đã lên cấp 2 (src/house.js) =====
-  game:       {name: 'Phòng Game', icon: '🕹️', desc: 'Tầng 2 trên phòng khách: arcade, bi lắc, cờ, sofa xem TV', assets: ['map-game', 'map-exterior', 'map-house-l2'], minHouse: 2},
-  kitchen:    {name: 'Bếp & hiên ăn', icon: '🍳', desc: 'Tầng 2 trên phòng Bin: bếp chung + hiên ăn có giàn gỗ', assets: ['map-kitchen', 'map-exterior', 'map-house-l2'], minHouse: 2},
-  memory:     {name: 'Phòng kỷ niệm', icon: '💌', desc: 'Tầng 2 trên phòng Vy: tường ảnh, hộp thư, quỹ chung', assets: ['map-memory', 'map-exterior', 'map-house-l2'], minHouse: 2},
-  greenhouse: {name: 'Vườn kính', icon: '🌿', desc: 'Nhà kính trên sân thượng: trồng cây + góc nghe nhạc', assets: ['map-greenhouse', 'map-exterior', 'map-house-l2'], minHouse: 2},
+  game:       {name: 'Phòng Game', icon: '🕹️', desc: 'Tầng 2 trên phòng khách: arcade, bi lắc, cờ, sofa xem TV', assets: ['map-game', 'map-exterior'], minHouse: 2},
+  kitchen:    {name: 'Bếp & hiên ăn', icon: '🍳', desc: 'Tầng 2 trên phòng Bin: bếp chung + hiên ăn có giàn gỗ', assets: ['map-kitchen', 'map-exterior'], minHouse: 2},
+  memory:     {name: 'Phòng kỷ niệm', icon: '💌', desc: 'Tầng 2 trên phòng Vy: tường ảnh, hộp thư, quỹ chung', assets: ['map-memory', 'map-exterior'], minHouse: 2},
+  greenhouse: {name: 'Vườn kính', icon: '🌿', desc: 'Nhà kính trên sân thượng: trồng cây + góc nghe nhạc', assets: ['map-greenhouse', 'map-exterior'], minHouse: 2},
 };
 export const DEFAULT_MAP = 'living';
 export const isMap = id => Object.prototype.hasOwnProperty.call(MAP_LIST, id);
@@ -17,7 +17,9 @@ export const isMap = id => Object.prototype.hasOwnProperty.call(MAP_LIST, id);
 import {houseLevel} from './house.js';
 export const mapOpen = id => isMap(id) && (MAP_LIST[id].minHouse || 1) <= houseLevel();
 // asset thật sự cần nạp cho map (nhà ≥ L2: nạp thêm phần tầng trên)
-export const mapAssets = id => { const a = [...MAP_LIST[id].assets]; if (houseLevel() >= 2 && !a.includes('map-house-l2')) a.push('map-house-l2'); return a; };
+// nhà ≥ L2: ngoại cảnh (vườn + vỏ nhà) đổi sang map-exterior-l2 = map-exterior bản chính, chỉ thay phần nhà bằng nhà L2
+export const extAsset = () => (houseLevel() >= 2 ? 'map-exterior-l2' : 'map-exterior');
+export const mapAssets = id => MAP_LIST[id].assets.map(a => (a === 'map-exterior' ? extAsset() : a));
 
 // Quản lý chuyển map: nạp trước (HTTP cache) + fade + tải lại có giữ phiên.
 // (Mỗi map dựng collider/A*/shader riêng nên chuyển map = khởi tạo lại engine; xem README "Giới hạn".)

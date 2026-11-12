@@ -181,15 +181,9 @@ ${FRAG_COLOR}
 
   // mái ngói cánh Vy/Bin: GLB ngoại cảnh chỉ có mái cánh phòng khách (Roof_Living) → nhân bản sang 2 cánh kia
   // (khớp kích thước mái gốc Roof_Vy/Roof_Bin trong LIVING_ROOM.glb: rộng 10.85, lệch tâm ±0.425, cao 6.4). skipX = x tâm cánh đang ở (giữ hở để nhìn vào)
-  // ===== nhà L2: phần tầng trên (assets/map-house-l2.glb) xếp chồng lên vỏ L1 — map-exterior giữ nguyên, chỉ ẩn mái phòng khách =====
-  // vật liệu cùng TÊN với map-exterior (Stylized Concrete, Stylized Brick Wall, Stylized  wood, Stylized Wood Planks…) → dùng lại vật liệu có texture của map-exterior
-  const L2=ctx.l2&&ctx.l2.scene?ctx.l2.scene:null;window.__houseL2=!!L2;
-  function attachL2(root){if(!L2||!root||L2.parent===root)return;
-    const mats={};root.traverse(o=>{if(!o.isMesh||o.isInstancedMesh)return;[].concat(o.material).forEach(m=>{if(m&&m.name&&!mats[m.name])mats[m.name]=m})});
-    L2.traverse(o=>{if(!o.isMesh)return;if(Array.isArray(o.material))o.material=o.material.map(m=>mats[m.name]||m);else if(o.material&&mats[o.material.name])o.material=mats[o.material.name]});
-    ['Roof_Living','Roof_Living_Gable'].forEach(n=>{const r=root.getObjectByName(n);if(r)r.visible=false});
-    root.add(L2);root.updateMatrixWorld(true)}
-  function addWingRoofs(root,skipX){if(L2)return;const L=root.getObjectByName('Roof_Living');if(!L)return;
+  // ===== nhà L2: cả nhà dùng 1 ngoại cảnh map-exterior-l2.glb (= map-exterior của bản chính, chỉ thay phần NHÀ). main.js nạp đúng file theo cấp nhà.
+  const L2=!!ctx.houseL2;window.__houseL2=L2;
+  function addWingRoofs(root,skipX){const L=root.getObjectByName('Roof_Living');if(!L)return;
     const fit={WING_VY:[0.575,15],WING_BIN:[-0.575,-5]};   // mép trong lùi 0.3 m khỏi tường cánh phòng khách (trước đây mái chĩa xuyên đỉnh tường → lộ răng cưa ngói trong phòng)
     for(const w in fit){const W=root.getObjectByName(w);if(!W||W.getObjectByName('Roof_'+w.slice(5,6)+w.slice(6).toLowerCase()))continue;if(skipX!=null&&Math.abs(fit[w][1]-skipX)<3)continue;
       const R=new THREE.Group();R.name='Roof_'+w.slice(5,6)+w.slice(6).toLowerCase();R.position.set(fit[w][0],6.4,0.015);R.scale.set(10.55/11,1,1);
@@ -197,7 +191,7 @@ ${FRAG_COLOR}
       parts.forEach(m=>{const c=new THREE.Mesh(m.geometry,m.material);c.name=R.name+'_'+m.name.split('_').pop();c.position.copy(m.position);c.quaternion.copy(m.quaternion);c.scale.copy(m.scale);c.castShadow=m.castShadow;c.receiveShadow=m.receiveShadow;R.add(c)});
       W.add(R)}
     root.updateMatrixWorld(true)}
-  if(MAP_CONFIGS[MAPID]&&MAP_CONFIGS[MAPID].outdoor){attachL2(envG.scene);addWingRoofs(envG.scene,null)}
+  if(MAP_CONFIGS[MAPID]&&MAP_CONFIGS[MAPID].outdoor)addWingRoofs(envG.scene,null);
   // env
   const env=envG.scene;toonify(env);scene.add(env);env.updateMatrixWorld(true);
   // mẫu Scatter (SF_BiomeProxy_* / SF_SourceProxy_* / SF_BiomeSurface_*: đá, cỏ Plant_01, hoa, bụi, cây) nằm ở gốc toạ độ GLB = góc trước-trái phòng khách → hiện thành cụm đá + lá phẳng dính tường. Chỉ là mẫu cho instancing → ẩn (mesh thường, không đụng InstancedMesh).
@@ -231,7 +225,6 @@ ${FRAG_COLOR}
   // MC.ext = {dx,dz: dời ngoại cảnh cho khớp toạ độ phòng; hide: regex node vỏ nhà phải ẩn (cánh nhà đang ở bị cắt); roofX: x tâm mái (instancing) cần ẩn}
   let EXTV=null,extG=null;
   if(!OUTD&&MC.ext&&ctx.ext){const X=MC.ext,_t0=performance.now();extG=ctx.ext.scene;extG.name='__EXTERIOR__';
-    attachL2(extG);
     extG.traverse(o=>{if((X.hide&&X.hide.test(o.name))||(L2&&X.hideL2&&X.hideL2.test(o.name))||/^Interior_(Bin|Living|Vy)/.test(o.name))o.visible=false});   // hộp tối giả nội thất sau cửa sổ: kính đã đặc nên không cần, và để chỗ 'khoét' tường hàng xóm không lộ mảng đen
     addWingRoofs(extG,X.roofX);
     extG.position.set(X.dx||0,X.dy||0,X.dz||0);extG.updateMatrixWorld(true);

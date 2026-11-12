@@ -7,22 +7,22 @@ export const MAP_CONFIGS = {
   // triCol: va chạm theo tam giác thật (đồ đạc gộp khối). tv: {node, mat?, inset} mặt màn TV (inset = khoảng viền đen chừa quanh mặt sáng); sofa: {node, seatY} sofa liền khối → tự chia 2 chỗ ngồi.
   // doors: ghim chuyển map {node, to, label}; spawnFrom[mapVừaRời] = [x, z, yaw, tầng(0/1)] — xuất hiện ngay chỗ cửa đã đi qua.
   living:{name:'Phòng khách',wallMats:['CH_wall','CH_plaster'],hide:/^Plane002$/,chairFlip:true,glass:{front:{x0:0.15,x1:9.85,z:0.25,y0:0,y1:5.9},top:{x0:0.15,x1:9.85,z0:-7.85,z1:0.25,y:5.9}},treadNames:['Stair_Treads','StairR_Treads'],mezz:['Mezz_Floor','Mezz_Ext_Floor'],seat:'Chair_Seat',chair:/^Desk_Chair\d*$/,walk0:[0.3,9.7,-7.6,-0.2],l1:[0.22,9.78,-7.6,-4.25],cl1:[0.4,9.6,-7.6,-4.3],garden:false,tint:{CH_floor:0xdcb88e},gtex:'Plane',out:/^__none__$/,lift:0,
-    ext:{dx:0,dz:0,hide:/^(Door_Main|Entrance_Hood|Facade_Living_Front|Glass_Living_Front|Interior_Living|Roof_Living)/,roofX:5,hideL2:/^L2_Living$/},
+    ext:{dx:0,dz:0,hide:/^(Door_Main|Entrance_Hood|Facade_Living_Front|Glass_Living_Front|Interior_Living|Roof_Living)/,roofX:5,hideL2:/^(L2_Living$|L2_Upgrade_Living_Front|L2_Upgrade_Entrance)/},
     doorsL2:[{at:[5.0,4.9,-7.35],to:'game',label:'Lên Phòng Game'}],
     doors:[{node:'Doormat',to:'exterior',label:'Ra vườn'},{node:'GD_Door_Entrance_Leaf',to:'bin',label:'Phòng Bin'},{node:'GD_Door_Entrance_Leaf001',to:'vy',label:'Phòng Vy'}],
     spawnFrom:{exterior:[4.2,-0.9,Math.PI,0],bin:[0.85,-6.95,Math.PI/2,1],vy:[9.15,-6.95,-Math.PI/2,1],game:[0.85,-6.95,Math.PI/2,1]}},
   vy:{name:'Phòng Vy',triCol:true,wallMats:['FWS_wall'],glass:{front:{x0:0.15,x1:9.85,z:1.12,y0:0,y1:5.9},top:{x0:0.15,x1:9.85,z0:-7.85,z1:1.12,y:5.9}},seam:[{x0:0,x1:0.15,z0:-0.02,z1:1.12,y0:0,y1:6.28,inner:'FWS_wall',side:'px'},{x0:9.85,x1:10.05,z0:-0.02,z1:1.12,y0:0,y1:6.28,inner:'FWS_wall',side:'nx'}],tv:{node:'TV_Unit001',inset:0},sofa:{node:'Sofa',seatY:0.45},treadNames:['Stair'],mezz:['Mezzanine'],seat:'Desk_Chair',chair:/^Desk_Chair$/,chairToward:'Desk',walk0:[0.3,9.7,-7.6,0.85],l1:[0.22,9.78,-7.6,-4.0],cl1:[0.4,9.6,-7.6,-4.05],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
-    ext:{dx:-10,dz:2,hide:/^(Facade_Vy_Front|Facade_Vy_Nook|Facade_Vy_Sides_Back|Glass_Vy_Front|Glass_Vy_Nook|Glass_Vy_Sides_Back|Interior_Vy)/,roofX:15,hideL2:/^L2_Vy$/},
+    ext:{dx:-10,dz:2,hide:/^(Facade_Vy_Front|Facade_Vy_Nook|Facade_Vy_Sides_Back|Glass_Vy_Front|Glass_Vy_Nook|Glass_Vy_Sides_Back|Interior_Vy)/,roofX:15,hideL2:/^(L2_Vy$|L2_Upgrade_Vy_Front)/},
     doorsL2:[{at:[5.0,4.9,-7.35],to:'memory',label:'Lên Phòng kỷ niệm'}],
     doors:[{node:'Door_Entrance_Leaf',to:'living',label:'Phòng khách'}],
     spawnFrom:{default:[0.85,-4.95,Math.PI/2,1]}},
   bin:{name:'Phòng Bin',camMirror:true,triCol:true,wallMats:['CH_wall'],glass:{front:{x0:0.15,x1:9.85,z:0.45,y0:0,y1:5.9},top:{x0:0.15,x1:9.85,z0:-7.85,z1:0.45,y:5.9}},seam:[{x0:9.85,x1:10.05,z0:-0.02,z1:0.88,y0:0,y1:6.28,inner:'CH_wall',side:'nx'},{x0:-0.05,x1:0.15,z0:-0.02,z1:0.45,y0:0,y1:6.28,inner:'CH_wall',side:'px'}],hide:/^Roof$/,cutTop:{node:/^Front_Frame$/,y:5.5},tv:{node:'TV_Unit',mat:'CH_screen',inset:0},sofa:{node:'Sofa',seatY:0.45},treadNames:['Stair'],mezz:['Mezzanine'],seat:'Desk_Chair',chair:/^Desk_Chair$/,chairToward:'Desk',walk0:[0.3,9.7,-7.6,0.18],l1:[0.22,9.78,-7.6,-4.0],cl1:[0.4,9.6,-7.6,-4.05],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
-    ext:{dx:10,dz:2,hide:/^(Facade_Bin_Front|Facade_Bin_Nook|Facade_Bin_Sides_Back|Glass_Bin_Front|Glass_Bin_Nook|Glass_Bin_Sides_Back|Interior_Bin)/,roofX:-5,hideL2:/^L2_Bin$/},
+    ext:{dx:10,dz:2,hide:/^(Facade_Bin_Front|Facade_Bin_Nook|Facade_Bin_Sides_Back|Glass_Bin_Front|Glass_Bin_Nook|Glass_Bin_Sides_Back|Interior_Bin)/,roofX:-5,hideL2:/^(L2_Bin$|L2_Upgrade_Bin_Front)/},
     doorsL2:[{at:[5.0,4.9,-7.35],to:'kitchen',label:'Lên Bếp & hiên ăn'}],
     doors:[{node:'Door_Entrance_Leaf',to:'living',label:'Phòng khách'}],
     spawnFrom:{default:[9.15,-4.95,-Math.PI/2,1]}},
   // ===== NHÀ L2 — tầng trên (chỉ mở khi nhà ≥ L2, xem src/house.js). Phòng 1 tầng (không gác/cầu thang), sàn y=0, mặt trước z=0 mở về camera.
-  // ext.dy: hạ ngoại cảnh xuống đúng cao độ tầng (dx/dy/dz sinh từ khối phòng trong map-house-l2.glb). hide: vỏ của chính phòng + phần nhà phía trên.
+  // Cùng 1 ngoại cảnh map-exterior-l2 cho mọi map; ext.dx/dy/dz đặt phòng đúng vị trí trong nhà L2 (dy = cao độ tầng). hide: tường trước/vỏ của chính phòng + phần nhà phía trên; roofX: mái ngói (instancing) của chính phòng.
   // spots: điểm hoạt động (ghim ⭐) — trò chơi/tiện ích làm sau, hiện tại báo "Sắp có".
   game:{name:'Phòng Game',triCol:true,flat:true,wallMats:['L2_Wall_Plaster','L2_Wall_Teal'],glass:{front:{x0:0.2,x1:9.5,z:0.02,y0:0,y1:4.18},top:{x0:0.2,x1:9.5,z0:-5.8,z1:0.02,y:4.18}},
     tv:{node:'TV_Unit',mat:'CH_screen',inset:0},sofa:{node:'Sofa',seatY:0.45},treadNames:[],mezz:[],seat:'Desk_Chair',chair:/^Desk_Chair$/,chairToward:'Desk',
@@ -33,14 +33,14 @@ export const MAP_CONFIGS = {
     spawnFrom:{greenhouse:[7.9,-3.9,0,0],default:[0.95,-0.9,Math.PI/2,0]}},
   kitchen:{name:'Bếp & hiên ăn',triCol:true,flat:true,wallMats:['L2_Wall_Plaster'],glass:{front:{x0:0.2,x1:8.3,z:0.02,y0:0,y1:3.25},top:{x0:0.2,x1:8.3,z0:-5.05,z1:0.02,y:3.25}},
     treadNames:[],mezz:[],walk0:[0.35,8.15,-4.85,3.8],l1:[0,0,0,0],cl1:[0,0,0,0],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
-    ext:{dx:9.35,dy:-6.52,dz:5.0,hide:/^L2_Kitchen_/},
+    ext:{dx:9.35,dy:-6.52,dz:5.0,hide:/^(L2_Kitchen_|L2_Bin_Pergola)/,roofX:-5.1},camMirror:true,
     doors:[{node:'Door_Entrance_Leaf',to:'bin',label:'Phòng Bin'}],
     spots:[{node:'Cooktop',label:'Nấu ăn cùng nhau'},{at:[4.2,1.25,1.95],label:'Bữa tối đôi'}],
     spawnFrom:{default:[0.95,-4.3,Math.PI/2,0]}},
   memory:{name:'Phòng kỷ niệm',triCol:true,flat:true,wallMats:['L2_Wall_Plaster','L2_Wall_Blush'],glass:{front:{x0:0.2,x1:8.3,z:0.02,y0:0,y1:3.25},top:{x0:0.2,x1:8.3,z0:-5.05,z1:0.02,y:3.25}},
     sofa:{node:'Sofa',seatY:0.45},treadNames:[],mezz:[],seat:'Desk_Chair',chair:/^Desk_Chair$/,chairToward:'Desk',
     walk0:[0.35,8.15,-4.85,3.8],l1:[0,0,0,0],cl1:[0,0,0,0],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
-    ext:{dx:-10.85,dy:-6.52,dz:5.0,hide:/^L2_Memory_/},
+    ext:{dx:-10.85,dy:-6.52,dz:5.0,hide:/^L2_Memory_/,roofX:15.1},
     doors:[{node:'Door_Entrance_Leaf',to:'vy',label:'Phòng Vy'}],
     spots:[{node:'Memory_Wall',label:'Tường kỷ niệm'},{node:'Mailbox',label:'Hộp thư'},{node:'Savings_Jar',label:'Quỹ chung'}],
     spawnFrom:{default:[7.55,-0.85,-Math.PI/2,0]}},

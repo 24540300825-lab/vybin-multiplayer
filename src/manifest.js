@@ -20,6 +20,11 @@ export const FILES = {
   "v": "a6c3beaa",
   "size": 934052
  },
+ "map-exterior-l2": {
+  "file": "map-exterior-l2.glb",
+  "v": "eb94952a",
+  "size": 7410292
+ },
  "map-exterior": {
   "file": "map-exterior.glb",
   "v": "f1238e01",
@@ -34,11 +39,6 @@ export const FILES = {
   "file": "map-greenhouse.glb",
   "v": "276826b6",
   "size": 274208
- },
- "map-house-l2": {
-  "file": "map-house-l2.glb",
-  "v": "2430f193",
-  "size": 1326336
  },
  "map-kitchen": {
   "file": "map-kitchen.glb",
