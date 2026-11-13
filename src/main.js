@@ -57,13 +57,16 @@ async function boot() {
   // ---------- 2) nạp song song: engine (JS) + asset map + nhân vật của mình ----------
   LB(10, 'Đang tải bản đồ & nhân vật ' + slot.toUpperCase() + '...');
   const enginePromise = import('./game.js');   // KHÔNG import sớm: hud.js/game.js đọc LOCAL_SLOT/MAPID lúc nạp module (file đã được modulepreload nên vẫn nhanh)
-  const ids = [...mapAssets(mapId), 'char-' + slot];
+  const {activeSeason} = await import('./season/calendar.js');
+  const SEASON = activeSeason(), seasonAsset = SEASON && Assets.hasAsset('season-' + SEASON) ? 'season-' + SEASON : null;   // mùa lễ: đồ trang trí (nếu đã có file)
+  window.__season = SEASON;
+  const ids = [...mapAssets(mapId), 'char-' + slot, ...(seasonAsset ? [seasonAsset] : [])];
   const files = await Assets.loadGroup(ids, p => LB(10 + p * 60));
   const eng = await enginePromise;
   LB(75, 'Dựng cảnh...');
   await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
   const EXT = extAsset(), mapKey = mapId === 'exterior' ? EXT : 'map-' + mapId;
-  eng.init({env: files[mapKey], ext: mapId !== 'exterior' ? files[EXT] || null : null, houseL2: EXT !== 'map-exterior', houseLv: EXT === 'map-exterior-l4' ? 4 : EXT === 'map-exterior-l3' ? 3 : EXT === 'map-exterior-l2' ? 2 : 1, localGlb: files['char-' + slot], localSlot: slot, mapId});
+  eng.init({env: files[mapKey], ext: mapId !== 'exterior' ? files[EXT] || null : null, houseL2: EXT !== 'map-exterior', houseLv: EXT === 'map-exterior-l4' ? 4 : EXT === 'map-exterior-l3' ? 3 : EXT === 'map-exterior-l2' ? 2 : 1, localGlb: files['char-' + slot], localSlot: slot, mapId, season: SEASON ? {id: SEASON, glb: seasonAsset ? files[seasonAsset] : null} : null});
   const api = eng.api;
   LB(88, 'Biên dịch shader...');
   let warmed = false; try { warmed = localStorage.getItem('vyWarm') === mapId; } catch (e) {}   // lần sau: trình duyệt đã cache shader → chờ ngắn hơn

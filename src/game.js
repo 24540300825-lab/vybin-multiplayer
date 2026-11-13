@@ -229,6 +229,17 @@ ${FRAG_COLOR}
     root.updateMatrixWorld(true)}
   if(MAP_CONFIGS[MAPID]&&MAP_CONFIGS[MAPID].outdoor)addWingRoofs(envG.scene,null);
   // env
+  // ===== MÙA LỄ (src/season/calendar.js): đồ trang trí season-<mùa>.glb — node gốc đặt theo map ('living', 'exterior@L4'…), toạ độ = toạ độ của map đó.
+  // Node 'PIN_<tên>' (hoặc custom property pin='Nhãn') → ghim ⭐ "Sắp có"; 'PIN_photobooth' → mở chế độ chụp ảnh. Xem docs/SEASONS.md.
+  const SEASON=ctx.season||null,SEASON_SPOTS=[];window.__seasonOn=SEASON?SEASON.id:null;
+  const seasonDecor=(want,into)=>{if(!SEASON||!SEASON.glb||!into)return 0;let n=0;
+    for(const src of SEASON.glb.scene.children){const m=/^([a-z0-9]+)(?:@L(\d))?$/i.exec(src.name||'');if(!m||m[1].toLowerCase()!==want||HLV<(+m[2]||1))continue;
+      const c=src.clone(true);c.name='SEASON_'+src.name;into.add(c);n++;
+      c.traverse(o=>{const ud=o.userData||{},mm=/^PIN_(.+)$/.exec(o.name||''),lab=ud.pin||ud.Pin;if(!lab&&!mm)return;
+        const id=String(ud.id||(mm?mm[1]:o.name)).toLowerCase();SEASON_SPOTS.push({obj:o,label:lab||(mm?mm[1].replace(/_/g,' '):o.name),id:/photobooth/.test(id)?'photobooth':id,season:SEASON.id});
+        if(!o.isMesh)o.visible=true})}
+    if(n)console.log('[season] '+SEASON.id+': '+n+' nhóm đồ trang trí → '+want);return n};
+  seasonDecor(String(ctx.mapId||window.MAPID||'').toLowerCase(),envG.scene);
   const env=envG.scene;{const LVN=(MAP_CONFIGS[MAPID]||{}).lvNodes;if(LVN){const rm=[];env.traverse(o=>{for(const [lv,rx] of LVN)if(HLV<lv&&rx.test(o.name))rm.push(o)});rm.forEach(o=>o.parent&&o.parent.remove(o))}}   // MC.lvNodes=[[cấp,/tên/]]: cầu thang lên tầng chưa xây thì ẩn
   toonify(env);markOcc(env);scene.add(env);env.updateMatrixWorld(true);
   // mẫu Scatter (SF_BiomeProxy_* / SF_SourceProxy_* / SF_BiomeSurface_*: đá, cỏ Plant_01, hoa, bụi, cây) nằm ở gốc toạ độ GLB = góc trước-trái phòng khách → hiện thành cụm đá + lá phẳng dính tường. Chỉ là mẫu cho instancing → ẩn (mesh thường, không đụng InstancedMesh).
@@ -278,6 +289,7 @@ ${FRAG_COLOR}
        const f=m=>{if(!m)return m;let c=cl.get(m);if(!c){c=m.clone();c.userData={...m.userData,noOcc:true};cl.set(m,c)}return c};o.material=Array.isArray(o.material)?o.material.map(f):f(o.material)})}
     extG.traverse(o=>{if(!o.isMesh||!o.visible||o.isInstancedMesh)return;let p=o.parent,inHouse=false,roof=/Roof|Tile/i.test(o.name);for(;p;p=p.parent){if(/^HOUSE_L[123]/.test(p.name))inHouse=true;if(/Roof|Tile/i.test(p.name))roof=true}
       if(inHouse&&!roof)[].concat(o.material).forEach(mm=>{if(mm&&!mm.userData.noOcc&&!/Roof|Tile/i.test(mm.name||''))mm.userData.occW=true})});
+    seasonDecor('exterior',extG);   // đồ trang trí ngoài vườn cũng thấy từ trong phòng
     toonify(extG);markOcc(extG);console.log('[sty] ngoại cảnh: '+api.stylize(extG));scene.add(extG);extG.updateMatrixWorld(true);
     const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
     const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null,walkAreas:null,indoor:true,floorY:(E0.floorY||0)+(X.dy||0)};   // dy: phòng tầng trên (nhà L2) → mặt đất vườn nằm thấp hơn sàn phòng
@@ -1245,7 +1257,7 @@ ${FRAG_COLOR}
     ...[...(MC.doors||[]),...(L2&&MC.doorsL2?MC.doorsL2:[]),...(L3&&MC.doorsL3?MC.doorsL3:[]),...(L4&&MC.doorsL4?MC.doorsL4:[])].map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+(b.max.y-b.min.y>0.5?-0.8:0.15),(b.min.z+b.max.z)/2):null;
       return {key:'door'+i,icon:'door',label:d.label,at:()=>p,act:()=>{if(window.__switchMap)window.__switchMap(d.to)}}}),
     // điểm hoạt động (minigame / tiện ích nhà L2) — MC.spots [{node|at, label}]: đi tới gần rồi báo "Sắp có" (trò chơi làm sau, mỗi trò 1 file trong src/features/)
-    ...[...(MC.spots||[]),...(L3&&MC.spotsL3?MC.spotsL3:[]),...(L4&&MC.spotsL4?MC.spotsL4:[])].map((d,i)=>{const b=d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+0.25,(b.min.z+b.max.z)/2):null;
+    ...[...(MC.spots||[]),...(L3&&MC.spotsL3?MC.spotsL3:[]),...(L4&&MC.spotsL4?MC.spotsL4:[]),...SEASON_SPOTS].map((d,i)=>{const b=d.obj?(()=>{d.obj.updateMatrixWorld(true);const bb=new THREE.Box3().setFromObject(d.obj);if(bb.isEmpty()){const w=d.obj.getWorldPosition(new THREE.Vector3());bb.set(w.clone().addScalar(-0.3),w.clone().addScalar(0.3))}return bb})():d.node?ctr(d.node):null,p=d.at?new THREE.Vector3(d.at[0],d.at[1],d.at[2]):b?new THREE.Vector3((b.min.x+b.max.x)/2,b.max.y+0.25,(b.min.z+b.max.z)/2):null;
       return {key:'spot'+i,icon:'star',label:d.label,at:()=>p,act:()=>{
         // đi tới cạnh máy (máy trên gác → tầng 1) rồi mới mở trò (window.__vySpot: trò chơi sau này — trả true = đã mở; chưa có thì báo "Sắp có")
         if(p){const c=b?b.getCenter(new THREE.Vector3()):p,lvS=(b?b.min.y:p.y-1)>(A.L1||2.4)-0.6?1:0,dx=P0.pos.x-c.x,dz=P0.pos.z-c.z,dd=Math.hypot(dx,dz)||1,r=b?Math.max(b.max.x-b.min.x,b.max.z-b.min.z)/2+0.55:0.8;cmdMove(c.x+dx/dd*r,c.z+dz/dd*r,lvS,false)}
@@ -2108,6 +2120,7 @@ ${FRAG_COLOR}
   // ===== API cho lớp mạng =====
   api.snapshot=()=>{const p=local.P,mv=p.sp>0.05||!!local.busy||local.plan.length>0,mov=p.sp>0.05&&p.mode==='free'&&!local.busy;
     return{x:r3(p.pos.x),y:r3(p.pos.y),z:r3(p.pos.z),w:r3(p.yaw),l:p.level,m:p.mode,b:local.busy?local.busy.kind:0,vx:mov?r3(Math.sin(p.yaw)*p.sp):0,vz:mov?r3(Math.cos(p.yaw)*p.sp):0,mv:mv?1:0,mp:MAPID,s:p.mode==='watch'?p.seat:undefined,ts:Math.round(performance.now())}};
+  api.toonify=toonify;   // tủ đồ (src/features/wardrobe.js): trang phục gắn vào nhân vật cũng tô toon như nhân vật
   api.addRemote=(slot,glb)=>{if(remote)return;remote=makeChar(glb,{...DEFS[slot],remote:true});api.remote=remote;rinp.mag=0};
   api.setRemoteVisible=v=>{if(remote&&remote.char.visible!==v)remote.char.visible=v};
   api.removeRemote=()=>{if(!remote)return;remote.dispose();remote=null;api.remote=null;if(window.__halo)endHalo()};

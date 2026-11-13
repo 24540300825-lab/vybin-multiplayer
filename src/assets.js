@@ -34,6 +34,10 @@ def('map-cinema', {owner: 'cinema', priority: 1});
 def('char-vy', {owner: null, priority: 2});
 def('char-bin', {owner: null, priority: 2});
 
+// mùa lễ: đồ trang trí (season-<mùa>.glb) + trang phục (costume-<vy|bin>-<id>.glb) — tự đăng ký mọi file có trong manifest
+for (const id of Object.keys(FILES)) if (/^(season|costume)-/.test(id) && FILES[id].file.endsWith('.glb') && !REG.has(id)) def(id, {owner: null, priority: 3});
+export const hasAsset = id => REG.has(id);
+export const fileUrl = id => (FILES[id] ? `assets/${FILES[id].file}?v=${FILES[id].v}` : null);   // ảnh khung chụp (png) …
 export const assetInfo = id => REG.get(id);
 export const listAssets = () => [...REG.values()].map(({id, state, refs, size, owner}) => ({id, state, refs, size, owner}));
 
