@@ -318,7 +318,7 @@ export function setupExterior(c) {
       im.computeBoundingSphere();
       { const ids = arr.map(mm => mm.pid); if (ids[0] !== undefined) im.userData.ids = ids; }     // cây người chơi rải: id từng bản thể (bấm chọn được)
       if (src.hana) { if (src.leaf) { const gr = src.leaf === 'grass', k = (mat.userData.hana.sil ? 's' : 'n') + (gr ? 'g' : ''); im.customDepthMaterial = hanaDepth[k] || (hanaDepth[k] = hanaDepthMat(mat.userData.hana.sil, WIND_FN, TU, FU, gr)); }
-        im.receiveShadow = cls !== 'grass' && cls !== 'flower'; }
+        im.receiveShadow = cls !== 'flower'; }     // cỏ HANA nhận bóng như bụi/cây/nền → cùng shade
       else if (mat.userData.grass) { if (!grassDepth) grassDepth = makeDepthMat(grassMask()); im.customDepthMaterial = grassDepth; }
       else if (mat.userData.fol2) im.customDepthMaterial = mat.userData.stemR ? (stemDepth ||= makeDepthMat(null, true)) : depthMat;
       group.add(im);

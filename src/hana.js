@@ -45,7 +45,8 @@ function ownUniforms(p, foliage) {
     uHCap: {value: num(p['Capture Mix'], 0.85)}, uHK: {value: num(p['Capture Exposure'], 0.9)}, uHWrap: {value: num(p.Wrap, 0.3)}, uHTrans: {value: num(p.Translucency, 0)},
     uHRimI: {value: num(p['Rim Intensity'], 0.25) * num(p['Rim Enable'], 1)}, uHRimW: {value: num(p['Rim Width'], 0.3)}, uHRimS: {value: num(p['Rim Softness'], 0.4)},
     uHRimAw: {value: num(p['Rim Light Aware'], 0.6)},
-    uHHue: {value: new THREE.Vector3(0, 1, 1)},   // đồng bộ tông: x = xoay hue (vòng), y = × bão hoà, z = × sáng (cỏ / mặt đất kéo về tông cây bụi)
+    uHHue: {value: new THREE.Vector3(0, 1, 1)},
+    uHToneOff: {value: 0},   // lệch tone riêng (cỏ / nền hướng thẳng lên trời → hạ xuống để cùng tỉ lệ sáng / vừa / tối với tán cây)   // đồng bộ tông: x = xoay hue (vòng), y = × bão hoà, z = × sáng (cỏ / mặt đất kéo về tông cây bụi)
   };
   if (foliage) Object.assign(u, {
     uHAccent: {value: col(p['Accent Color'], [0.25, 0.3, 0.3])}, uHCavity: {value: col(p['Cavity Color'], [0.05, 0.08, 0.03])},
@@ -88,7 +89,7 @@ export const HANA_CUT = `
 
 export const HANA_FRAG_PARS = `
 uniform vec3 uHRefL,uHRefS;uniform float uHSun,uHAmb,uHLift,uHSolidLift,uHDbg;uniform vec4 uHG;uniform vec3 uHTSh,uHTHi,uHGLift;uniform float uHTAmt;
-uniform vec3 uHMidC,uHShadowC,uHLightC,uHHighC,uHRimC,uHHue;
+uniform vec3 uHMidC,uHShadowC,uHLightC,uHHighC,uHRimC,uHHue;uniform float uHToneOff;
 uniform float uHThr,uHSoft,uHShape,uHShStr,uHHThr,uHHSoft,uHHStr,uHTexSh,uHTexHi,uHCap,uHK,uHWrap,uHTrans,uHRimI,uHRimW,uHRimS,uHRimAw;
 #ifdef HANA_FOL
 uniform vec2 uHGBot;uniform vec3 uHAccent,uHCavity;uniform float uHVolume,uHFlat,uHInterior,uHTipL,uHHGrad,uHLeafVar,uHJit,uHPaint,uHAOSh,uHAOCol,uHLayer,uHMedVar,uHColVar;
@@ -137,7 +138,7 @@ vec3 hanaShade( vec3 N, vec3 V, vec3 L, float sh, float sunK, float ambK, float 
   float val = uHSun * sunK * mix( max( ndl, 0.0 ), max( -ndl, 0.0 ), f ) * sh * 0.31830989 + uHAmb * ambK;
   float real = val / ( val + max( uHK, 0.001 ) );
   float lam = clamp( ( ndl + uHWrap ) / ( 1.0 + uHWrap ), 0.0, 1.0 );
-  float t = clamp( mix( lam, real, uHCap ) + offset, 0.0, 1.0 ); gHT = t; gHNdl = ndl; gHVal = real;
+  float t = clamp( mix( lam, real, uHCap ) + offset + uHToneOff, 0.0, 1.0 ); gHT = t; gHNdl = ndl; gHVal = real;
   float stp = hSm( uHThr - uHSoft, uHThr + uHSoft, t ), cont = hSm( uHThr - 0.35, uHThr + 0.35, t );
   lit = mix( cont, stp, uHShape );
   float shadow = 1.0 - lit, high = hSm( uHHThr - uHHSoft, uHHThr + uHHSoft, t ) * lit, lg = hSm( uHThr, max( uHHThr, uHThr + 0.01 ), t );
@@ -205,7 +206,9 @@ export const HANA_COLOR = `
   hc = max( hc, 0.0 );
   if ( uHHue.x != 0.0 || uHHue.y != 1.0 || uHHue.z != 1.0 ) { vec3 hh = hRgb2hsv( hc ); hh.x = fract( hh.x + uHHue.x ); hh.y = clamp( hh.y * uHHue.y, 0.0, 1.0 ); hh.z *= uHHue.z; hc = hHsv2rgb( hh ); }
   // giữ màu Blender lúc 12h trời quang; giờ khác / thời tiết khác: nhân tỉ lệ ánh sáng hiện tại so với 12h (vùng nắng / vùng bóng riêng)
-  vec3 envK = mix( envS / max( uHRefS, vec3( 1e-3 ) ), envL / max( uHRefL, vec3( 1e-3 ) ), hlit );
+  // MỘT hệ số môi trường chung cho mọi vật HANA (không đổi theo vùng sáng/tối của từng vật) → cây, bụi, cỏ, nền đổi màu theo giờ/thời tiết y như nhau
+  vec3 envK = mix( envS / max( uHRefS, vec3( 1e-3 ) ), envL / max( uHRefL, vec3( 1e-3 ) ), 0.6 );
+  { float ek = dot( envK, vec3( 0.2126, 0.7152, 0.0722 ) ); envK = mix( vec3( ek ), envK, 0.55 ); }   // giữ sắc môi trường vừa phải (hoàng hôn ấm, đêm lạnh) nhưng không đổi hue lá
   col = hc * clamp( envK, 0.0, 3.0 ) * uHLift;
   #ifndef HANA_FOL
    col *= uHSolidLift;
@@ -223,7 +226,11 @@ export const HANA_COLOR = `
 `;
 
 // đồng bộ tông cỏ + mặt đất với cây/bụi (cỏ, Moss của file gốc ngả vàng chanh hơn lá cây) — chỉnh nhanh trong ?tune hoặc tại đây
-export const HUE_SYNC = {grass: new THREE.Vector3(0.05, 0.9, 0.88), ground: new THREE.Vector3(0.04, 0.95, 0.92)};
+export const HUE_SYNC = {grass: new THREE.Vector3(0, 1, 1), ground: new THREE.Vector3(0, 1, 1)};   // (0,1,1) = không chỉnh: cỏ / nền đã dùng chung bảng màu lá (FOL_KEYS)
+export const TONE_OFF = {grass: -0.12, ground: -0.26};
+// mặt đất Moss dùng CHUNG bảng màu + cách nhận sáng với lá cây/bụi/cỏ (giữ pigment texture của Moss) → cùng màu, cùng shade
+export const FOL_KEYS = ['Mid Color', 'Shadow Color', 'Light Color', 'Highlight Color', 'Accent Color', 'Cavity Color', 'Rim Color', 'Threshold', 'Softness', 'Light Response',
+  'Shadow Strength', 'Highlight Threshold', 'Highlight Softness', 'Highlight Strength', 'Capture Mix', 'Capture Exposure', 'Wrap', 'Translucency', 'Texture In Shadow', 'Texture In Light'];
 
 // ---------- vật liệu ----------
 // kind: 'leaf' (lá cây/bụi) | 'grass' | 'solid' (đá, cành, chậu, hoa: pigment = map hoặc màu đỉnh, data = data map hoặc _hana_data)
@@ -268,6 +275,7 @@ mvPosition = viewMatrix * wpos; gl_Position = projectionMatrix * mvPosition;`);
 // trả {kits: {id: {kind, lods: [{parts: [{geometry, material, matrix}], size, min, max}]}}, all: [materials]}
 export async function buildHanaKits(gltf, groundGltf = null) {   // vật liệu trả về trong .mats — game.js gọi toonMat() cho từng cái
   const parser = gltf.parser, kits = {}, mats = [], matCache = new Map();
+  let folParams = null;   // bảng màu lá (cây/bụi/cỏ dùng chung) — mặt đất lấy theo
   const accArr = async i => (await parser.getDependency('accessor', i));
   const q = new THREE.Quaternion(), v = new THREE.Vector3(), n = new THREE.Vector3();
 
@@ -354,8 +362,9 @@ export async function buildHanaKits(gltf, groundGltf = null) {   // vật liệu
         jobs.push((async () => {
           const g = await leafGeometry(d);
           const kind = d.kind === 'GRASS' ? 'grass' : 'leaf';
+          if (!folParams) folParams = d.params;
           const m = hanaMaterial(d.params, {kind, sil: d.sil, name: 'HANA_' + id + '_L' + lod});
-          if (kind === 'grass') m.userData.hana.U.uHHue.value.copy(HUE_SYNC.grass);
+          if (kind === 'grass') { m.userData.hana.U.uHHue.value.copy(HUE_SYNC.grass); m.userData.hana.U.uHToneOff.value = TONE_OFF.grass; }
           if (kind === 'leaf' && ex.kind === 'bush') m.userData.bush = false;
           mats.push(m);
           parts.push({geometry: g, material: m, matrix: new THREE.Matrix4(), leaf: kind});
@@ -379,10 +388,11 @@ export async function buildHanaKits(gltf, groundGltf = null) {   // vật liệu
     groundGltf.scene.traverse(o => { if (o.isMesh && !gm) { gm = o.material; const g = o.geometry; if (!g.boundingBox) g.computeBoundingBox(); const s = g.boundingBox.getSize(new THREE.Vector3()); o.updateWorldMatrix(true, false); const sc = new THREE.Vector3().setFromMatrixScale(o.matrixWorld); tile = Math.max(s.x * Math.abs(sc.x), s.z * Math.abs(sc.z)) || 20; } });
     if (gm) {
       let p = {}; try { p = JSON.parse((gm.userData || {}).hana_params_json || '{}'); } catch (e) {}
+      if (folParams) FOL_KEYS.forEach(k => { if (folParams[k] !== undefined) p[k] = folParams[k]; });
       const map = gm.map; if (map) { map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping; map.anisotropy = 8; map.needsUpdate = true; }
       const dm = gm.aoMap || null; if (dm) { dm.colorSpace = THREE.NoColorSpace; dm.wrapS = dm.wrapT = THREE.RepeatWrapping; }
       const m = hanaMaterial(p, {kind: 'solid', map, dataMap: dm, name: 'HANA_Ground'}); m.userData.hanaGround = true; m.userData.noSty = true;
-      m.userData.hana.U.uHHue.value.copy(HUE_SYNC.ground);
+      m.userData.hana.U.uHHue.value.copy(HUE_SYNC.ground); m.userData.hana.U.uHToneOff.value = TONE_OFF.ground;
       mats.push(m); ground = {material: m, tile};
     }
   }
