@@ -15,6 +15,8 @@ import {MAP_CONFIGS} from './map-configs.js';
 import {TU,applyToon,patchLeafMask,hexV,TP,DEPTH_LEAF} from './toon.js';
 import {Perf} from './perf.js';
 import {FU,vertFol2,FRAG_PARS,FRAG_COLOR,OCC_GLSL,makeDepthMat,bindTU} from './foliage.js';
+import {replaceIndoorPots} from './hana-ext.js';
+import {HU,HANA_PMASK,HANA_VERT_PARS,HANA_VERT,HANA_SOLID_VERT_PARS,HANA_SOLID_VERT,HANA_CUT,HANA_FRAG_PARS,HANA_COLOR} from './hana.js';
 import {setupExterior,LEVELS} from './exterior.js';
 import {makeStylizer} from './stylize.js';
 import {patchDecal} from './decals.js';
@@ -97,9 +99,9 @@ export function init(ctx){
   // chỉ bóng đèn / đèn neon / lửa mới được chói (bloom); màu sáng thường + màn hình thì không
   const isGlow=m=>!!(m&&m.emissive&&(m.emissive.r+m.emissive.g+m.emissive.b)>0.05&&/Bulb|Lamp|lamp|Neon|Lantern|Candle|Fire|Star_Light|glow|Sconce|Festoon/.test(m.name||'')&&!/Screen|screen|display/.test(m.name||''));
   function toonMat(m){
-      m.onBeforeCompile=sh=>{if(m.userData.leafMask)patchLeafMask(sh);Object.assign(sh.uniforms,TU);if(aoOn(m))Object.assign(sh.uniforms,AOU);
+      m.onBeforeCompile=sh=>{if(m.userData.leafMask)patchLeafMask(sh);Object.assign(sh.uniforms,TU);const HN=m.userData.hana||null;if(HN)Object.assign(sh.uniforms,HN.U);if(aoOn(m))Object.assign(sh.uniforms,AOU);
         const F2=!!m.userData.fol2,GB=!!m.userData.grass,FOL=!F2&&!GB&&(/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf,SW=!F2&&!GB&&(/Wind/i.test(m.name||'')||m.userData.sway||FOL),GRD=!!m.userData.ground||/Stylized Grass/i.test(m.name||'');
-        const VS0=(F2||GB)?vertFol2(sh.vertexShader,!!m.userData.cloudV,NOISE_GLSL,GB||!!m.userData.squash,!!m.userData.stemR):sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+        const VS0=(F2||GB)?vertFol2(sh.vertexShader,!!m.userData.cloudV,NOISE_GLSL,GB||!!m.userData.squash,!!m.userData.stemR,!!HN):sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
           #ifdef SWAYX
           {vec4 q=vec4(transformed,1.0);
           #ifdef USE_INSTANCING
@@ -115,8 +117,8 @@ export function init(ctx){
           vWP=(modelMatrix*_p).xyz;}`);
         if(F2||GB){sh.uniforms.uCenter={value:m.userData.center||new THREE.Vector3(0,0.65,0)};sh.uniforms.uHInv={value:m.userData.hInv||0.66};sh.uniforms.uWindDir=FU.uWindDir;sh.uniforms.uHybrid=FU.uHybrid;sh.uniforms.uBaseShade=FU.uBaseShade;sh.uniforms.uFolEmi=FU.uFolEmi;sh.uniforms.uGMap=FU.uGMap;sh.uniforms.uGK=FU.uGK;sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uPl=FU.uPl;sh.uniforms.uFolTint=FU.uFolTint;sh.uniforms.uFolVar=FU.uFolVar;sh.uniforms.uGrTint=FU.uGrTint;sh.uniforms.uGrVar=FU.uGrVar;sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}
         if((m.userData.occW||m.userData.occF)&&!(F2||GB)){sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}   // (trước đây gán nhầm trong nhánh cây → tường không khoét được)
-        sh.vertexShader=(SW?'#define SWAYX\n':'')+'varying vec3 vWP;uniform float uWindT,uWindA;\n'+VS0;
-        sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uDesat={value:m.userData.desat==null?1:m.userData.desat};sh.fragmentShader='uniform float uDesat;uniform vec3 uGTint;\n'+(isGlow(m)?'#define VY_GLOW\n':'')+(FOL?'#define FOLIAGE\n':'')+(F2?'#define FOL2\n':'')+(m.userData.bush?'#define BUSHF\n':'')+(GB?'#define GRASSB\n':'')+(GRD?'#define GROUNDX\n':'')+((F2||GB)?FRAG_PARS:((m.userData.occW||m.userData.occF)?'uniform vec4 uOcc;uniform vec3 uOccPl;\n':''))+(aoOn(m)?'#define VY_AO\nuniform sampler2D uAOT;uniform vec3 uAOB,uAOS,uAOC;uniform vec4 uAOG;uniform vec2 uAOA;uniform float uAOK;\nfloat aoFetch(vec3 q){float fy=clamp(q.y*uAOG.w-0.5,0.0,uAOG.w-1.0);float i0=floor(fy),a=fy-i0,i1=min(i0+1.0,uAOG.w-1.0);vec2 t=vec2(clamp(q.x*uAOG.x,0.5,uAOG.x-0.5),clamp(q.z*uAOG.y,0.5,uAOG.y-0.5));vec2 o0=vec2(mod(i0,uAOG.z),floor(i0/uAOG.z))*uAOG.xy,o1=vec2(mod(i1,uAOG.z),floor(i1/uAOG.z))*uAOG.xy;return mix(texture2D(uAOT,(o0+t)/uAOA).r,texture2D(uAOT,(o1+t)/uAOA).r,a);}\n':'')+'uniform float uInHK;uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK,uLOff;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+sh.fragmentShader.replace('#include <normal_fragment_begin>',(F2||GB)?'#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\nnormal*=(gl_FrontFacing?1.0:-1.0);\n#endif\n'+(m.userData.occ?OCC_GLSL:''):'#include <normal_fragment_begin>'+(m.userData.occW?OCCW_GLSL:(m.userData.occF?OCCF_GLSL:''))).replace('#include <opaque_fragment>',`
+        sh.vertexShader=(SW?'#define SWAYX\n':'')+'varying vec3 vWP;uniform float uWindT,uWindA;\n'+(HN?((F2||GB)?HANA_VERT_PARS:(HN.dattr?'#define HANA_DATTR\n':'')+HANA_SOLID_VERT_PARS):'')+(HN?(GB?'#define HANA_PMASK\nuniform sampler2D uPMask;uniform vec4 uPMB;\n':'')+VS0.replace('#include <uv_vertex>','#include <uv_vertex>\n'+((F2||GB)?HANA_VERT:HANA_SOLID_VERT)).replace('vRoot = rootW.xz;',HANA_PMASK+'vRoot = rootW.xz;'):VS0);
+        sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uDesat={value:m.userData.desat==null?1:m.userData.desat};sh.fragmentShader='uniform float uDesat;uniform vec3 uGTint;\n'+(HN?'#define HANA\n'+((F2||GB)?'#define HANA_FOL\n':'')+(GB?'#define HANA_GRASS\n':'')+(HN.sil?'#define HANA_SIL\n':'')+(HN.dmap?'#define HANA_DMAP\n':'')+(HN.kind==='decal'?'#define HANA_DEC\n':''):'')+(isGlow(m)?'#define VY_GLOW\n':'')+(FOL?'#define FOLIAGE\n':'')+(F2?'#define FOL2\n':'')+(m.userData.bush?'#define BUSHF\n':'')+(GB?'#define GRASSB\n':'')+(GRD?'#define GROUNDX\n':'')+((F2||GB)?FRAG_PARS:((m.userData.occW||m.userData.occF)?'uniform vec4 uOcc;uniform vec3 uOccPl;\n':''))+(aoOn(m)?'#define VY_AO\nuniform sampler2D uAOT;uniform vec3 uAOB,uAOS,uAOC;uniform vec4 uAOG;uniform vec2 uAOA;uniform float uAOK;\nfloat aoFetch(vec3 q){float fy=clamp(q.y*uAOG.w-0.5,0.0,uAOG.w-1.0);float i0=floor(fy),a=fy-i0,i1=min(i0+1.0,uAOG.w-1.0);vec2 t=vec2(clamp(q.x*uAOG.x,0.5,uAOG.x-0.5),clamp(q.z*uAOG.y,0.5,uAOG.y-0.5));vec2 o0=vec2(mod(i0,uAOG.z),floor(i0/uAOG.z))*uAOG.xy,o1=vec2(mod(i1,uAOG.z),floor(i1/uAOG.z))*uAOG.xy;return mix(texture2D(uAOT,(o0+t)/uAOA).r,texture2D(uAOT,(o1+t)/uAOA).r,a);}\n':'')+'uniform float uInHK;uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK,uLOff;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+(HN?HANA_FRAG_PARS:'')+sh.fragmentShader.replace('#include <normal_fragment_begin>',(F2||GB)?'#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\nnormal*=(gl_FrontFacing?1.0:-1.0);\n#endif\n'+(m.userData.occ?OCC_GLSL:''):'#include <normal_fragment_begin>'+(m.userData.occW?OCCW_GLSL:(m.userData.occF?OCCF_GLSL:''))).replace('#include <opaque_fragment>',`
         {float I=1.0,Ih=1.0,vis=1.0,Ig=0.0;
          #ifdef FOLIAGE
          {float lm=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));vec3 lf=mix(uLeafA,uLeafB,smoothstep(0.03,0.4,lm));
@@ -125,10 +127,10 @@ export function init(ctx){
          #ifdef GROUNDX
          {float lm=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));diffuseColor.rgb=mix(diffuseColor.rgb,mix(uGrassA,uGrassB,smoothstep(0.08,0.6,lm)),0.75)*uGTint;}
          #endif
-         #if defined(FOL2)||defined(GRASSB)
+         #if (defined(FOL2)||defined(GRASSB))&&!defined(HANA)
 ${FRAG_COLOR}
          #endif
-         #if defined(FOLIAGE)||defined(FOL2)||defined(GRASSB)||defined(GROUNDX)||defined(BUSHF)
+         #if (defined(FOLIAGE)||defined(FOL2)||defined(GRASSB)||defined(GROUNDX)||defined(BUSHF))&&!defined(HANA)
          diffuseColor.rgb*=vec3(0.93,1.0,1.09);   // cỏ cây lá: ngả nhẹ sang teal
          #endif
          #if ( NUM_DIR_LIGHTS > 0 )
@@ -174,7 +176,8 @@ ${FRAG_COLOR}
          if(uCloudSh>0.01){float csn=vn3(vec3(vWP.x*0.05+uWindT*0.5,0.0,vWP.z*0.05+uWindT*0.2));tone*=1.0-0.28*smoothstep(0.5,0.62,csn)*uCloudSh*(1.0-inH);}
          #endif
          vec3 col=diffuseColor.rgb*tone;
-         #if defined(FOL2)&&!defined(BUSHF)   // phần "phát sáng" chỉ cho cây/hoa; cỏ & bụi tính sáng như thảm
+${HANA_COLOR}
+         #if defined(FOL2)&&!defined(BUSHF)&&!defined(HANA)   // phần "phát sáng" chỉ cho cây/hoa; cỏ & bụi tính sáng như thảm
          col+=diffuseColor.rgb*uFolEmi*mix(amb,uSunC,0.5*vis)*1.15;   // phần "phát sáng" của lá cũng ăn theo tông môi trường (sáng/tối/hoàng hôn/mưa)
          #endif
          #if defined(FOL2)&&!defined(BUSHF)
@@ -191,7 +194,9 @@ ${FRAG_COLOR}
          #if defined(FOL2)||defined(GRASSB)
          rim*=0.25;
          #endif
+         #ifndef HANA
          col+=uRimCol*uSunC*rim*(0.35+0.65*I);
+         #endif
          col+=diffuseColor.rgb*uLampC*inH*(0.2+0.35*I);
          {float lp=0.0;for(int li=0;li<10;li++){if(float(li)>=uLN)break;vec3 ld=uLP[li].xyz-vWP;float q=clamp(1.0-dot(ld,ld)/(uLP[li].w*uLP[li].w),0.0,1.0);lp+=q*q;}
           lp=min(lp,1.4);
@@ -206,18 +211,19 @@ ${FRAG_COLOR}
           col*=mix(vec3(1.0),uAOC,clamp(dA,0.0,1.0));}
          #endif
          outgoingLight=col+totalEmissiveRadiance;
-         #ifdef VY_GLOW
+         #if defined(VY_GLOW)||defined(HANA)
          outgoingLight=min(outgoingLight,vec3(2.0));
          #else
          outgoingLight=min(outgoingLight,vec3(0.78))+(1.0-exp(-max(outgoingLight-0.78,0.0)/0.18))*0.18;
          #endif
          }
-        #include <opaque_fragment>`);if(STY)STY.patch(sh,m);if(m.userData.vyDec)patchDecal(sh,m)};
-      m.customProgramCacheKey=()=>'vytoon11'+(isGlow(m)?'Y':'')+(aoOn(m)?'A':'')+(STY?STY.key(m):'')+(m.userData.vyDec?'D'+m.userData.vyDec:'')+(m.userData.occW?'W':(m.userData.occF?'X':''))+(m.userData.fol2?'F':'')+(m.userData.stemR?'R':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
+        #include <opaque_fragment>`);if(HN&&HN.sil)sh.fragmentShader=sh.fragmentShader.replace('#include <clipping_planes_fragment>',HANA_CUT+'#include <clipping_planes_fragment>');if(STY&&!HN)STY.patch(sh,m);if(m.userData.vyDec)patchDecal(sh,m)};
+      m.customProgramCacheKey=()=>'vytoon11'+(m.userData.hana?'H'+m.userData.hana.kind+(m.userData.hana.sil?'s':'')+(m.userData.hana.dmap?'d':'')+(m.userData.hana.dattr?'a':''):'')+(isGlow(m)?'Y':'')+(aoOn(m)?'A':'')+(STY?STY.key(m):'')+(m.userData.vyDec?'D'+m.userData.vyDec:'')+(m.userData.occW?'W':(m.userData.occF?'X':''))+(m.userData.fol2?'F':'')+(m.userData.stemR?'R':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
 
   // mái ngói cánh Vy/Bin: GLB ngoại cảnh chỉ có mái cánh phòng khách (Roof_Living) → nhân bản sang 2 cánh kia
   // (khớp kích thước mái gốc Roof_Vy/Roof_Bin trong LIVING_ROOM.glb: rộng 10.85, lệch tâm ±0.425, cao 6.4). skipX = x tâm cánh đang ở (giữ hở để nhìn vào)
   // ===== nhà L2: cả nhà dùng 1 ngoại cảnh map-exterior-l2.glb (= map-exterior của bản chính, chỉ thay phần NHÀ). main.js nạp đúng file theo cấp nhà.
+  const HKIT=ctx.hana||null;if(HKIT)HKIT.mats.forEach(m=>toonMat(m));window.__hana=HKIT;   // cây cỏ HANA (src/hana.js): vật liệu đi chung đường shader toon
   const L2=!!ctx.houseL2;window.__houseL2=L2;const HLV=ctx.houseLv||(L2?2:1),L3=HLV>=3,L4=HLV>=4;window.__houseLv=HLV;   // nhà L3: map-exterior-l3 (vườn + nhà vườn/tháp), MC.hideL3/doorsL3/spotsL3
   function addWingRoofs(root,skipX){const L=root.getObjectByName('Roof_Living');if(!L)return;
     const fit={WING_VY:[0.575,15],WING_BIN:[-0.575,-5]};   // mép trong lùi 0.3 m khỏi tường cánh phòng khách (trước đây mái chĩa xuyên đỉnh tường → lộ răng cưa ngói trong phòng)
@@ -270,7 +276,7 @@ ${FRAG_COLOR}
     g.setIndex(out);o.geometry=g;console.log('[cutTop] '+o.name+': '+(ix.length-out.length)/3+' tam giác bỏ')})}
   env.updateMatrixWorld(true);
   let EXT=null;
-  if(OUTD){const _t0=performance.now();EXT=setupExterior({scene,env,MC,toonMat,ultra:wantUltra()});api.stylize(EXT.group);console.log('[ext] setup '+Math.round(performance.now()-_t0)+'ms');if(/[?&]tune\b/.test(location.search))import('./tune.js').then(m=>m.mountTune(EXT,FU));for(let i=envMeshes.length-1;i>=0;i--)if(!envMeshes[i].parent)envMeshes.splice(i,1);
+  if(OUTD){const _t0=performance.now();EXT=setupExterior({scene,env,MC,toonMat,ultra:wantUltra(),hana:HKIT});api.stylize(EXT.group);console.log('[ext] setup '+Math.round(performance.now()-_t0)+'ms');if(/[?&]tune\b/.test(location.search))import('./tune.js').then(m=>m.mountTune(EXT,FU));for(let i=envMeshes.length-1;i>=0;i--)if(!envMeshes[i].parent)envMeshes.splice(i,1);
     env.traverse(o=>{if(o.isMesh&&/^Stylized Grass$/.test((o.material&&o.material.name)||''))o.visible=false;if(o.isMesh&&/^\.SF_/.test(o.name))o.visible=false});env.updateMatrixWorld(true)}
   // ===== map TRONG NHÀ có ngoại cảnh: dùng lại nguyên map ngoài vườn (map-exterior, đúng như bản đang chạy) quanh căn nhà =====
   // MC.ext = {dx,dz: dời ngoại cảnh cho khớp toạ độ phòng; hide: regex node vỏ nhà phải ẩn (cánh nhà đang ở bị cắt); roofX: x tâm mái (instancing) cần ẩn}
@@ -293,7 +299,7 @@ ${FRAG_COLOR}
     toonify(extG);markOcc(extG);console.log('[sty] ngoại cảnh: '+api.stylize(extG));scene.add(extG);extG.updateMatrixWorld(true);
     const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
     const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null,walkAreas:null,indoor:true,floorY:(E0.floorY||0)+(X.dy||0)};   // dy: phòng tầng trên (nhà L2) → mặt đất vườn nằm thấp hơn sàn phòng
-    EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat,ultra:wantUltra()});api.stylize(EXTV.group);EXTV.setLevel(TP.quality==='low'?'low':'indoor');
+    EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat,ultra:wantUltra(),hana:HKIT});api.stylize(EXTV.group);EXTV.setLevel(TP.quality==='low'?'low':'indoor');
     // cây/bụi lẻ (không nằm trong ô instancing) ở XA nhà: bỏ hẳn — từ camera trên cao nhìn xuống chỉ thấy khối thô xấu; gần nhà giữ nguyên
     {const C=new THREE.Vector3(5,0,-4),sp=new THREE.Sphere();let n=0;extG.updateMatrixWorld(true);env.updateMatrixWorld(true);
      [extG,env].forEach(R=>R&&R.traverse(o=>{if(!o.isMesh||!o.visible)return;for(let p=o;p;p=p.parent)if(p.name==='EXT_CELLS'||/^(HOUSE_L|SITE_L\d|FENCE)/.test(p.name))return;   // công trình nhà/vườn L3 (gỗ) không phải cây lẻ
@@ -1406,6 +1412,13 @@ ${FRAG_COLOR}
   ground.rotation.x=-Math.PI/2;/* dy: phòng tầng trên → mặt đất vườn nằm dưới sàn phòng */ground.position.set(0,OUTD?A.L0-0.03:extG?MAPS.exterior.floorY-0.03+((MC.ext&&MC.ext.dy)||0):-0.3,0);ground.renderOrder=-999;if(MC.noGround)ground.visible=false;   /* rạp phim tầng hầm: không có mặt đất vườn */ground.receiveShadow=OUTD||!!extG;scene.add(ground);
   if(OUTD){envMeshes.push(ground)}if(OUTD||extG)FU.uGMap.value=gTex;
   // nhà L4: đồi hoa = mặt đất thật (đi lên được) → dùng chung vật liệu + toạ độ UV của mặt đất vườn để liền màu/texture với nền
+  // mặt đất HANA (Moss, src/hana.js): thay vật liệu mặt đất vườn + mọi lưới nền cỏ trong GLB; UV theo toạ độ thế giới (1 ô = cạnh tấm plane gốc)
+  if(HKIT&&HKIT.ground&&(OUTD||extG)){const HG=HKIT.ground,gm=HG.material,rp=1300/HG.tile;if(gm.map)gm.map.repeat.set(rp,rp);if(gm.userData.hana.U.uHDataMap&&gm.userData.hana.U.uHDataMap.value)gm.userData.hana.U.uHDataMap.value.repeat.set(rp,rp);
+    ground.material=gm;const gp=ground.position;
+    [extG,env].forEach(R=>R&&R.traverse(o=>{if(!o.isMesh||o.isInstancedMesh||o===ground||!o.material||Array.isArray(o.material)||!grassTex||o.material.map!==grassTex)return;o.updateMatrixWorld(true);
+      const P=o.geometry.attributes.position,uv=new Float32Array(P.count*2),v=new THREE.Vector3();
+      for(let i=0;i<P.count;i++){v.fromBufferAttribute(P,i).applyMatrix4(o.matrixWorld);uv[i*2]=((v.x-gp.x)/650+1)/2;uv[i*2+1]=(-(v.z-gp.z)/650+1)/2}
+      o.geometry=o.geometry.clone();o.geometry.setAttribute('uv',new THREE.BufferAttribute(uv,2));o.material=gm}))}
   {const gp=ground.position;[extG,env].forEach(R=>R&&R.traverse(o=>{if(!o.isMesh||!/^L4_Hill_Ground/.test(o.name))return;o.updateMatrixWorld(true);
     const P=o.geometry.attributes.position,uv=new Float32Array(P.count*2),v=new THREE.Vector3();
     for(let i=0;i<P.count;i++){v.fromBufferAttribute(P,i).applyMatrix4(o.matrixWorld);uv[i*2]=((v.x-gp.x)/650+1)/2;uv[i*2+1]=(-(v.z-gp.z)/650+1)/2}
@@ -1493,6 +1506,7 @@ ${FRAG_COLOR}
     // texture: anisotropy cao để cảnh ngoài cửa sổ không bị sạn/nhấp nháy
     const tex=new Set();env.traverse(o=>{if(!o.isMesh)return;(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{if(!m)return;['map','normalMap','emissiveMap','roughnessMap','metalnessMap','aoMap'].forEach(k=>{if(m[k])tex.add(m[k])})})});
     tex.forEach(t=>{t.anisotropy=maxAniso;t.generateMipmaps=true;t.minFilter=THREE.LinearMipmapLinearFilter;t.needsUpdate=true});
+    if(HKIT&&!OUTD){try{const n=replaceIndoorPots(env,HKIT.kits,'pot5');if(n)console.log('[hana] chậu trong phòng → chậu sứ HANA: '+n)}catch(e){console.warn('[hana] pots',e)}}
     console.log('[sty] map: '+api.stylize(env));
     // chống z-fighting: tấm mỏng nằm áp lên mặt khác (thảm, tranh, bảng ghim, khung, tấm lót…) → vật liệu riêng có polygonOffset
     // (kéo về phía camera trong bộ đệm sâu, không dời hình). Tấm chồng lên tấm khác (thảm trong trên thảm ngoài) được đẩy mạnh thêm 1 bậc.
@@ -1946,6 +1960,9 @@ ${FRAG_COLOR}
     const des=c=>c.clone().lerp(grayOf(c),WC.des);
     const sunC=des(k.sun),aS=des(k.ambS),aG=des(k.ambG);const sI=Math.min(1.15,(0.35+0.65*k.sunI)*(0.4+0.6*WC.dim)*Math.max(fade,0.2))*(1+flash*1.2),aI=0.95+flash*0.5;
     const raw=(c,v)=>{const w=c.clone().convertLinearToSRGB();v.value.set(w.r,w.g,w.b)};raw(sunC,TU.uSunC);TU.uSunC.value.multiplyScalar(sI);raw(aS,TU.uAmbS);TU.uAmbS.value.multiplyScalar(aI);raw(aG,TU.uAmbG);TU.uAmbG.value.multiplyScalar(aI);
+    {// cây cỏ HANA (src/hana.js): ánh sáng tham chiếu = 12h30 trời quang → màu HANA đúng như Blender lúc đó, giờ/thời tiết khác nhân theo tỉ lệ
+     const k12=keyAt(12.5),s12=Math.min(1.15,0.35+0.65*k12.sunI),cs=k12.sun.clone().convertLinearToSRGB(),ca=k12.ambS.clone().convertLinearToSRGB(),M=TU.uMid.value,Sh=TU.uSh.value,R=HU.uHRefL.value,RS=HU.uHRefS.value;
+     R.set(M.x*cs.r*s12,M.y*cs.g*s12,M.z*cs.b*s12);RS.set(Math.min(Sh.x*ca.r*0.95,R.x*0.78),Math.min(Sh.y*ca.g*0.95,R.y*0.78),Math.min(Sh.z*ca.b*0.95,R.z*0.78))}
     {const fl=dt>0?Math.min(1,dt*5):1;LI.ka+=((LI.a?1:0)-LI.ka)*fl;LI.kb+=((LI.b?1:0)-LI.kb)*fl}   // bật/tắt đèn nhà: mờ dần ~0.4s
     const lamp=Math.max(k.lamp,WC.dim<0.5?0.3:0)*0.95*LI.ka;TU.uLampC.value.set(1.0*lamp,0.62*lamp,0.3*lamp);TU.uLK.value=(0.7+0.5*Math.min(1,Math.max(k.lamp,WC.dim<0.5?0.3:0)))*LI.kb;
     TU.uLOff.value=(1-LI.ka)*(0.35+0.65*(1-LI.kb))*(0.55+0.45*(1-k.day));   // tắt ánh chung → tối bớt; tắt thêm đèn có bóng → tối hẳn
@@ -1964,6 +1981,7 @@ ${FRAG_COLOR}
     // grade
     GU.uExpo.value=TP.expo*(1-(1-WC.dim)*0.3);GU.uCon.value=TP.con*(OUTD?0.97:1);GU.uSat.value=TP.sat*(1-WC.des*0.35)*(OUTD?0.9:1);GU.uCon.value*=WL.gC;GU.uTemp.value=TP.temp+k.gt+WL.gT;GU.uVig.value=TP.vig+WL.gV;GU.uLift.value.copy(WL.gL).multiplyScalar(0.5+0.5*k.day);GU.uGrain.value=WL.gG;GU.uTintAmt.value=TP.tintAmt;GU.uFlash.value=flash*0.6;
     const hs=h=>{const v=hexV(h);return new THREE.Vector3(v.x,v.y,v.z)};GU.uTintSh.value.copy(hexV(TP.tintSh));GU.uTintHi.value.copy(hexV(TP.tintHi));
+    HU.uHG.value.set(GU.uExpo.value,GU.uCon.value,GU.uSat.value,GU.uTemp.value);HU.uHTSh.value.copy(GU.uTintSh.value);HU.uHTHi.value.copy(GU.uTintHi.value);HU.uHTAmt.value=GU.uTintAmt.value;HU.uHGLift.value.copy(GU.uLift.value);   // HANA bù ngược hậu kỳ (src/hana.js)
     bloomP.strength=Math.min(TP.bloom,0.3)*(1+0.35*(1-k.day));bloomP.threshold=Math.max(TP.bloomTh,0.98);bloomP.radius=0.45;   // vật thường bị chặn trần 0.96 → chỉ đèn vượt ngưỡng
     // light shafts
     const dirL=act.v,ltC=des(k.sun);beamU.uCol.value.copy(ltC);beamU.uDir.value.copy(dirL).multiplyScalar(-1);

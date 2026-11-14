@@ -63,6 +63,7 @@ export function makeStylizer(THREE, {aniso = 8} = {}) {
 
   const kindOf = (m, o) => {
     if (!m || !m.isMeshStandardMaterial || m.userData.vySty) return m && m.userData.vySty;
+    if (m.userData.hana || m.userData.noSty) return null;     // cây cỏ / đá / chậu HANA: giữ nguyên pigment của HANA
     const n = m.name || '';
     if (/^(Stylized\s+Concrete|M_Wall_Cream)/i.test(n) || wallNames.has(n)) return 'wall';
     if (/^Stylized Brick Wall/i.test(n)) return 'roof';

@@ -73,11 +73,12 @@ gl_Position = projectionMatrix * mvPosition;
 `;
 
 // vs: vertex shader gốc của three (đã chứa các #include). Trả về shader mới. noise: NOISE_GLSL của game (vn3) để tính bóng mây theo đỉnh.
-export function vertFol2(vs, withCloud, noise, squash, stem) {
+// hana: lá HANA — giữ pháp tuyến của từng lá (mass normal của tán đi riêng qua _voln, src/hana.js), không dùng normal lai
+export function vertFol2(vs, withCloud, noise, squash, stem, hana) {
   return (squash ? '#define SQUASH\n' : '') + (stem ? '#define STEMR\nattribute vec3 _root;\n' : '') + 'uniform vec3 uPl[2];uniform vec3 uCenter;uniform float uHInv,uHybrid;varying float vLeafH,vHash,vCS;varying vec2 vRoot;uniform float uCloudSh;\n' + (withCloud ? noise + '\n' : '') + WIND_FN + '\n' + vs
     .replace('#include <beginnormal_vertex>', `
       vec3 objectNormal = vec3( normal );
-      { vec3 nRad = normalize( position - uCenter + vec3( 0.0, 1e-3, 0.0 ) ); objectNormal = normalize( mix( vec3( 0.0, 1.0, 0.0 ), nRad, uHybrid ) ); }
+      ${hana ? '' : '{ vec3 nRad = normalize( position - uCenter + vec3( 0.0, 1e-3, 0.0 ) ); objectNormal = normalize( mix( vec3( 0.0, 1.0, 0.0 ), nRad, uHybrid ) ); }'}
       #ifdef USE_TANGENT
         vec3 objectTangent = vec3( tangent.xyz );
       #endif`)

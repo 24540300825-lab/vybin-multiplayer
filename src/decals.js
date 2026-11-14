@@ -6,12 +6,16 @@
 // Mỗi loại 1 lượt vẽ (InstancedMesh): dải cỏ + 3 dáng cây.
 import * as THREE from 'three';
 import {FU} from './foliage.js';
+import {HU, HUE_SYNC} from './hana.js';
 export const DEC_VER = 2;
 const META = {"grass":{"w":8.932,"h":2.076,"bh":1.977},"pine":{"w":4.16,"h":9.424,"bh":9.239},"round1":{"w":5.165,"h":8.369,"bh":8.205},"round2":{"w":5.734,"h":8.293,"bh":8.131},"round3":{"w":3.942,"h":9.797,"bh":9.605},"round4":{"w":2.532,"h":9.003,"bh":8.827},"round5":{"w":3.519,"h":10.237,"bh":10.036}};   // assets/decal/meta.json (tools/bake/pack.py)
 
+// decal HANA (tools/hana_bake: bake bằng hana-three.js = màu Blender) — assets/decal/h_*.png + h_meta.json (base = tỉ lệ đáy cây trên ảnh)
+const META_H = {"tree1": {"w": 2.629, "h": 3.287, "bh": 3.101, "base": 0.0317}, "tree2": {"w": 2.284, "h": 2.855, "bh": 2.694, "base": 0.0317}, "bush2": {"w": 2.224, "h": 1.39, "bh": 0.722, "base": 0.2423}, "bush3": {"w": 2.831, "h": 1.77, "bh": 0.747, "base": 0.2904}, "bush4": {"w": 2.155, "h": 1.347, "bh": 0.864, "base": 0.1815}, "berry": {"w": 2.269, "h": 1.418, "bh": 1.2, "base": 0.08}, "grass": {"w": 12.238, "h": 3.06, "bh": 0.898, "base": 0.366}};
+
 // gọi trong onBeforeCompile của toonMat (game.js) khi m.userData.vyDec có
 export function patchDecal(sh, m) {
-  const U = m.userData.vyDecU, tree = m.userData.vyDec !== 'grass';
+  const U = m.userData.vyDecU, tree = m.userData.vyDec !== 'grass', H = !!m.userData.hanaDec;   // H: decal HANA (màu bake sẵn = màu Blender, src/hana.js bù hậu kỳ + nhân ánh sáng môi trường)
   Object.assign(sh.uniforms, U); if (!tree) { sh.uniforms.uGMap = FU.uGMap; sh.uniforms.uGK = FU.uGK; }
   sh.vertexShader = 'uniform vec3 uTgt;varying float vFlip;\n' + sh.vertexShader
     .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
@@ -25,13 +29,13 @@ export function patchDecal(sh, m) {
       {float ly=transformed.y*_ct,lz=-transformed.y*_st;transformed=vec3(transformed.x*_c+lz*_s,ly,-transformed.x*_s+lz*_c);}`);
   sh.fragmentShader = 'uniform vec3 uTgt;uniform vec4 uBox;uniform float uR0,uR1,uM0,uM1,uMist,uFar;varying float vFlip;\n' + (tree ? '' : 'uniform sampler2D uGMap;uniform float uGK;uniform vec4 uFen;uniform float uFenK;\n') + sh.fragmentShader
     .replace('#include <map_fragment>', `
-      vec2 _uv=vMapUv;${tree ? '' : '_uv.x=vFlip>0.5?1.0-_uv.x:_uv.x;'}vec4 _da=texture2D(map,_uv);float _mk=texture2D(normalMap,_uv).a;
+      vec2 _uv=vMapUv;${tree && !H ? '' : '_uv.x=vFlip>0.5?1.0-_uv.x:_uv.x;'}vec4 _da=texture2D(map,_uv);float _mk=${H ? '0.0' : 'texture2D(normalMap,_uv).a'};
       {// hiện dần theo khoảng cách tới nhân vật (dither ổn định trên màn hình) — gần thì đã có cây cỏ 3D thật
        float dd=distance(vWP.xz,uTgt.xz);if(uBox.y>uBox.x){vec2 _bq=max(max(vec2(uBox.x-vWP.x,uBox.z-vWP.z),vec2(vWP.x-uBox.y,vWP.z-uBox.w)),0.0);dd=length(_bq);}float fz=smoothstep(uR0,uR1,dd)*(1.0-smoothstep(uFar*0.85,uFar,dd));
        float hs=fract(52.9829189*fract(dot(floor(gl_FragCoord.xy),vec2(0.06711056,0.00583715))));
        if(fz<=hs*0.98+0.01)discard;}
       ${tree ? '' : 'if(uFenK>0.5&&vWP.x>uFen.x&&vWP.x<uFen.y&&vWP.z>uFen.z&&vWP.z<uFen.w)discard;'}   // ULTRA: trong hàng rào đã có thảm cỏ thật (meadow.js)
-      ${tree ? `vec3 _lf=mix(uLeafA,uLeafB,smoothstep(0.18,0.95,_da.r))*vec3(0.93,1.0,1.09)*mix(0.82,1.06,_da.r);   // ngả teal như cỏ cây 3D; giữ sáng tối trong tán
+      ${H ? 'diffuseColor.rgb*=_da.rgb;' : tree ? `vec3 _lf=mix(uLeafA,uLeafB,smoothstep(0.18,0.95,_da.r))*vec3(0.93,1.0,1.09)*mix(0.82,1.06,_da.r);   // ngả teal như cỏ cây 3D; giữ sáng tối trong tán
       diffuseColor.rgb*=mix(_da.rgb,_lf,_mk);` : `// CỎ: màu lấy THẲNG từ texture thảm ngay dưới (đúng công thức cỏ 3D gần) → luôn tệp màu với thảm ở mọi góc nhìn; chỉ giữ chút sáng tối của cụm
       vec3 _gt=texture2D(uGMap,vec2(55.0+vWP.x*uGK,55.0-vWP.z*uGK)).rgb*uGTint;float _gl=dot(_gt,vec3(0.299,0.587,0.114));
       vec3 _gc=mix(_gt,mix(uGrassA,uGrassB,smoothstep(0.08,0.6,_gl))*uGTint,0.75);
@@ -46,22 +50,25 @@ export function patchDecal(sh, m) {
       #endif`);
 }
 
-export function makeFoliageDecals({scene, toonMat, trees = [], grass = [], indoor = false}) {
+export function makeFoliageDecals({scene, toonMat, trees = [], grass = [], bushes = [], indoor = false, hana = false}) {
   const L = new THREE.TextureLoader();
   const tex = (f, srgb) => { const t = L.load('assets/decal/' + f + '.png?v=' + DEC_VER); t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 4; return t; };
   const group = new THREE.Group(); group.name = 'FOLIAGE_DECALS'; scene.add(group);
   const U = {
     tree: {uTgt: {value: new THREE.Vector3()}, uBox: {value: new THREE.Vector4(0, -1, 0, -1)}, uR0: {value: 26}, uR1: {value: 31}, uM0: {value: 40}, uM1: {value: 170}, uMist: {value: 0.5}, uFar: {value: 260}},
+    bush: {uTgt: {value: new THREE.Vector3()}, uBox: {value: new THREE.Vector4(0, -1, 0, -1)}, uR0: {value: 13}, uR1: {value: 17}, uM0: {value: 40}, uM1: {value: 170}, uMist: {value: 0.4}, uFar: {value: 120}},
     grass: {uTgt: {value: new THREE.Vector3()}, uR0: {value: 11}, uR1: {value: 15.5}, uM0: {value: 25}, uM1: {value: 130}, uMist: {value: 0}, uFar: {value: 150}},   // cỏ: chỉ sương chung như thảm (không mist riêng) → không tách màu
   };
-  U.grass.uTgt = U.tree.uTgt; U.grass.uBox = U.tree.uBox;                      // dùng chung 1 vector tâm
+  U.grass.uTgt = U.tree.uTgt; U.grass.uBox = U.tree.uBox; U.bush.uTgt = U.tree.uTgt; U.bush.uBox = U.tree.uBox;                      // dùng chung 1 vector tâm
   U.grass.uFen = {value: new THREE.Vector4(0, -1, 0, -1)}; U.grass.uFenK = {value: 0};   // ULTRA: bỏ decal cỏ trong hàng rào (đã có thảm cỏ thật)
   const meshes = [];
   function build(kind, list, base) {
     if (!list.length) return;
-    const M = META[kind], g = new THREE.PlaneGeometry(M.w, M.h); g.translate(0, M.h / 2, 0);
-    const mat = new THREE.MeshStandardMaterial({map: tex(kind + '_a', true), normalMap: tex(kind + '_n'), alphaTest: 0.45, roughness: 1, metalness: 0});
-    mat.name = 'VY_DECAL_' + kind; mat.userData.vyDec = base; mat.userData.vyDecU = U[base]; mat.userData.desat = base === 'grass' ? 0.95 : 1;
+    const H = kind.startsWith('h_'), M = H ? META_H[kind.slice(2)] : META[kind], g = new THREE.PlaneGeometry(M.w, M.h); g.translate(0, M.h / 2 - (M.base || 0) * M.h, 0);
+    const mat = H ? new THREE.MeshStandardMaterial({map: tex(kind, true), alphaTest: 0.45, roughness: 1, metalness: 0})
+      : new THREE.MeshStandardMaterial({map: tex(kind + '_a', true), normalMap: tex(kind + '_n'), alphaTest: 0.45, roughness: 1, metalness: 0});
+    mat.name = 'VY_DECAL_' + kind; mat.userData.vyDec = base === 'bush' ? 'tree' : base; mat.userData.vyDecU = U[base]; mat.userData.desat = base === 'grass' ? 0.95 : 1;
+    if (H) { mat.userData.hanaDec = true; mat.userData.noSty = true; mat.userData.noAO = true; mat.userData.hana = {kind: 'decal', sil: false, dmap: false, dattr: false, U: {...HU, uHHue: {value: base === 'grass' ? HUE_SYNC.grass.clone() : new THREE.Vector3(0, 1, 1)}}}; }
     toonMat(mat);
     const im = new THREE.InstancedMesh(g, mat, list.length), m4 = new THREE.Matrix4(), c = new THREE.Color();
     list.forEach((p, i) => { m4.makeScale(p.s, p.s, p.s).setPosition(p.x, p.y, p.z); im.setMatrixAt(i, m4); c.setHSL(0, 0, 1).offsetHSL(p.hue || 0, 0, p.val || 0); im.setColorAt(i, c); });
@@ -79,10 +86,20 @@ export function makeFoliageDecals({scene, toonMat, trees = [], grass = [], indoo
     if (t.far && h1 < 0.28 && rnd() < 0.75) return 'pine';
     const main = ROUND[Math.floor(h2 * ROUND.length)], alt = ROUND[Math.floor(hsh(gx + 3, gz + 9) * ROUND.length)];
     return rnd() < 0.65 ? main : rnd() < 0.6 ? alt : ROUND[Math.floor(rnd() * ROUND.length)]; };
+  if (hana) {      // cây cỏ HANA: decal bake từ chính cây HANA (2 dáng cây, 4 dáng bụi, dải cỏ)
+    const HB = {h_tree1: [], h_tree2: [], h_bush2: [], h_bush3: [], h_bush4: [], h_berry: []};
+    trees.forEach(t => { const k = t.kit === 'tree2' || (!t.kit && rnd() < 0.5) ? 'h_tree2' : 'h_tree1', M = META_H[k.slice(2)];
+      HB[k].push({x: t.x, y: t.y, z: t.z, s: Math.max(0.3, t.h / M.bh) * (0.95 + rnd() * 0.1), hue: (rnd() - 0.5) * 0.02, val: (rnd() - 0.5) * 0.06}); });
+    bushes.forEach(t => { const k = 'h_' + (t.kit || 'bush2'), M = META_H[k.slice(2)]; if (!M) return;
+      HB[k].push({x: t.x, y: t.y, z: t.z, s: Math.max(0.2, t.h / M.bh), hue: 0, val: (rnd() - 0.5) * 0.05}); });
+    Object.keys(HB).forEach(k => build(k, HB[k], k.includes('tree') ? 'tree' : 'bush'));
+    build('h_grass', grass.map(p => ({...p, s: p.s * 8.932 / META_H.grass.w * 1.6})), 'grass');
+  } else {
   trees.forEach(t => { const k = t.kind || kindAt(t); const M = META[k];
     by[k].push({x: t.x, y: t.y, z: t.z, s: Math.max(0.3, t.h / M.bh) * (0.95 + rnd() * 0.1), hue: (rnd() - 0.5) * 0.03, val: (rnd() - 0.5) * 0.08}); });
   Object.keys(by).forEach(k => build(k, by[k], 'tree'));
   build('grass', grass, 'grass');
+  }
   return {
     group, meshes, U,
     update(target) { U.tree.uTgt.value.copy(target); },

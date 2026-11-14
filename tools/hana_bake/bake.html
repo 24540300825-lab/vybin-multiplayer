@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script></head><body>
+<script type="module">
+// Bake decal xa cho cây cỏ HANA: render từng cây/bụi/dải cỏ bằng chính hana-three.js (= màu Blender) → PNG nền trong suốt (cửa sổ chính diện).
+// ?what=tree1|tree2|bush2|bush3|bush4|berry|grass &w=&h=   → window.__out = {png dataURL, w, h, bh (m)}
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {setupHanaRenderer, prepareHanaScene, updateHana} from './hana-three.js';
+const Q = new URLSearchParams(location.search), what = Q.get('what'), W = +Q.get('w') || 512, H = +Q.get('h') || 512;
+const GROUPS = {
+  tree1: [/^Tree_Leaf_1_HANA_Foliage$/, /^Tree_Branch_1_HANA$/], tree2: [/^Tree_Leaf_2_HANA_Foliage$/, /^Tree_Branch_2_HANA$/],
+  bush2: [/^Bush_2_HANA_Foliage$/], bush3: [/^Bush_3_HANA_Foliage$/], bush4: [/^Bush_4_HANA_Foliage$/],
+  berry: [/^Bush_bush-blackberry-eurasian-generic-mature-b_1_HANA_Foliage$/, /^bush-blackberry-eurasian-generic-mature-b\.001_HANA$/],
+  grass: [/^Grass_plane_HANA_Foliage$/],
+};
+const renderer = setupHanaRenderer(new THREE.WebGLRenderer({antialias: true, alpha: true, preserveDrawingBuffer: true}));
+renderer.setSize(W, H); renderer.setClearColor(0x000000, 0); document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const gltf = await new GLTFLoader().loadAsync('./hana_scene.glb');
+const hana = prepareHanaScene(gltf.scene, {baseUrl: './', shadows: false});
+await hana.ready;
+scene.add(hana.root);
+const keep = GROUPS[what];
+hana.root.children.forEach(o => { o.visible = keep.some(r => r.test(o.name)); });
+// dải cỏ: 4 tấm cỏ nối nhau theo chiều ngang (ảnh rộng)
+if (what === 'grass') {
+  const src = hana.root.children.find(o => keep[0].test(o.name));
+  for (let i = 1; i < 5; i++) { const c = src.clone(); c.position.x += i * 1.7; c.position.z += (i % 2 ? 0.3 : -0.2); c.rotation.y = i * 1.3; hana.root.add(c); }
+}
+hana.root.updateMatrixWorld(true);
+const box = new THREE.Box3(); hana.root.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && visible(o)) box.expandByObject(o); });
+function visible(o) { for (let q = o; q; q = q.parent) if (!q.visible) return false; return true; }
+const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
+// camera trực giao nhìn ngang (hơi từ trên xuống cho cỏ), mặt trời từ phía trước-trên như key light của bạn
+const tilt = what === 'grass' ? 0.42 : 0.12;
+const pw = (what === 'grass' ? s.x : Math.max(s.x, s.z)) * (what.startsWith('tree') ? 1.08 : 1.2), ph = (s.y + (what === 'grass' ? Math.max(s.x, s.z) * Math.sin(tilt) * 0.5 : 0)) * 1.06;
+const aspect = W / H; let hw = pw / 2, hh = ph / 2; if (hw / hh > aspect) hh = hw / aspect; else hw = hh * aspect;
+const cam = new THREE.OrthographicCamera(-hw, hw, hh, -hh, 0.01, 200);
+cam.position.set(c.x, c.y + Math.sin(tilt) * 30, c.z + Math.cos(tilt) * 30); cam.lookAt(c.x, c.y, c.z);
+const sun = new THREE.DirectionalLight(0xfff1dc, 4.0); sun.position.set(c.x + 12, c.y + 30, c.z + 22); sun.target.position.copy(c); scene.add(sun, sun.target);
+scene.add(new THREE.AmbientLight(0xbcd6ff, Math.PI * 0.35));
+updateHana(hana, cam);
+renderer.render(scene, cam);
+// đáy cây trên ảnh: chiếu điểm thấp nhất của hộp
+const bot = new THREE.Vector3(c.x, box.min.y, c.z).project(cam);
+window.__out = {png: renderer.domElement.toDataURL('image/png'), w: hw * 2, h: hh * 2, bh: s.y, base: (bot.y + 1) / 2};
+</script></body></html>

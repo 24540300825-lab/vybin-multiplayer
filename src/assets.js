@@ -33,6 +33,8 @@ def('map-library', {owner: 'library', priority: 1});
 def('map-cinema', {owner: 'cinema', priority: 1});
 def('char-vy', {owner: null, priority: 2});
 def('char-bin', {owner: null, priority: 2});
+def('flora-hana', {owner: null, priority: 2});
+def('ground-hana', {owner: null, priority: 2});  // mặt đất HANA Moss (tấm plane 21.5 m của bạn, lặp theo toạ độ thế giới)   // cây cỏ HANA (tools/hana_kit.py): cây/bụi/cỏ/hoa/đá/đá dẫn lối/chậu — dùng chung mọi map
 
 // mùa lễ: đồ trang trí (season-<mùa>.glb) + trang phục (costume-<vy|bin>-<id>.glb) — tự đăng ký mọi file có trong manifest
 for (const id of Object.keys(FILES)) if (/^(season|costume)-/.test(id) && FILES[id].file.endsWith('.glb') && !REG.has(id)) def(id, {owner: null, priority: 3});

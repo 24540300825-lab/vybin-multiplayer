@@ -60,13 +60,16 @@ async function boot() {
   const {activeSeason} = await import('./season/calendar.js');
   const SEASON = activeSeason(), seasonAsset = SEASON && Assets.hasAsset('season-' + SEASON) ? 'season-' + SEASON : null;   // mùa lễ: đồ trang trí (nếu đã có file)
   window.__season = SEASON;
-  const ids = [...mapAssets(mapId), 'char-' + slot, ...(seasonAsset ? [seasonAsset] : [])];
+  const ids = [...mapAssets(mapId), 'char-' + slot, ...(seasonAsset ? [seasonAsset] : []), ...(Assets.hasAsset('flora-hana') && !/[?&]nohana\b/.test(location.search) ? ['flora-hana', ...(Assets.hasAsset('ground-hana') ? ['ground-hana'] : [])] : [])];
   const files = await Assets.loadGroup(ids, p => LB(10 + p * 60));
   const eng = await enginePromise;
+  // cây cỏ HANA: dựng hình học lá + vật liệu một lần (src/hana.js) — lỗi thì giữ cây cỏ cũ
+  let hanaKit = null;
+  if (files['flora-hana']) { try { const {buildHanaKits} = await import('./hana.js'); hanaKit = await buildHanaKits(files['flora-hana'], files['ground-hana'] || null); } catch (e) { console.warn('[hana]', e); } }
   LB(75, 'Dựng cảnh...');
   await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
   const EXT = extAsset(), mapKey = mapId === 'exterior' ? EXT : 'map-' + mapId;
-  eng.init({env: files[mapKey], ext: mapId !== 'exterior' ? files[EXT] || null : null, houseL2: EXT !== 'map-exterior', houseLv: EXT === 'map-exterior-l4' ? 4 : EXT === 'map-exterior-l3' ? 3 : EXT === 'map-exterior-l2' ? 2 : 1, localGlb: files['char-' + slot], localSlot: slot, mapId, season: SEASON ? {id: SEASON, glb: seasonAsset ? files[seasonAsset] : null} : null});
+  eng.init({env: files[mapKey], ext: mapId !== 'exterior' ? files[EXT] || null : null, houseL2: EXT !== 'map-exterior', houseLv: EXT === 'map-exterior-l4' ? 4 : EXT === 'map-exterior-l3' ? 3 : EXT === 'map-exterior-l2' ? 2 : 1, localGlb: files['char-' + slot], localSlot: slot, mapId, hana: hanaKit, season: SEASON ? {id: SEASON, glb: seasonAsset ? files[seasonAsset] : null} : null});
   const api = eng.api;
   LB(88, 'Biên dịch shader...');
   let warmed = false; try { warmed = localStorage.getItem('vyWarm') === mapId; } catch (e) {}   // lần sau: trình duyệt đã cache shader → chờ ngắn hơn

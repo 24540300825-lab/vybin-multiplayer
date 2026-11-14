@@ -10,10 +10,20 @@ export const FILES = {
   "v": "2bac8e6f",
   "size": 6270748
  },
+ "flora-hana": {
+  "file": "flora-hana.glb",
+  "v": "3812c28d",
+  "size": 3076904
+ },
  "grass-mask": {
   "file": "grass-mask.png",
   "v": "b552db26",
   "size": 512472
+ },
+ "ground-hana": {
+  "file": "ground-hana.glb",
+  "v": "6e6d0708",
+  "size": 257824
  },
  "map-bin": {
   "file": "map-bin.glb",
