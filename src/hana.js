@@ -15,6 +15,7 @@ export const HU = {
   uHLift: {value: 1.0},     // nhân độ sáng tổng của cây cỏ HANA
   uHSolidLift: {value: 1.0},
   uHGBot: {value: new THREE.Vector2(0.5, 0.62)},   // cỏ: vùng tối ở gốc — x = độ tối (trừ vào tone), y = cao tới đâu (0 gốc → 1 ngọn)
+  uHFolShadow: {value: new THREE.Color(0.002, 0.277, 0.022)},   // màu vùng tối của lá (từ file HANA) — decal xa về đúng màu này khi khuất nắng / ban đêm
   uHDbg: {value: 0},
   // hậu kỳ màu của game (Grade pass, game.js) — HANA bù ngược để màu hiện ra = màu tham chiếu Blender (rồi mới nhân ánh sáng môi trường)
   uHG: {value: new THREE.Vector4(1, 1, 1, 0)},     // expo, con, sat, temp
@@ -88,7 +89,7 @@ export const HANA_CUT = `
 `;
 
 export const HANA_FRAG_PARS = `
-uniform vec3 uHRefL,uHRefS;uniform float uHSun,uHAmb,uHLift,uHSolidLift,uHDbg;uniform vec4 uHG;uniform vec3 uHTSh,uHTHi,uHGLift;uniform float uHTAmt;
+uniform vec3 uHRefL,uHRefS,uHFolShadow;uniform float uHSun,uHAmb,uHLift,uHSolidLift,uHDbg;uniform vec4 uHG;uniform vec3 uHTSh,uHTHi,uHGLift;uniform float uHTAmt;
 uniform vec3 uHMidC,uHShadowC,uHLightC,uHHighC,uHRimC,uHHue;uniform float uHToneOff;
 uniform float uHThr,uHSoft,uHShape,uHShStr,uHHThr,uHHSoft,uHHStr,uHTexSh,uHTexHi,uHCap,uHK,uHWrap,uHTrans,uHRimI,uHRimW,uHRimS,uHRimAw;
 #ifdef HANA_FOL
@@ -176,7 +177,10 @@ export const HANA_COLOR = `
   float sunK = hLum( envL ) / max( hLum( uHRefL ), 1e-3 ), ambK = hLum( envS ) / max( hLum( uHRefS ), 1e-3 );
   vec3 hV = geometryViewDir, hN = geometryNormal; float hlit = 1.0; vec3 hc;
   #if defined( HANA_DEC )
-   hc = diffuseColor.rgb; hlit = 0.8;      // decal xa: màu bake sẵn (= Blender), chỉ nhân ánh sáng môi trường
+   // decal xa: màu bake sẵn (= Blender lúc nắng) → cùng cách đổi vùng như cây cỏ 3D: nắng yếu (chiều tối / đêm) hoặc nằm trong bóng → về màu vùng tối của lá
+   { float dl = clamp( sunK, 0.0, 1.0 );      // (không dùng bóng đổ: decal ở xa, tấm nghiêng → răng cưa bóng)
+     vec3 hS = mix( uHFolShadow, diffuseColor.rgb * 0.45, 0.45 );
+     hlit = smoothstep( 0.2, 0.85, dl ); hc = mix( hS, diffuseColor.rgb, hlit ); }
   #elif defined( HANA_FOL )
    vec3 hNg = hN;
    hN = normalize( mix( hNg, normalize( vHVol ), uHVolume ) );
@@ -362,7 +366,7 @@ export async function buildHanaKits(gltf, groundGltf = null) {   // vật liệu
         jobs.push((async () => {
           const g = await leafGeometry(d);
           const kind = d.kind === 'GRASS' ? 'grass' : 'leaf';
-          if (!folParams) folParams = d.params;
+          if (!folParams) { folParams = d.params; const sc = d.params['Shadow Color']; if (sc) HU.uHFolShadow.value.setRGB(sc[0], sc[1], sc[2]); }
           const m = hanaMaterial(d.params, {kind, sil: d.sil, name: 'HANA_' + id + '_L' + lod});
           if (kind === 'grass') { m.userData.hana.U.uHHue.value.copy(HUE_SYNC.grass); m.userData.hana.U.uHToneOff.value = TONE_OFF.grass; }
           if (kind === 'leaf' && ex.kind === 'bush') m.userData.bush = false;

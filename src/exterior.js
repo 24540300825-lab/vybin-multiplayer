@@ -451,6 +451,7 @@ export function setupExterior(c) {
       }
     }
   }
+  if (HK) decGrass.length = 0;     // HANA: xa không dùng dải cỏ decal (nhìn như tấm phẳng) — để lộ nền Moss nét cọ, cỏ 3D LOD1 thưa dần ở rìa
   const DEC = makeFoliageDecals({scene, toonMat, trees: treeSpots, grass: decGrass, bushes: bushSpots, indoor: INDOOR, hana: !!HK});
 
   // ---- 4b) lớp CÂY NGƯỜI CHƠI RẢI (src/build/furniture.js): đi CHUNG đường ống với cây vườn — styleMat (gió, tâm tán, bụi, cúi khi đi qua,
@@ -535,7 +536,7 @@ export function setupExterior(c) {
       if (ce.im1 && ce.im1.visible !== v1) ce.im1.visible = v1;
       if (!vis) continue;
       // cây/đá trong hàng rào có VẬT CẢN → luôn đủ bản (không thưa) để không "va vào cây tàng hình"; còn lại thưa dần theo khoảng cách
-      const solid = ce.user || ce.cls === 'path' || (ce.cls === 'grass' && ce.lod != null) || (!INDOOR && !ce.far && (ce.cls === 'tree' || ce.cls === 'rock'));
+      const solid = ce.user || ce.cls === 'path' || (ce.cls === 'grass' && ce.lod === 0) || (!INDOOR && !ce.far && (ce.cls === 'tree' || ce.cls === 'rock'));
       const t = Math.min(1, Math.max(0, (d - CL.d0) / (CL.d1 - CL.d0)));
       // cỏ: sát nhân vật gần đủ dày (lv.gNear), xa thưa dần về min×dens; các loại khác như cũ
       const f = solid ? 1 : ce.cls === 'grass' ? lv.gNear + (CL.min * lv.dens - lv.gNear) * t : Math.max(CL.min, 1 - t * (1 - CL.min)) * lv.dens * (ce.cls === 'flower' ? lv.fl : 1);   // hoa: số lượng theo mức chất lượng
