@@ -288,7 +288,7 @@ export function hanaDepthMat(sil, WIND_FN, TU, FU, grass) {
   d.customProgramCacheKey = () => 'hana-depth' + (sil ? 'S' : '') + (grass ? 'G' : '');
   d.onBeforeCompile = sh => {
     sh.uniforms.uWindT = TU.uWindT; sh.uniforms.uWindA = TU.uWindA; sh.uniforms.uWindDir = FU.uWindDir; sh.uniforms.uPMask = HU.uPMask; sh.uniforms.uPMB = HU.uPMB;
-    sh.vertexShader = (grass ? '#define HANA_PMASK\nattribute vec3 _root;\n' : '') + 'uniform sampler2D uPMask;uniform vec4 uPMB;uniform float uWindT,uWindA;attribute vec4 _leaf;varying vec4 vHLeaf;varying vec2 vHUv;\n' + WIND_FN + '\n' + sh.vertexShader
+    sh.vertexShader = (grass ? '#define HANA_PMASK\nattribute vec3 _root;\n' : '#define HANA_LEAFW\nattribute vec3 _lc;\n') + 'uniform sampler2D uPMask;uniform vec4 uPMB;uniform float uWindT,uWindA;attribute vec4 _leaf;varying vec4 vHLeaf;varying vec2 vHUv;\n' + WIND_FN + '\n' + sh.vertexShader
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvHUv = uv; vHLeaf = _leaf;')
       .replace('#include <project_vertex>', `
 vec3 rl = vec3( 0.0 ), lp0 = transformed;
@@ -301,7 +301,17 @@ vec4 mvPosition = vec4( transformed, 1.0 ); float instScale = 1.0; vec3 instBase
 #endif
 vec4 wpos = modelMatrix * mvPosition;
 vec3 rootW = ( modelMatrix * vec4( instBase, 1.0 ) ).xyz;
+#ifdef HANA_LEAFW
+{ vec4 lc4 = vec4( _lc, 1.0 );
+  #ifdef USE_INSTANCING
+    lc4 = instanceMatrix * lc4;
+  #endif
+  vec3 lcw = ( modelMatrix * lc4 ).xyz;
+  wpos.xyz += hanaFlick( wpos.xyz, lcw, fract( sin( dot( _lc, vec3( 12.9898, 78.233, 37.719 ) ) ) * 43758.5453 ), lcw.y - rootW.y );
+  wpos.xyz += hanaSway( rootW, wpos.y - rootW.y ); }
+#else
 wpos.xyz += windOffset( lp0, rootW, instScale );
+#endif
 ${HANA_PMASK}
 mvPosition = viewMatrix * wpos; gl_Position = projectionMatrix * mvPosition;`);
     sh.fragmentShader = (sil ? '#define HANA_SIL\n' : '') + 'varying vec4 vHLeaf;varying vec2 vHUv;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n' + HANA_CUT);
@@ -361,6 +371,11 @@ export async function buildHanaKits(gltf, groundGltf = null) {   // vật liệu
       const RT = new Float32Array(NV * 3);
       for (let i = 0; i < L; i++) for (let k = 0; k < nU; k++) { const o = (i * nU + k) * 3; RT[o] = ip.getX(i); RT[o + 1] = ip.getY(i); RT[o + 2] = ip.getZ(i); }
       g.setAttribute('_root', new THREE.BufferAttribute(RT, 3));
+    } else {       // cây/bụi: cuống từng lá → lá rung quanh cuống (gió HANA, foliage.js)
+      const LC = new Float32Array(NV * 3);
+      for (let i = 0; i < L; i++) for (let k = 0; k < nU; k++) { const o = (i * nU + k) * 3; LC[o] = ip.getX(i); LC[o + 1] = ip.getY(i); LC[o + 2] = ip.getZ(i); }
+      for (let k = 0; k < nC; k++) { const o = (L * nU + k) * 3; LC[o] = P[o]; LC[o + 1] = P[o + 1]; LC[o + 2] = P[o + 2]; }
+      g.setAttribute('_lc', new THREE.BufferAttribute(LC, 3));
     } g.setAttribute('_leaf', new THREE.BufferAttribute(LF, 4, true));
     g.setIndex(new THREE.BufferAttribute(I, 1)); g.computeBoundingBox(); g.computeBoundingSphere();
     return g;
@@ -374,6 +389,7 @@ export async function buildHanaKits(gltf, groundGltf = null) {   // vật liệu
       m.vertexColors = false;      // màu đỉnh trong file là pigment của HANA (gần đen) — vật liệu ngoài HANA (PolyShader) không dùng
       m.name = src.name; m.roughness = 1; m.metalness = 0; m.userData.noAO = true; m.userData.noSty = true;
       if (kind === 'flower' || kind === 'pot' || kind === 'bush') m.userData.sway = true;      // cây trong chậu / cuống hoa: lay gió theo độ cao
+      if (kind === 'tree') m.userData.tsway = true;      // cành cây: nghiêng cùng tán (hanaSway)
       matCache.set(src, m); mats.push(m); return m;
     }
     const key = src.uuid;
@@ -383,6 +399,7 @@ export async function buildHanaKits(gltf, groundGltf = null) {   // vật liệu
     if (src.map) src.map.colorSpace = THREE.SRGBColorSpace;
     const m = hanaMaterial(p, {kind: 'solid', map: src.map, dataMap: dm, vcol: !src.map && !!src.vertexColors, dattr: !!ud.hana_data_attr, name: src.name});
     if (kind === 'flower' || kind === 'pot') m.userData.sway = true;
+    if (kind === 'tree') m.userData.tsway = true;
     matCache.set(key, m); mats.push(m); return m;
   }
 

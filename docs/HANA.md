@@ -36,9 +36,16 @@ Cây, bụi, cỏ, hoa, đá, đá dẫn lối, chậu và mặt đất ngoài v
 
 | Loại | LOD0 | LOD1 | LOD2 | Xa hơn |
 |---|---|---|---|---|
-| Cây | < 18 m | 18–26 m | 26–32 m | decal |
+| Cây trong vườn | < 18 m | 18–26 m | từ 26 m trở đi (không bao giờ mất) | — |
+| Cây ngoài vườn | < 18 m | 18–26 m | 26–32 m | decal |
 | Bụi | < 12 m | 12–16 m | 16–18 m | decal |
 | Cỏ | cả tấm Grass_plane < 10 m | 40% cọng, 10–15 m | — | decal dải cỏ |
 
 - Khoảng cách nhân theo mức chất lượng.
+- "Trong vườn" = trong hàng rào (`fence` của map).
+
+## Gió cây
+
+- Cả tán và cành nghiêng chung một khối, mỗi cây một pha, cơn gió chậm lan theo hướng gió (`hanaSway` trong `src/foliage.js`).
+- Từng lá rung quanh cuống, xoay cứng nên lá không bị kéo méo (`hanaFlick`).
 - Bụi 4 không có LOD2: tool tự làm thưa từ LOD1.

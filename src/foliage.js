@@ -21,6 +21,24 @@ export const FU = {
   uOccPl: {value: new THREE.Vector3()},           // điểm ngắm trên người (cây/bụi nằm chắn giữa camera và người sẽ mờ dần kiểu dither)
 };
 
+// cây HANA: cả tán + cành nghiêng chung một khối (pha riêng từng cây, cơn gió chậm lan theo hướng gió),
+// lá rung từng chiếc quanh cuống (xoay cứng, không kéo méo lá) → không còn 'sóng nước' lan trên tán.
+export const HANA_SWAY_FN = `
+vec3 hanaSway( vec3 rootW, float hw ){
+  float hs = fract( sin( dot( rootW.xz, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+  vec3 dir = vec3( uWindDir.x, 0.0, uWindDir.y ), side = vec3( -uWindDir.y, 0.0, uWindDir.x );
+  float slow = 0.5 + 0.5 * sin( uWindT * 0.45 - dot( rootW.xz, uWindDir ) * 0.06 + hs * 1.5 );
+  float ph = uWindT * ( 0.9 + 0.5 * uWindA ) + hs * 6.2832;
+  vec3 o = dir * ( 0.55 * slow + 0.22 * sin( ph ) ) + side * ( 0.15 * sin( ph * 0.77 + 1.3 ) );
+  float h = clamp( hw, 0.0, 9.0 );
+  return o * uWindA * 0.008 * h * h;
+}
+vec3 hanaFlick( vec3 pw, vec3 lcw, float hs, float hw ){
+  float t = uWindT * ( 4.0 + 3.0 * uWindA ) + hs * 6.2832;
+  float a = ( sin( t ) * 0.6 + sin( t * 1.73 + 2.1 ) * 0.4 ) * ( 0.05 + 0.2 * uWindA ) * smoothstep( 0.15, 1.2, hw );
+  vec3 ax = normalize( vec3( -uWindDir.y, 0.35, uWindDir.x ) );
+  return cross( ax, pw - lcw ) * a;
+}`;
 // hàm gió dùng chung cho vật liệu màu và vật liệu bóng (depth) → bóng đung đưa đúng như lá
 export const WIND_FN = `
 uniform vec2 uWindDir;
@@ -34,7 +52,8 @@ vec3 windOffset(vec3 lp, vec3 baseW, float sc){
   float t = uWindT * (4.0 + uWindA * 3.0);
   vec3 fl = vec3(sin(t + lp.x * 9.0 + lp.y * 5.0), sin(t * 1.3 + lp.z * 8.0), cos(t * 0.9 + lp.x * 7.0 + lp.z * 6.0)) * 0.035 * (0.15 + uWindA);
   return (d * w + fl * (0.35 + 0.65 * h)) * sc;
-}`;
+}
+` + HANA_SWAY_FN;
 
 // STEMR: cây cỏ người chơi rải (assets/nature) — mỗi đỉnh có _root = gốc NHÁNH của nó (cụm hoa/cỏ được tách thành nhánh lúc xuất GLB)
 // → gió, pha gió, lệch màu và "cúi khi đi qua" tính theo từng nhánh như từng cây hoa của vườn, cả cụm không lắc/bay như 1 khối.
@@ -56,7 +75,17 @@ vec3 instBase = rl;
 #endif
 vec4 wpos = modelMatrix * mvPosition;
 vec3 rootW = ( modelMatrix * vec4( instBase, 1.0 ) ).xyz;
+#ifdef HANA_LEAFW
+{ vec4 lc4 = vec4( _lc, 1.0 );
+  #ifdef USE_INSTANCING
+    lc4 = instanceMatrix * lc4;
+  #endif
+  vec3 lcw = ( modelMatrix * lc4 ).xyz;
+  wpos.xyz += hanaFlick( wpos.xyz, lcw, fract( sin( dot( _lc, vec3( 12.9898, 78.233, 37.719 ) ) ) * 43758.5453 ), lcw.y - rootW.y );
+  wpos.xyz += hanaSway( rootW, wpos.y - rootW.y ); }
+#else
 wpos.xyz += windOffset( lp0, rootW, instScale );
+#endif
 #ifdef SQUASH
 { vec2 d0 = rootW.xz - uPl[0].xz, d1 = rootW.xz - uPl[1].xz; float r0 = length( d0 ), r1 = length( d1 );
   float k0 = 1.0 - smoothstep( 0.15, 2.4, r0 ), k1 = 1.0 - smoothstep( 0.15, 2.4, r1 ); k0 *= k0; k1 *= k1;
@@ -75,7 +104,7 @@ gl_Position = projectionMatrix * mvPosition;
 // vs: vertex shader gốc của three (đã chứa các #include). Trả về shader mới. noise: NOISE_GLSL của game (vn3) để tính bóng mây theo đỉnh.
 // hana: lá HANA — giữ pháp tuyến của từng lá (mass normal của tán đi riêng qua _voln, src/hana.js), không dùng normal lai
 export function vertFol2(vs, withCloud, noise, squash, stem, hana) {
-  return (squash ? '#define SQUASH\n' : '') + (stem ? '#define STEMR\nattribute vec3 _root;\n' : '') + 'uniform vec3 uPl[2];uniform vec3 uCenter;uniform float uHInv,uHybrid;varying float vLeafH,vHash,vCS;varying vec2 vRoot;uniform float uCloudSh;\n' + (withCloud ? noise + '\n' : '') + WIND_FN + '\n' + vs
+  return (hana === 2 ? '#define HANA_LEAFW\nattribute vec3 _lc;\n' : '') + (squash ? '#define SQUASH\n' : '') + (stem ? '#define STEMR\nattribute vec3 _root;\n' : '') + 'uniform vec3 uPl[2];uniform vec3 uCenter;uniform float uHInv,uHybrid;varying float vLeafH,vHash,vCS;varying vec2 vRoot;uniform float uCloudSh;\n' + (withCloud ? noise + '\n' : '') + WIND_FN + '\n' + vs
     .replace('#include <beginnormal_vertex>', `
       vec3 objectNormal = vec3( normal );
       ${hana ? '' : '{ vec3 nRad = normalize( position - uCenter + vec3( 0.0, 1e-3, 0.0 ) ); objectNormal = normalize( mix( vec3( 0.0, 1.0, 0.0 ), nRad, uHybrid ) ); }'}

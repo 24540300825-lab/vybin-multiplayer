@@ -14,7 +14,7 @@ import {$,sstep,clamp,K,CFG,angDiff} from './shared.js';
 import {MAP_CONFIGS} from './map-configs.js';
 import {TU,applyToon,patchLeafMask,hexV,TP,DEPTH_LEAF} from './toon.js';
 import {Perf} from './perf.js';
-import {FU,vertFol2,FRAG_PARS,FRAG_COLOR,OCC_GLSL,makeDepthMat,bindTU} from './foliage.js';
+import {FU,vertFol2,FRAG_PARS,FRAG_COLOR,OCC_GLSL,makeDepthMat,bindTU,HANA_SWAY_FN} from './foliage.js';
 import {replaceIndoorPots,replacePlanterPots} from './hana-ext.js';
 import {HU,HANA_PMASK,HANA_VERT_PARS,HANA_VERT,HANA_SOLID_VERT_PARS,HANA_SOLID_VERT,HANA_CUT,HANA_FRAG_PARS,HANA_COLOR} from './hana.js';
 import {setupExterior,LEVELS} from './exterior.js';
@@ -101,7 +101,15 @@ export function init(ctx){
   function toonMat(m){
       m.onBeforeCompile=sh=>{if(m.userData.leafMask)patchLeafMask(sh);Object.assign(sh.uniforms,TU);const HN=m.userData.hana||null;if(HN)Object.assign(sh.uniforms,HN.U);if(aoOn(m))Object.assign(sh.uniforms,AOU);
         const F2=!!m.userData.fol2,GB=!!m.userData.grass,FOL=!F2&&!GB&&(/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf,SW=!F2&&!GB&&(/Wind/i.test(m.name||'')||m.userData.sway||FOL),GRD=!!m.userData.ground||/Stylized Grass/i.test(m.name||'');
-        const VS0=(F2||GB)?vertFol2(sh.vertexShader,!!m.userData.cloudV,NOISE_GLSL,GB||!!m.userData.squash,!!m.userData.stemR,!!HN):sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+        const VS0=(F2||GB)?vertFol2(sh.vertexShader,!!m.userData.cloudV,NOISE_GLSL,GB||!!m.userData.squash,!!m.userData.stemR,HN?(HN.kind==='leaf'?2:1):0):sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+          #ifdef HANA_TSWAY
+          {mat4 _M=modelMatrix;
+          #ifdef USE_INSTANCING
+           _M=modelMatrix*instanceMatrix;
+          #endif
+          vec3 _rw=(_M*vec4(0.0,0.0,0.0,1.0)).xyz,_pw=(_M*vec4(transformed,1.0)).xyz;mat3 _m3=mat3(_M);
+          transformed+=transpose(_m3)*hanaSway(_rw,_pw.y-_rw.y)/dot(_m3[0],_m3[0]);}
+          #endif
           #ifdef SWAYX
           {vec4 q=vec4(transformed,1.0);
           #ifdef USE_INSTANCING
@@ -116,8 +124,8 @@ export function init(ctx){
           #endif
           vWP=(modelMatrix*_p).xyz;}`);
         if(F2||GB){sh.uniforms.uCenter={value:m.userData.center||new THREE.Vector3(0,0.65,0)};sh.uniforms.uHInv={value:m.userData.hInv||0.66};sh.uniforms.uWindDir=FU.uWindDir;sh.uniforms.uHybrid=FU.uHybrid;sh.uniforms.uBaseShade=FU.uBaseShade;sh.uniforms.uFolEmi=FU.uFolEmi;sh.uniforms.uGMap=FU.uGMap;sh.uniforms.uGK=FU.uGK;sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uPl=FU.uPl;sh.uniforms.uFolTint=FU.uFolTint;sh.uniforms.uFolVar=FU.uFolVar;sh.uniforms.uGrTint=FU.uGrTint;sh.uniforms.uGrVar=FU.uGrVar;sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}
-        if((m.userData.occW||m.userData.occF)&&!(F2||GB)){sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}   // (trước đây gán nhầm trong nhánh cây → tường không khoét được)
-        sh.vertexShader=(SW?'#define SWAYX\n':'')+'varying vec3 vWP;uniform float uWindT,uWindA;\n'+(HN?((F2||GB)?HANA_VERT_PARS:(HN.dattr?'#define HANA_DATTR\n':'')+HANA_SOLID_VERT_PARS):'')+(HN?(GB?'#define HANA_PMASK\nuniform sampler2D uPMask;uniform vec4 uPMB;\n':'')+VS0.replace('#include <uv_vertex>','#include <uv_vertex>\n'+((F2||GB)?HANA_VERT:HANA_SOLID_VERT)).replace('vRoot = rootW.xz;',HANA_PMASK+'vRoot = rootW.xz;'):VS0);
+        if(m.userData.tsway&&!(F2||GB))sh.uniforms.uWindDir=FU.uWindDir;if((m.userData.occW||m.userData.occF)&&!(F2||GB)){sh.uniforms.uOcc=FU.uOcc;sh.uniforms.uOccPl=FU.uOccPl}   // (trước đây gán nhầm trong nhánh cây → tường không khoét được)
+        sh.vertexShader=(SW?'#define SWAYX\n':'')+'varying vec3 vWP;uniform float uWindT,uWindA;\n'+(m.userData.tsway&&!(F2||GB)?'#define HANA_TSWAY\nuniform vec2 uWindDir;\n'+HANA_SWAY_FN+'\n':'')+(HN?((F2||GB)?HANA_VERT_PARS:(HN.dattr?'#define HANA_DATTR\n':'')+HANA_SOLID_VERT_PARS):'')+(HN?(GB?'#define HANA_PMASK\nuniform sampler2D uPMask;uniform vec4 uPMB;\n':'')+VS0.replace('#include <uv_vertex>','#include <uv_vertex>\n'+((F2||GB)?HANA_VERT:HANA_SOLID_VERT)).replace('vRoot = rootW.xz;',HANA_PMASK+'vRoot = rootW.xz;'):VS0);
         sh.uniforms.uGTint=FU.uGTint;sh.uniforms.uDesat={value:m.userData.desat==null?1:m.userData.desat};sh.fragmentShader='uniform float uDesat;uniform vec3 uGTint;\n'+(HN?'#define HANA\n'+((F2||GB)?'#define HANA_FOL\n':'')+(GB?'#define HANA_GRASS\n':'')+(HN.sil?'#define HANA_SIL\n':'')+(HN.dmap?'#define HANA_DMAP\n':'')+(HN.kind==='decal'?'#define HANA_DEC\n':'')+(HN.ground?'#define HANA_GROUND\n':'')+(HN.card?'#define HANA_CARD\n':''):'')+(isGlow(m)?'#define VY_GLOW\n':'')+(FOL?'#define FOLIAGE\n':'')+(F2?'#define FOL2\n':'')+(m.userData.bush?'#define BUSHF\n':'')+(GB?'#define GRASSB\n':'')+(GRD?'#define GROUNDX\n':'')+((F2||GB)?FRAG_PARS:((m.userData.occW||m.userData.occF)?'uniform vec4 uOcc;uniform vec3 uOccPl;\n':''))+(aoOn(m)?'#define VY_AO\nuniform sampler2D uAOT;uniform vec3 uAOB,uAOS,uAOC;uniform vec4 uAOG;uniform vec2 uAOA;uniform float uAOK;\nfloat aoFetch(vec3 q){float fy=clamp(q.y*uAOG.w-0.5,0.0,uAOG.w-1.0);float i0=floor(fy),a=fy-i0,i1=min(i0+1.0,uAOG.w-1.0);vec2 t=vec2(clamp(q.x*uAOG.x,0.5,uAOG.x-0.5),clamp(q.z*uAOG.y,0.5,uAOG.y-0.5));vec2 o0=vec2(mod(i0,uAOG.z),floor(i0/uAOG.z))*uAOG.xy,o1=vec2(mod(i1,uAOG.z),floor(i1/uAOG.z))*uAOG.xy;return mix(texture2D(uAOT,(o0+t)/uAOA).r,texture2D(uAOT,(o1+t)/uAOA).r,a);}\n':'')+'uniform float uInHK;uniform vec3 uSh,uMid,uHi,uGCol,uRimCol,uSunC,uAmbS,uAmbG,uLampC;uniform vec4 uLP[10];uniform float uLN,uLK,uLOff;uniform vec3 uLeafA,uLeafB,uGrassA,uGrassB;uniform float uDS,uDM,uHiS,uGS,uGM,uGStr,uRim,uRimPow,uLeafMix,uWindT,uWet,uCloudSh;varying vec3 vWP;\n'+NOISE_GLSL+'\n'+(HN?HANA_FRAG_PARS:'')+sh.fragmentShader.replace('#include <normal_fragment_begin>',(F2||GB)?'#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\nnormal*=(gl_FrontFacing?1.0:-1.0);\n#endif\n'+(m.userData.occ?OCC_GLSL:''):'#include <normal_fragment_begin>'+(m.userData.occW?OCCW_GLSL:(m.userData.occF?OCCF_GLSL:''))).replace('#include <opaque_fragment>',`
         {float I=1.0,Ih=1.0,vis=1.0,Ig=0.0;
          #ifdef FOLIAGE
@@ -218,7 +226,7 @@ ${HANA_COLOR}
          #endif
          }
         #include <opaque_fragment>`);if(HN&&(HN.sil||HN.card))sh.fragmentShader=sh.fragmentShader.replace('#include <clipping_planes_fragment>',HANA_CUT+'#include <clipping_planes_fragment>');if(STY&&!HN)STY.patch(sh,m);if(m.userData.vyDec)patchDecal(sh,m)};
-      m.customProgramCacheKey=()=>'vytoon11'+(m.userData.hana?'H'+m.userData.hana.kind+(m.userData.hana.sil?'s':'')+(m.userData.hana.dmap?'d':'')+(m.userData.hana.dattr?'a':'')+(m.userData.hana.ground?'g':'')+(m.userData.hana.card?'c':''):'')+(isGlow(m)?'Y':'')+(aoOn(m)?'A':'')+(STY?STY.key(m):'')+(m.userData.vyDec?'D'+m.userData.vyDec:'')+(m.userData.occW?'W':(m.userData.occF?'X':''))+(m.userData.fol2?'F':'')+(m.userData.stemR?'R':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
+      m.customProgramCacheKey=()=>'vytoon11'+(m.userData.hana?'H'+m.userData.hana.kind+(m.userData.hana.sil?'s':'')+(m.userData.hana.dmap?'d':'')+(m.userData.hana.dattr?'a':'')+(m.userData.hana.ground?'g':'')+(m.userData.hana.card?'c':''):'')+(isGlow(m)?'Y':'')+(aoOn(m)?'A':'')+(STY?STY.key(m):'')+(m.userData.vyDec?'D'+m.userData.vyDec:'')+(m.userData.occW?'W':(m.userData.occF?'X':''))+(m.userData.fol2?'F':'')+(m.userData.stemR?'R':'')+(m.userData.tsway?'T':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
 
   // mái ngói cánh Vy/Bin: GLB ngoại cảnh chỉ có mái cánh phòng khách (Roof_Living) → nhân bản sang 2 cánh kia
   // (khớp kích thước mái gốc Roof_Vy/Roof_Bin trong LIVING_ROOM.glb: rộng 10.85, lệch tâm ±0.425, cao 6.4). skipX = x tâm cánh đang ở (giữ hở để nhìn vào)
