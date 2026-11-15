@@ -326,66 +326,94 @@ const BED = /Bed/;      // luống hoa sát đất → trồng hoa HANA kín lu�
 const PLANT_MAT = /^M_L2_(Leaf|Leaf_Dark|Bloom_\w+)$/;
 // hiện thật sự: chính nó và MỌI node cha đều visible (phòng khác / tầng khác / vỏ nhà bị ẩn theo nhóm → không đặt chậu thay)
 function shown(o) { for (let q = o; q; q = q.parent) if (!q.visible) return false; return true; }
-export function replacePlanterPots(root, kits, group) {
-  const ids = ['pot1', 'pot2', 'pot3', 'pot4'].filter(id => kits[id]); if (!ids.length) return 0;
-  root.updateMatrixWorld(true);
-  const pts = [], hide = [], beds = [];
+export function replacePlanterPots(root, kits, group, sink = null) {     // sink(id, matrices, bed): ngoài vườn → đưa vào hệ ô LOD / cull của exterior.js
+  // Cây placeholder (lá / hoa khối) → chậu HANA hoặc hoa HANA, ĐẶT TRÊN BỀ MẶT THẬT bên dưới (đất bồn, mặt bàn, bệ cửa sổ):
+  //  - gom điểm của mọi lưới cây thành từng cụm liền nhau (ô 0.3 m) → mỗi cụm = 1 bồn / 1 khay / 1 giỏ
+  //  - bắn tia thẳng xuống tìm mặt đỡ ngay dưới gốc lá: luống (Bed) → hoa mọc đúng trên đất, chỉ ở chỗ cây cũ đứng; bồn/khay → chậu đứng trên mặt đỡ
+  //  - không có mặt đỡ nào dưới cả cụm = giỏ treo → chậu treo đúng chỗ giỏ (dây giữ nguyên); chỗ không có mặt đỡ thì bỏ (không lơ lửng)
+  const ids = ['pot1', 'pot2', 'pot3', 'pot4'].filter(id => kits[id]), fl = ['flowerc', 'flower1', 'flower2'].filter(id => kits[id]);
+  if (!ids.length) return 0;
+  root.updateMatrixWorld(true); group.updateMatrixWorld(true);
+  const gInv = group.matrixWorld.clone().invert();
+  const isPlant = o => [].concat(o.material).some(m => m && PLANT_MAT.test(m.name || ''));
+  const pts = [], bedP = [], hide = [];
   root.traverse(o => {
-    if (!o.isMesh || !shown(o) || ![].concat(o.material).some(m => m && PLANT_MAT.test(m.name || ''))) return;
+    if (!o.isMesh || o.isInstancedMesh || !shown(o) || !isPlant(o)) return;
     let ok = true, bed = false; for (let q = o; q && q !== root; q = q.parent) { if (NOT_POT.test(q.name || '')) { ok = false; break; } if (BED.test(q.name || '')) bed = true; }
     if (!ok) return;
-    if (bed) { beds.push(o); return; }
     const pos = o.geometry.attributes.position;
-    for (let i = 0; i < pos.count; i++) { V.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); pts.push(V.x, V.y, V.z); }
+    for (let i = 0; i < pos.count; i++) { V.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); pts.push(V.x, V.y, V.z); bedP.push(bed ? 1 : 0); }
     hide.push(o);
   });
-  // luống hoa: hoa HANA (3 loại) trồng theo lưới 0.32 m lệch ngẫu nhiên, phủ kín hộp bao của cây trong luống
-  const fl = ['flowerc', 'flower1', 'flower2'].filter(id => kits[id]), perF = new Map();
-  if (fl.length) beds.forEach(o => {
-    const b = new THREE.Box3().setFromObject(o); o.visible = false;
-    for (let x = b.min.x + 0.16; x < b.max.x; x += 0.32) for (let z = b.min.z + 0.16; z < b.max.z; z += 0.32) {
-      const jx = x + (hash(x, z, 1) - 0.5) * 0.22, jz = z + (hash(x, z, 2) - 0.5) * 0.22, id = fl[Math.floor(hash(x, z, 3) * fl.length) % fl.length], kh = kits[id].lods[0].size.y;
-      const sc = (0.4 + 0.25 * hash(x, z, 4)) / kh;
-      (perF.get(id) || perF.set(id, []).get(id)).push(new THREE.Matrix4().compose(V.set(jx, b.min.y - 0.02, jz), Q.setFromEuler(E.set(0, hash(x, z, 5) * 6.283, 0)), S.set(sc, sc, sc)));
-    }
-  });
-  for (const [id, mats] of perF) for (const p of kitParts(kits[id], 0)) {
-    const im = new THREE.InstancedMesh(p.geometry, p.material, mats.length); mats.forEach((m, i) => im.setMatrixAt(i, m));
-    im.instanceMatrix.needsUpdate = true; im.castShadow = false; im.receiveShadow = true; im.name = 'HANA_BED_' + id; im.computeBoundingSphere(); group.add(im);
-  }
-  if (!pts.length) return perF.size;
-  // gom bồn: ô lưới 0.3 m, nối các ô kề nhau (cùng độ cao ±0.4 m)
+  if (!pts.length) return 0;
+  hide.forEach(o => { o.visible = false; });
+  // mặt đỡ: mọi lưới đang hiện (không phải cây, không phải HANA)
+  const sup = [];
+  root.traverse(o => { if (!o.isMesh || !shown(o) || isPlant(o) || [].concat(o.material).some(m => m && m.userData && m.userData.hana)) return;
+    let bb; if (o.isInstancedMesh) { if (!o.boundingSphere) o.computeBoundingSphere(); const sp = o.boundingSphere.clone().applyMatrix4(o.matrixWorld); bb = new THREE.Box3(sp.center.clone().subScalar(sp.radius), sp.center.clone().addScalar(sp.radius)); } else bb = new THREE.Box3().setFromObject(o);
+    sup.push({o, bb}); });
+  const rc = new THREE.Raycaster(), DN = new THREE.Vector3(0, -1, 0), NW = new THREE.Vector3();
+  // y mặt đỡ ngay dưới (x,z), tìm trong [yLo, yHi]; null nếu không có
+  const surf = (x, z, yHi, yLo, cand) => {
+    rc.set(V.set(x, yHi, z), DN); rc.far = yHi - yLo;
+    const hits = rc.intersectObjects(cand, false);
+    for (const h of hits) { if (h.face && !h.object.isInstancedMesh) { NW.copy(h.face.normal).transformDirection(h.object.matrixWorld); if (NW.y < 0.5) continue; } return h.point.y; }
+    return null;
+  };
+  // gom cụm: ô 0.3 m × tầng 0.4 m, nối 26 ô kề
   const G = 0.3, cells = new Map();
   for (let i = 0; i < pts.length; i += 3) { const k = Math.floor(pts[i] / G) + ',' + Math.floor(pts[i + 1] / 0.4) + ',' + Math.floor(pts[i + 2] / G); (cells.get(k) || cells.set(k, []).get(k)).push(i); }
-  const seen = new Set(), boxes = [];
+  const seen = new Set(), clusters = [];
   for (const k0 of cells.keys()) {
     if (seen.has(k0)) continue; seen.add(k0);
-    const st = [k0], b = {x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9, z0: 1e9, z1: -1e9};
-    while (st.length) { const k = st.pop(); for (const i of cells.get(k)) { b.x0 = Math.min(b.x0, pts[i]); b.x1 = Math.max(b.x1, pts[i]); b.y0 = Math.min(b.y0, pts[i + 1]); b.y1 = Math.max(b.y1, pts[i + 1]); b.z0 = Math.min(b.z0, pts[i + 2]); b.z1 = Math.max(b.z1, pts[i + 2]); }
+    const st = [k0], b = {x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9, z0: 1e9, z1: -1e9}, foot = new Map(); let nb = 0, n = 0;
+    while (st.length) { const k = st.pop();
+      for (const i of cells.get(k)) { const x = pts[i], y = pts[i + 1], z = pts[i + 2]; b.x0 = Math.min(b.x0, x); b.x1 = Math.max(b.x1, x); b.y0 = Math.min(b.y0, y); b.y1 = Math.max(b.y1, y); b.z0 = Math.min(b.z0, z); b.z1 = Math.max(b.z1, z); nb += bedP[i / 3]; n++;
+        const fk = Math.floor(x / G) + ',' + Math.floor(z / G); foot.set(fk, Math.min(foot.get(fk) ?? 1e9, y)); }
       const [a, c, d] = k.split(',').map(Number);
       for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) { const kk = (a + dx) + ',' + (c + dy) + ',' + (d + dz); if (cells.has(kk) && !seen.has(kk)) { seen.add(kk); st.push(kk); } } }
-    boxes.push(b);
+    clusters.push({b, foot, bed: nb > n * 0.5});
   }
-  hide.forEach(o => { o.visible = false; });
-  // đặt chậu dọc trục dài của mỗi bồn
-  const per = new Map();
-  boxes.forEach((b, bi) => {
-    // lưới chậu phủ cả bồn (bồn dài → 1 hàng, bồn rộng / luống trên bàn nhà kính → nhiều hàng), mỗi chậu ~0.55 m
+  const perF = new Map(), per = new Map(); let nHang = 0, nSkip = 0;
+  const put = (mp, id, x, y, z, s, ry) => (mp.get(id) || mp.set(id, []).get(id)).push(new THREE.Matrix4().compose(V.set(x, y, z), Q.setFromEuler(E.set(0, ry, 0)), S.set(s, s, s)).premultiply(gInv));
+  clusters.forEach((cl, ci) => {
+    const b = cl.b, cand = sup.filter(s => s.bb.max.x > b.x0 - 0.3 && s.bb.min.x < b.x1 + 0.3 && s.bb.max.z > b.z0 - 0.3 && s.bb.min.z < b.z1 + 0.3 && s.bb.max.y > b.y0 - 4.2 && s.bb.min.y < b.y1).map(s => s.o);
+    // mặt đỡ phải nằm sát gốc lá: từ 0.5 m trên gốc lá xuống tối đa 0.6 m dưới gốc lá
+    const at = (x, z, y0, deep) => cand.length ? surf(x, z, y0 + 0.5, y0 - (deep ? 4 : 0.6), cand) : null;
+    if (cl.bed && fl.length) {      // luống: 1 bông / ô chân cây cũ, mọc trên đất luống
+      for (const [fk, y0] of cl.foot) {
+        const [ix, iz] = fk.split(',').map(Number), x = (ix + 0.5) * G + (hash(ix, iz, 1) - 0.5) * 0.18, z = (iz + 0.5) * G + (hash(ix, iz, 2) - 0.5) * 0.18;
+        const y = at(x, z, y0); if (y == null) { nSkip++; continue; }
+        const id = fl[Math.floor(hash(ix, iz, 3) * fl.length) % fl.length], kh = kits[id].lods[0].size.y;
+        put(perF, id, x, y - 0.01, z, (0.4 + 0.25 * hash(ix, iz, 4)) / kh, hash(ix, iz, 5) * 6.283);
+      }
+      return;
+    }
+    // bồn / khay: lưới chậu ~0.55 m trên phần có cây
     const lx = b.x1 - b.x0, lz = b.z1 - b.z0, nx = Math.max(1, Math.round(lx / 0.55)), nz = Math.max(1, Math.round(lz / 0.55)), sx = lx / nx, sz = lz / nz;
+    const spots = [];
     for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
-      const id = ids[(bi + i + j * 3) % ids.length], k = kits[id], kh = k.lods[0].size.y, kw = Math.max(k.lods[0].size.x, k.lods[0].size.z);
+      const x = b.x0 + sx * (i + 0.5), z = b.z0 + sz * (j + 0.5);
+      let y0 = null; for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const v = cl.foot.get((Math.floor(x / G) + dx) + ',' + (Math.floor(z / G) + dz)); if (v != null) y0 = y0 == null ? v : Math.min(y0, v); }
+      if (y0 == null) continue;                    // giữa 2 khóm cây không có gì → không đặt
+      spots.push({x, z, y0, y: at(x, z, y0, false)});
+    }
+    const anySup = spots.some(p => p.y != null);
+    for (const [k, p] of spots.entries()) {
+      let y = p.y;
+      if (y == null) { if (anySup) { nSkip++; continue; }       // cả cụm không có mặt đỡ sát gốc lá (cây thân cao / cây đứng trên sàn): đặt chậu xuống mặt đỡ gần nhất bên dưới
+        y = at(p.x, p.z, p.y0, true); if (y == null) { nSkip++; continue; } nHang++; }
+      const id = ids[(ci + k) % ids.length], kt = kits[id], kh = kt.lods[0].size.y, kw = Math.max(kt.lods[0].size.x, kt.lods[0].size.z);
       const s = Math.min(Math.max(0.42, Math.min(0.62, (b.y1 - b.y0) * 2.2)) / kh, (Math.min(Math.max(sx, 0.3), Math.max(sz, 0.3)) * 0.95) / kw);
-      const cx = b.x0 + sx * (i + 0.5), cz = b.z0 + sz * (j + 0.5);
-      const m = new THREE.Matrix4().compose(V.set(cx, b.y0 - 0.02, cz), Q.setFromEuler(E.set(0, hash(cx, cz, 2) * 6.283, 0)), S.set(s, s, s));
-      (per.get(id) || per.set(id, []).get(id)).push(m);
+      put(per, id, p.x, y - 0.005, p.z, s, hash(p.x, p.z, 2) * 6.283);
     }
   });
-  let nPot = 0;
-  for (const [id, mats] of per) for (const p of kitParts(kits[id], 0)) {
+  const emit = (mp, pre, shadow) => { let n = 0; for (const [id, mats] of mp) { n += mats.length; if (sink) { sink(id, mats, pre === 'HANA_BED_'); continue; } for (const p of kitParts(kits[id], 0)) {
     const im = new THREE.InstancedMesh(p.geometry, p.material, mats.length); mats.forEach((m, i) => im.setMatrixAt(i, m));
-    im.instanceMatrix.needsUpdate = true; im.castShadow = im.receiveShadow = true; im.name = 'HANA_POTS_' + id; im.computeBoundingSphere(); group.add(im); nPot = Math.max(nPot, 0) + (p === kitParts(kits[id], 0)[0] ? mats.length : 0);
-  }
-  return nPot;
+    im.instanceMatrix.needsUpdate = true; im.castShadow = shadow; im.receiveShadow = true; im.name = pre + id; im.computeBoundingSphere(); group.add(im); } } return n; };
+  const nF = emit(perF, 'HANA_BED_', false), nP = emit(per, 'HANA_POTS_', true);
+  if (nHang || nSkip) console.log('[hana] chậu: hạ xuống mặt đỡ thấp hơn ' + nHang + ', bỏ chỗ không có mặt đỡ ' + nSkip);
+  return nP + nF;
 }
 
 // ---------------- chỗ nào lộ mặt đất? (bản đồ độ cao chụp từ trên xuống) ----------------

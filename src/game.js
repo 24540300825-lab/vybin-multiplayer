@@ -188,8 +188,8 @@ ${HANA_COLOR}
          #if defined(FOL2)&&!defined(BUSHF)&&!defined(HANA)   // phần "phát sáng" chỉ cho cây/hoa; cỏ & bụi tính sáng như thảm
          col+=diffuseColor.rgb*uFolEmi*mix(amb,uSunC,0.5*vis)*1.15;   // phần "phát sáng" của lá cũng ăn theo tông môi trường (sáng/tối/hoàng hôn/mưa)
          #endif
-         #if defined(FOL2)&&!defined(BUSHF)
-         col*=1.0-0.06*uWet*(1.0-inH); col=mix(col,col*vec3(0.9,1.1,0.9),uWet*0.6);   // lá ướt: không tối/xám bẩn, hơi tươi hơn
+         #if (defined(FOL2)&&!defined(BUSHF))||(defined(HANA)&&(defined(GRASSB)||defined(HANA_GROUND)))
+         col*=1.0-0.06*uWet*(1.0-inH); col=mix(col,col*vec3(0.9,1.1,0.9),uWet*0.6);   // lá ướt: không tối/xám bẩn, hơi tươi hơn — cỏ + nền Moss HANA cùng cách với cây bụi (mưa không tách màu)
          #else
          col*=1.0-0.2*uWet*(1.0-inH);
          #endif
@@ -306,7 +306,7 @@ ${HANA_COLOR}
     seasonDecor('exterior',extG);   // đồ trang trí ngoài vườn cũng thấy từ trong phòng
     toonify(extG);markOcc(extG);console.log('[sty] ngoại cảnh: '+api.stylize(extG));scene.add(extG);extG.updateMatrixWorld(true);
     const E0=MAPS.exterior,dx=X.dx||0,dz=X.dz||0,f=E0.fence;
-    const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null,walkAreas:null,indoor:true,floorY:(E0.floorY||0)+(X.dy||0)};   // dy: phòng tầng trên (nhà L2) → mặt đất vườn nằm thấp hơn sàn phòng
+    const EMC={...E0,fence:[f[0]+dx,f[1]+dx,f[2]+dz,f[3]+dz,f[4]+dx],dropTrees:(E0.dropTrees||[]).map(q=>[q[0]+dx,q[1]+dz]),noPlant:(E0.noPlant||[]).map(b=>[b[0]+dx,b[1]+dx,b[2]+dz,b[3]+dz]),porch:null,walkAreas:null,indoor:true,roomBox:(()=>{const bb=new THREE.Box3();env.traverse(o=>{if(o.isMesh&&o.visible&&o.geometry){o.geometry.computeBoundingBox&&!o.geometry.boundingBox&&o.geometry.computeBoundingBox();const b=o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld);if(b.max.y-b.min.y<40&&b.max.x-b.min.x<60)bb.union(b)}});return bb.isEmpty()?null:[bb.min.x,bb.max.x,bb.min.z,bb.max.z]})(),floorY:(E0.floorY||0)+(X.dy||0)};   // dy: phòng tầng trên (nhà L2) → mặt đất vườn nằm thấp hơn sàn phòng
     EXTV=setupExterior({scene,env:extG,MC:EMC,toonMat,ultra:wantUltra(),hana:HKIT,renderer});api.stylize(EXTV.group);EXTV.setLevel(TP.quality==='low'?'low':'indoor');
     // cây/bụi lẻ (không nằm trong ô instancing) ở XA nhà: bỏ hẳn — từ camera trên cao nhìn xuống chỉ thấy khối thô xấu; gần nhà giữ nguyên
     {const C=new THREE.Vector3(5,0,-4),sp=new THREE.Sphere();let n=0;extG.updateMatrixWorld(true);env.updateMatrixWorld(true);
