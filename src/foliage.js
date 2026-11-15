@@ -94,6 +94,11 @@ wpos.xyz += windOffset( lp0, rootW, instScale );
   wpos.xz += push * hh * hh * 0.6;                                   // ngọn nghiêng toả ra khỏi chân người, mềm dần theo khoảng cách
   wpos.y = rootW.y + ( wpos.y - rootW.y ) * ( 1.0 - 0.5 * max( k0, k1 ) * ( 0.4 + 0.6 * hh ) ); }
 #endif
+#ifdef HANA_CARD
+{ // tấm cỏ xa, chỉ khi nhìn từ phòng (uHTop): ngả ra sau theo hướng nhìn của camera → từ trên cao vẫn thấy mặt tấm, không thành vệt mỏng
+  float hh = max( wpos.y - rootW.y, 0.0 ); vec2 aw = rootW.xz - cameraPosition.xz; float la = length( aw );
+  if ( uHTop > 0.0 && la > 0.01 ) { wpos.xz += aw / la * hh * 0.9 * uHTop; wpos.y = rootW.y + hh * ( 1.0 - 0.35 * uHTop ); } }
+#endif
 vRoot = rootW.xz;
 vHash = fract( sin( dot( rootW.xz, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
 vWP = wpos.xyz;

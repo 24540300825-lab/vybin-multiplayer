@@ -7,7 +7,7 @@ import {FILES} from './manifest.js';
 import {makeDepthMat} from './foliage.js';
 import {makeFoliageDecals} from './decals.js';
 import {makeMeadow} from './meadow.js';
-import {hanaDepthMat, kitParts} from './hana.js';
+import {hanaDepthMat, kitParts, HU} from './hana.js';
 const kitParts0 = k => kitParts(k, 0)[0];
 import {HANA_CLS, kitSet, toKits, rockClumps, pathStones, grassTiles, bushLayout, bakeGrassCard, grassCardSpots, replacePlanterPots, groundFree} from './hana-ext.js';
 import {WIND_FN, FU} from './foliage.js';
@@ -40,7 +40,7 @@ const CLASS_OUT = {
 };
 // 3 phòng trong nhà: chỉ giữ cây cỏ GẦN nhà, đủ chi tiết; xa hơn cũng là decal (thưa hơn)
 const CLASS_IN = {   // trong nhà: khoảng cách tính từ HỘP NHÀ (không phải tâm nhìn) → chỉ phần sát cửa kính mới có mesh 3D, xa hơn là decal; ô nhỏ để cull chặt
-  grass:  {maxD: 4.5, d0: 1,  d1: 4.5, min: 0.25, shadow: false, cell: 6,  lod: 0, l1: 2,  l2: 99},
+  grass:  {maxD: 14,  d0: 8,  d1: 14,  min: 0.60, shadow: false, cell: 6,  lod: 0, l1: 5,  l2: 99},   // phần vườn nhìn thấy từ phòng: cỏ 3D đủ dày (trong hàng rào); ngoài hàng rào chỉ tấm cỏ xa
   flower: {maxD: 2.5, d0: 1,  d1: 2.5, min: 0.20, shadow: false, cell: 6,  lod: 0},
   bush:   {maxD: 8,   d0: 3,  d1: 8,   min: 0.35, shadow: false, cell: 8,  lod: 0, l1: 3,  l2: 6},
   tree:   {maxD: 22,  d0: 8,  d1: 22,  min: 0.55, shadow: false, cell: 14, lod: 0, l1: 7,  l2: 14},
@@ -115,6 +115,7 @@ export function setupExterior(c) {
   const group = new THREE.Group(); group.name = 'EXT_CELLS'; scene.add(group);
   const cells = [];          // {im, cls, n, cx, cz, r}
   const INDOOR = !!(c.MC && c.MC.indoor); CLASS = INDOOR ? CLASS_IN : CLASS_OUT;
+  HU.uHTop.value = INDOOR ? 1 : 0;     // nhìn vườn từ phòng (trên cao): cỏ dịu tương phản + tấm cỏ xa ngả theo camera; ngoài vườn giữ nguyên
   const colliders = {boxes: [], circles: []};
   // cây TRONG VƯỜN (trong hàng rào): không bao giờ biến mất / thành decal — xa nhất chỉ xuống LOD2. Cây ngoài vườn: LOD → decal như cũ.
   const GF = c.MC && c.MC.fence, inGard = (x, z) => !!GF && x > GF[0] - 0.3 && x < GF[1] + 0.3 && z > GF[2] - 0.3 && z < GF[3] + 0.3;
@@ -277,7 +278,7 @@ export function setupExterior(c) {
   const onPath = (x, z, m) => !!(PS && PS.near(x, z, m));
   // chỗ lộ mặt đất (không luống / sàn / hồ / nhà / đường đất…) — cỏ mọc kín mọi chỗ trống, không cần vị trí cỏ cũ
   let FREE = null;
-  if (HK && c.renderer && MC.fence) { try { const Fe = MC.fence, B = INDOOR ? 14 : 24; FREE = groundFree(c.renderer, env, Fe[0] - B, Fe[1] + B, Fe[2] - B, Fe[3] + B, MC.floorY || 0); } catch (e) { console.warn('[hana] groundFree', e); } }
+  if (HK && c.renderer && MC.fence) { try { const Fe = MC.fence, B = INDOOR ? 14 : 24; FREE = groundFree(c.renderer, env, Fe[0] - B, Fe[1] + B, Fe[2] - B, Fe[3] + B, MC.floorY || 0); if (/freedbg/.test(location.search)) { let t = 'FREE ' + JSON.stringify(Fe) + '\n'; for (let z = Fe[2]; z < Fe[3]; z += 1) { let r = ''; for (let x = Fe[0]; x < Fe[1]; x += 1) r += FREE(x, z, 0) ? '.' : '#'; t += r + '\n'; } console.log(t); } } catch (e) { console.warn('[hana] groundFree', e); } }
   let bushDone = false, grassDone = false; const grassPatchMats = [];
   const treeH = set => { let h = 0; set.forEach(m => { const g = m.geometry; if (!g.boundingBox) g.computeBoundingBox(); h = Math.max(h, g.boundingBox.max.y); }); return Math.max(2, h); };
   // bán kính tán (ngang) của mẫu cây/bụi theo hộp bao thật của mọi phần (thân + tán) — dùng để bỏ cây/bụi có tán chạm vào tường nhà (lộ vào phòng, nhìn nhạt/xuyên tường)
@@ -591,7 +592,7 @@ export function setupExterior(c) {
     setMeadow(q === 'ultra' || q === 'indoorUltra');
     // decal bắt đầu đúng chỗ cây cỏ 3D hết (theo chất lượng)
     const tr = CLASS.tree.maxD * lv.dist, gr = CLASS.grass.maxD * lv.dist; DEC.U.tree.uR0.value = tr - 7; DEC.U.tree.uR1.value = tr - 1.5; DEC.U.grass.uR0.value = gr - 4.5; DEC.U.grass.uR1.value = gr - 0.5;
-    if (cardMat) cardMat.userData.hana.U.uHCardR.value.set(5.5 * lv.dist, 11 * lv.dist);     // cỏ xa hiện từ ~6 m, chồng lên cỏ 3D → không có ranh giới
+    if (cardMat) { if (INDOOR) cardMat.userData.hana.U.uHCardR.value.set(0.5, 2); else cardMat.userData.hana.U.uHCardR.value.set(5.5 * lv.dist, 11 * lv.dist); }     // cỏ xa hiện từ ~6 m, chồng lên cỏ 3D → không có ranh giới
     const br = CLASS.bush.maxD * lv.dist; DEC.U.bush.uR0.value = br - 4; DEC.U.bush.uR1.value = br - 0.5; }
   setLevel('medium');
   function update(target, camPos, fogColor, wcFog) {
@@ -599,7 +600,7 @@ export function setupExterior(c) {
     for (const ce of cells) {
       const CL = CLASS[ce.cls];
       const d = INDOOR ? Math.max(0, Math.hypot(Math.max(IB[0] - ce.cx, 0, ce.cx - IB[1]), Math.max(IB[2] - ce.cz, 0, ce.cz - IB[3])) - CL.cell * 0.4) : Math.hypot(ce.cx - target.x, ce.cz - target.z);
-      const dist = CL.maxD * lv.dist, vis = (d < dist || ce.garden) && !(meadOn && ce.cls === 'grass' && !ce.user && inFence(ce.cx, ce.cz)) && !(ce.cls === 'gcard' && d < 5.5 * lv.dist - CL.cell * 0.75);
+      const dist = CL.maxD * lv.dist, vis = (d < dist || ce.garden) && !(meadOn && ce.cls === 'grass' && !ce.user && inFence(ce.cx, ce.cz)) && !(!INDOOR && ce.cls === 'gcard' && d < 5.5 * lv.dist - CL.cell * 0.75) && !(INDOOR && ce.cls === 'grass' && ce.far && !ce.user);
       const lod0 = !ce.im1 || d < CL.lod * lv.dist;            // gần: hình đủ chi tiết; xa: hình giảm tam giác
       // kit HANA: 3 cấp LOD (mỗi cấp 1 InstancedMesh riêng, cùng bản thể) — chọn theo khoảng cách
       const wantL = ce.lod == null ? -1 : Math.min(d < (CL.l1 || 0) * lv.dist ? 0 : d < (CL.l2 || 99) * lv.dist ? 1 : 2, ce.lodMax);

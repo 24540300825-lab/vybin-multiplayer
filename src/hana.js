@@ -14,7 +14,8 @@ export const HU = {
   uHAmb: {value: 0.35},     // ánh sáng trời quy đổi (Blender World)
   uHLift: {value: 1.0},     // nhân độ sáng tổng của cây cỏ HANA
   uHSolidLift: {value: 1.0},
-  uHGBot: {value: new THREE.Vector2(0.5, 0.62)},   // cỏ: vùng tối ở gốc — x = độ tối (trừ vào tone), y = cao tới đâu (0 gốc → 1 ngọn)
+  uHGBot: {value: new THREE.Vector2(0.5, 0.62)},
+  uHTop: {value: 0},   // 1 = map trong phòng (camera trên cao nhìn xuống vườn): cỏ bớt tương phản, tấm cỏ xa ngả ra sau theo hướng nhìn → cỏ tệp vào nền. Ngoài vườn = 0 (giữ nguyên)   // cỏ: vùng tối ở gốc — x = độ tối (trừ vào tone), y = cao tới đâu (0 gốc → 1 ngọn)
   uHFolShadow: {value: new THREE.Color(0.002, 0.277, 0.022)},   // màu vùng tối của lá (từ file HANA) — decal xa về đúng màu này khi khuất nắng / ban đêm
   uHDbg: {value: 0},
   // hậu kỳ màu của game (Grade pass, game.js) — HANA bù ngược để màu hiện ra = màu tham chiếu Blender (rồi mới nhân ánh sáng môi trường)
@@ -62,7 +63,7 @@ function ownUniforms(p, foliage) {
 
 // ---------- GLSL ----------
 // đỉnh: lá/cỏ — pháp tuyến lá giữ nguyên (không dùng normal lai của foliage.js), truyền mass normal + dữ liệu lá xuống fragment
-export const HANA_VERT_PARS = 'attribute vec4 _voln;attribute vec4 _leaf;varying vec3 vHVol;varying vec4 vHLeaf;varying vec2 vHUv;\n';
+export const HANA_VERT_PARS = 'uniform float uHTop;attribute vec4 _voln;attribute vec4 _leaf;varying vec3 vHVol;varying vec4 vHLeaf;varying vec2 vHUv;\n';
 export const HANA_VERT = `
   { vec3 vn = _voln.xyz;
     #ifdef USE_INSTANCING
@@ -95,7 +96,7 @@ export const HANA_CUT = `
 `;
 
 export const HANA_FRAG_PARS = `
-uniform vec3 uHRefL,uHRefS,uHFolShadow;uniform vec2 uHGBot;
+uniform vec3 uHRefL,uHRefS,uHFolShadow;uniform vec2 uHGBot;uniform float uHTop;
 #ifdef HANA_DEC
 uniform float uHDecBase;
 #endif
@@ -219,8 +220,11 @@ export const HANA_COLOR = `
    float off = depth * uHInterior * -0.6 + ( tip - 0.5 ) * uHTipL + ( height - 0.5 ) * uHHGrad + ( rnd - 0.5 ) * uHLeafVar;
    off += ( dab - 0.5 ) * uHJit * uHPaint; off -= cav * uHAOSh;
    #ifdef HANA_GRASS
-    off -= ( 1.0 - smoothstep( 0.0, uHGBot.y, tip ) ) * uHGBot.x;     // gốc cỏ vào vùng tối cao hơn → cỏ có 2 tông sáng / tối như cây bụi
-    off += hanaMacro( vWP );                                          // mảng sáng / tối lớn của cả cánh đồng (giống hệt trên nền + cỏ xa)
+    off -= ( 1.0 - smoothstep( 0.0, uHGBot.y, tip ) ) * uHGBot.x * ( 1.0 - 0.7 * uHTop );     // gốc cỏ vào vùng tối cao hơn → cỏ có 2 tông sáng / tối như cây bụi
+    off += hanaMacro( vWP ) * ( 1.0 - 0.5 * uHTop );                  // mảng sáng / tối lớn của cả cánh đồng (giống hệt trên nền + cỏ xa)
+    // nhìn từ phòng (trên cao): nén tương phản sáng/tối của cọng, bóng cọng nhẹ đi, pháp tuyến ngả về hướng lên như nền → cỏ đều, tệp vào tấm Moss
+    off *= 1.0 - 0.45 * uHTop; hSh = mix( hSh, 1.0, 0.5 * uHTop );
+    hN = normalize( mix( hN, normalize( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz ), 0.6 * uHTop ) );
    #endif
    vec3 loc = uHMidC;
    loc = mix( loc, uHAccent, step( 1.0 - 0.35 * uHLayer, fract( rnd * 13.37 ) ) * 0.75 );

@@ -195,7 +195,7 @@ export function replaceIndoorPots(root, kits, id = 'pot5') {
   const parts = kitParts(kit, 0), groups = new Map();
   root.updateMatrixWorld(true);
   root.traverse(o => {
-    if (!o.isMesh || !o.visible) return;
+    if (!o.isMesh || !shown(o)) return;
     let n = null; for (let q = o; q && q !== root; q = q.parent) { const m = /^(Plant_[A-Za-z0-9]+(?:_[A-Z](?![a-z]))?)/.exec(q.name || ''); if (m && /^Plant_/.test(q.name)) { n = m[1].replace(/_(Pot|Soil|Leaf)$/, ''); break; } }
     if (!n) return;
     (groups.get(n) || groups.set(n, []).get(n)).push(o);
@@ -324,12 +324,14 @@ export function grassCardSpots(grassMats, MC, ext, skip) {
 const NOT_POT = /Hedge|Arch|Vines|Orchard|Bamboo|Lilies|Shore|Island|Aquarium|Earth|Onsen|Picnic/;
 const BED = /Bed/;      // luống hoa sát đất → trồng hoa HANA kín luống (không đặt chậu)
 const PLANT_MAT = /^M_L2_(Leaf|Leaf_Dark|Bloom_\w+)$/;
+// hiện thật sự: chính nó và MỌI node cha đều visible (phòng khác / tầng khác / vỏ nhà bị ẩn theo nhóm → không đặt chậu thay)
+function shown(o) { for (let q = o; q; q = q.parent) if (!q.visible) return false; return true; }
 export function replacePlanterPots(root, kits, group) {
   const ids = ['pot1', 'pot2', 'pot3', 'pot4'].filter(id => kits[id]); if (!ids.length) return 0;
   root.updateMatrixWorld(true);
   const pts = [], hide = [], beds = [];
   root.traverse(o => {
-    if (!o.isMesh || !o.visible || ![].concat(o.material).some(m => m && PLANT_MAT.test(m.name || ''))) return;
+    if (!o.isMesh || !shown(o) || ![].concat(o.material).some(m => m && PLANT_MAT.test(m.name || ''))) return;
     let ok = true, bed = false; for (let q = o; q && q !== root; q = q.parent) { if (NOT_POT.test(q.name || '')) { ok = false; break; } if (BED.test(q.name || '')) bed = true; }
     if (!ok) return;
     if (bed) { beds.push(o); return; }
@@ -397,7 +399,8 @@ export function groundFree(renderer, env, x0, x1, z0, z1, floorY, px = 0.25) {
        w=modelMatrix*instanceMatrix*vec4(position,1.0);
       #endif
       vY=w.y;gl_Position=projectionMatrix*viewMatrix*w;}`, fragmentShader: 'varying float vY;void main(){gl_FragColor=vec4(vY,1.0,0.0,1.0);}'});
-  const skip = o => { const ms = [].concat(o.material); return ms.some(m => m && (m.userData.hana || m.userData.ground || /^(M_PathStone|Plant_01|Poly|ROCK$|M_L4_Sand)/.test(m.name || ''))) || /Hill_Ground|^Plane\d*$|Ground/i.test(o.name || ''); };
+  const skip = o => { if (o.isInstancedMesh && o.count > 20) return true;     // rải cỏ/cây/đá/hoa trong GLB (sắp được thay bằng HANA) — không chiếm đất
+    const ms = [].concat(o.material); return ms.some(m => m && (m.userData.hana || m.userData.ground || /^(M_PathStone|Plant_01|Poly|ROCK$|M_L4_Sand)/.test(m.name || ''))) || /Hill_Ground|^Plane\d*$|Ground|^\.?SF_/i.test(o.name || '') || ms.some(m => m && /^Stylized Grass$/.test(m.name || '')); };
   const hidden = []; env.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && o.visible && skip(o)) { o.visible = false; hidden.push(o); } });
   const tmp = new THREE.Scene(); tmp.overrideMaterial = mat; const par = env.parent, idx = par ? par.children.indexOf(env) : -1; tmp.add(env);
   const cam = new THREE.OrthographicCamera(x0, x1, -z0, -z1, 0.1, 400); cam.position.set(0, floorY + 200, 0); cam.up.set(0, 0, -1); cam.lookAt(0, floorY, 0);
@@ -405,11 +408,17 @@ export function groundFree(renderer, env, x0, x1, z0, z1, floorY, px = 0.25) {
   const prevT = renderer.getRenderTarget(), pc = renderer.getClearColor(new THREE.Color()), pa = renderer.getClearAlpha();
   renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(tmp, cam);
   const buf = new Float32Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf);
+  // lần 2: nhìn từ DƯỚI lên → mặt thấp nhất. Mái hiên / ban công / tán che cao hơn 1.2 m không chiếm đất → cỏ mọc sát chân tường
+  // (camera nhìn lên: trục x ảnh bị lật → cột i = (x1 - x) / px)
+  const camU = new THREE.OrthographicCamera(-x1, -x0, -z0, -z1, 0.1, 400); camU.position.set(0, floorY - 200, 0); camU.up.set(0, 0, -1); camU.lookAt(0, floorY, 0);
+  renderer.clear(); renderer.render(tmp, camU);
+  const bufU = new Float32Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, bufU);
   renderer.setRenderTarget(prevT); renderer.setClearColor(pc, pa);
   if (par) { par.add(env); if (idx >= 0) { par.children.splice(par.children.indexOf(env), 1); par.children.splice(idx, 0, env); } }
   hidden.forEach(o => { o.visible = true; }); rt.dispose(); mat.dispose();
   const occ = new Uint8Array(W * H);
-  for (let i = 0; i < W * H; i++) occ[i] = buf[i * 4 + 1] > 0.5 && buf[i * 4] > floorY + 0.08 ? 1 : 0;
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const k = j * W + i, u = j * W + (W - 1 - i);
+    occ[k] = buf[k * 4 + 1] > 0.5 && buf[k * 4] > floorY + 0.08 && bufU[u * 4 + 1] > 0.5 && bufU[u * 4] < floorY + 1.2 ? 1 : 0; }
   // ô ảnh: hàng 0 = z1 (đáy ảnh, vì trục dọc = -z) → (x, z) → (i, j)
   return (x, z, m = 0) => {
     if (x < x0 || x > x1 || z < z0 || z > z1) return true;
