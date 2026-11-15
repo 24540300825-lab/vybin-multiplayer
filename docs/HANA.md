@@ -49,3 +49,23 @@ Cây, bụi, cỏ, hoa, đá, đá dẫn lối, chậu và mặt đất ngoài v
 - Cả tán và cành nghiêng chung một khối, mỗi cây một pha, cơn gió chậm lan theo hướng gió (`hanaSway` trong `src/foliage.js`).
 - Từng lá rung quanh cuống, xoay cứng nên lá không bị kéo méo (`hanaFlick`).
 - Bụi 4 không có LOD2: tool tự làm thưa từ LOD1.
+
+## Cỏ mọc ở đâu
+
+- Lúc dựng map, game chụp mặt đất từ trên xuống và từ dưới lên (`groundFree` trong `src/hana-ext.js`).
+  - Chỗ nào có bề mặt không phải đất (nhà, nước hồ, hồ bơi, sân, đường ray, lối đất, sàn phòng…) thì không mọc cỏ.
+  - Mái hiên / ban công cao hơn 1,2 m không chặn cỏ → cỏ mọc sát chân tường.
+  - Trong phòng: sàn phòng đang đứng cũng chặn cỏ.
+- Thảm cỏ: lớp 1 = cả tấm Grass_plane, lớp 2 lấp kẽ = hình LOD1 (40% cọng).
+
+## Chậu và hoa luống
+
+- Cây placeholder được gom thành từng cụm (bồn, khay, giỏ, luống).
+- Game bắn tia thẳng xuống tìm mặt đỡ (đất bồn, mặt bàn, bệ cửa sổ); chỗ không có mặt đỡ thì không đặt.
+- Luống (`Bed`): hoa HANA mọc đúng chỗ cây cũ đứng. Bồn / khay: chậu HANA.
+- Chỉ thay cây đang thực sự hiện (phòng / tầng khác bị ẩn thì bỏ qua).
+- Ngoài vườn: chậu và hoa luống đi vào hệ ô LOD (tắt dần theo khoảng cách).
+
+## LOD
+
+- Cả ô đổi cấp cùng lúc, tính theo cây gần nhất của ô, có trễ ±2 m (đi qua lại ở ranh giới không nhấp nháy).
