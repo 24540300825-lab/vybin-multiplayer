@@ -205,7 +205,12 @@ export const HANA_COLOR = `
    #ifdef HANA_DMAP
     hd = texture2D( uHDataMap, vMapUv ).rgb;
    #endif
-   hc = hanaShade( hN, hV, hL, hSh, sunK, ambK, hd.r * 2.0 - 1.0, diffuseColor.rgb, hd.g, hlit );
+   vec3 hLoc = diffuseColor.rgb;
+   #ifdef HANA_GROUND
+    // mặt đất: hue + độ bão hoà = đúng màu lá (uHMidC); texture Moss chỉ giữ sáng tối (nét cọ), tăng tương phản nhẹ quanh độ sáng trung bình của tấm
+    hLoc = uHMidC * clamp( 1.0 + ( dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ) / 0.111 - 1.0 ) * 1.8, 0.55, 1.6 );
+   #endif
+   hc = hanaShade( hN, hV, hL, hSh, sunK, ambK, hd.r * 2.0 - 1.0, hLoc, hd.g, hlit );
   #endif
   hc = max( hc, 0.0 );
   if ( uHHue.x != 0.0 || uHHue.y != 1.0 || uHHue.z != 1.0 ) { vec3 hh = hRgb2hsv( hc ); hh.x = fract( hh.x + uHHue.x ); hh.y = clamp( hh.y * uHHue.y, 0.0, 1.0 ); hh.z *= uHHue.z; hc = hHsv2rgb( hh ); }
@@ -231,7 +236,7 @@ export const HANA_COLOR = `
 
 // đồng bộ tông cỏ + mặt đất với cây/bụi (cỏ, Moss của file gốc ngả vàng chanh hơn lá cây) — chỉnh nhanh trong ?tune hoặc tại đây
 export const HUE_SYNC = {grass: new THREE.Vector3(0, 1, 1), ground: new THREE.Vector3(0, 1, 1)};   // (0,1,1) = không chỉnh: cỏ / nền đã dùng chung bảng màu lá (FOL_KEYS)
-export const TONE_OFF = {grass: -0.12, ground: -0.26};
+export const TONE_OFF = {grass: -0.12, ground: -0.1};   // nền: nằm giữa highlight và shade của cỏ
 // mặt đất Moss dùng CHUNG bảng màu + cách nhận sáng với lá cây/bụi/cỏ (giữ pigment texture của Moss) → cùng màu, cùng shade
 export const FOL_KEYS = ['Mid Color', 'Shadow Color', 'Light Color', 'Highlight Color', 'Accent Color', 'Cavity Color', 'Rim Color', 'Threshold', 'Softness', 'Light Response',
   'Shadow Strength', 'Highlight Threshold', 'Highlight Softness', 'Highlight Strength', 'Capture Mix', 'Capture Exposure', 'Wrap', 'Translucency', 'Texture In Shadow', 'Texture In Light'];
@@ -396,7 +401,7 @@ export async function buildHanaKits(gltf, groundGltf = null) {   // vật liệu
       const map = gm.map; if (map) { map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping; map.anisotropy = 8; map.needsUpdate = true; }
       const dm = gm.aoMap || null; if (dm) { dm.colorSpace = THREE.NoColorSpace; dm.wrapS = dm.wrapT = THREE.RepeatWrapping; }
       const m = hanaMaterial(p, {kind: 'solid', map, dataMap: dm, name: 'HANA_Ground'}); m.userData.hanaGround = true; m.userData.noSty = true;
-      m.userData.hana.U.uHHue.value.copy(HUE_SYNC.ground); m.userData.hana.U.uHToneOff.value = TONE_OFF.ground;
+      m.userData.hana.U.uHHue.value.copy(HUE_SYNC.ground); m.userData.hana.U.uHToneOff.value = TONE_OFF.ground; m.userData.hana.ground = true;
       mats.push(m); ground = {material: m, tile};
     }
   }
