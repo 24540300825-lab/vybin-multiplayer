@@ -80,6 +80,12 @@ export const HANA_SOLID_VERT = `
 
 // viền lá vẽ tay: hình oval nhọn, mép hơi răng cưa (như hana-three.js HANA_SILHOUETTE)
 export const HANA_CUT = `
+#ifdef HANA_CARD
+ // tấm cỏ xa: hình cọng từ mặt nạ bake (a), hiện dần (dither) từ chỗ cỏ 3D hết
+ vec4 hCm = texture2D( uHCard, vHUv ); if ( hCm.a < 0.5 ) discard;
+ { float hcd = distance( vWP.xz, uHTgt.xz ), hth = fract( 52.9829189 * fract( dot( floor( gl_FragCoord.xy ), vec2( 0.06711056, 0.00583715 ) ) ) );
+   if ( smoothstep( uHCardR.x, uHCardR.y, hcd ) * ( 1.0 - smoothstep( uHCardR.y + 75.0, uHCardR.y + 90.0, hcd ) ) <= hth * 0.98 + 0.01 ) discard; }
+#endif
 #ifdef HANA_SIL
  { float hx = ( vHUv.x - 0.5 ) * 2.0, hy = vHUv.y;
    float hw = pow( sin( 3.14159 * clamp( hy, 0.0, 1.0 ) ), 0.75 ) * ( 0.92 - 0.25 * hy );
@@ -99,6 +105,9 @@ uniform float uHThr,uHSoft,uHShape,uHShStr,uHHThr,uHHSoft,uHHStr,uHTexSh,uHTexHi
 #ifdef HANA_FOL
 uniform vec3 uHAccent,uHCavity;uniform float uHVolume,uHFlat,uHInterior,uHTipL,uHHGrad,uHLeafVar,uHJit,uHPaint,uHAOSh,uHAOCol,uHLayer,uHMedVar,uHColVar;
 varying vec3 vHVol;varying vec4 vHLeaf;varying vec2 vHUv;
+#ifdef HANA_CARD
+uniform sampler2D uHCard;uniform vec2 uHCardR;uniform vec3 uHTgt;
+#endif
 #else
 varying vec3 vHData;
 #ifdef HANA_DMAP
@@ -128,6 +137,8 @@ vec3 hanaInvGrade( vec3 c ) {
   c /= vec3( 1.0 + uHG.w, 1.0 + uHG.w * 0.25, max( 1.0 - uHG.w, 0.05 ) );
   return c / max( uHG.x, 0.05 );
 }
+// mảng sáng/tối lớn theo toạ độ thế giới (cánh đồng cỏ kiểu tranh nền): cùng 1 hàm cho cỏ gần, cỏ xa, mặt đất → liền mạch
+float hanaMacro( vec3 wp ) { float n = vn3( vec3( wp.x * 0.045, 0.0, wp.z * 0.045 ) ) * 0.65 + vn3( vec3( wp.x * 0.13 + 7.1, 0.0, wp.z * 0.13 - 3.4 ) ) * 0.35; return ( n - 0.5 ) * 0.42; }
 float hLum( vec3 c ) { return dot( c, vec3( 0.2126, 0.7152, 0.0722 ) ); }
 float hSm( float a, float b, float x ) { float t = clamp( ( x - a ) / max( b - a, 1e-5 ), 0.0, 1.0 ); return t * t * ( 3.0 - 2.0 * t ); }
 vec3 hRgb2hsv( vec3 c ) { vec4 K = vec4( 0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0 ); vec4 p = mix( vec4( c.bg, K.wz ), vec4( c.gb, K.xy ), step( c.b, c.g ) );
@@ -192,7 +203,11 @@ export const HANA_COLOR = `
   #elif defined( HANA_FOL )
    vec3 hNg = hN;
    hN = normalize( mix( hNg, normalize( vHVol ), uHVolume ) );
-   float rnd = vHLeaf.x, depth = vHLeaf.y, height = vHLeaf.z, tip = vHLeaf.w;
+   vec4 hLf = vHLeaf;
+   #ifdef HANA_CARD
+    hLf = vec4( hCm.g, 0.0, hCm.r, hCm.r );     // tấm cỏ xa: rand + độ cao cọng lấy từ mặt nạ
+   #endif
+   float rnd = hLf.x, depth = hLf.y, height = hLf.z, tip = hLf.w;
    #ifdef HANA_GRASS
     height = tip;
    #endif
@@ -201,6 +216,7 @@ export const HANA_COLOR = `
    off += ( dab - 0.5 ) * uHJit * uHPaint; off -= cav * uHAOSh;
    #ifdef HANA_GRASS
     off -= ( 1.0 - smoothstep( 0.0, uHGBot.y, tip ) ) * uHGBot.x;     // gốc cỏ vào vùng tối cao hơn → cỏ có 2 tông sáng / tối như cây bụi
+    off += hanaMacro( vWP );                                          // mảng sáng / tối lớn của cả cánh đồng (giống hệt trên nền + cỏ xa)
    #endif
    vec3 loc = uHMidC;
    loc = mix( loc, uHAccent, step( 1.0 - 0.35 * uHLayer, fract( rnd * 13.37 ) ) * 0.75 );
@@ -215,6 +231,7 @@ export const HANA_COLOR = `
    #endif
    vec3 hLoc = diffuseColor.rgb;
    #ifdef HANA_GROUND
+    hd.r += hanaMacro( vWP ) * 0.5;
     // mặt đất: hue + độ bão hoà = đúng màu lá (uHMidC); texture Moss chỉ giữ sáng tối (nét cọ), tăng tương phản nhẹ quanh độ sáng trung bình của tấm
     hLoc = uHMidC * clamp( 1.0 + ( dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ) / 0.111 - 1.0 ) * 1.8, 0.55, 1.6 );
    #endif
@@ -396,6 +413,15 @@ export async function buildHanaKits(gltf, groundGltf = null) {   // vật liệu
       }
     });
     await Promise.all(jobs);
+    // gió: chậu sứ trong nhà (pot5) đứng yên; chậu ngoài nhà chỉ cây/hoa lay (phần thân chậu + đất thấp → đứng yên)
+    if (ex.kind === 'pot') {
+      const kh = (ex.size && ex.size[1]) || 1;
+      parts.forEach(p => { [].concat(p.material).forEach(m => {
+        if (id === 'pot5') { m.userData.sway = false; return; }
+        if (!m.userData.hana) return;      // PolyShader (tên có 'Wind') = cây/hoa trong chậu → lay theo độ cao
+        const g = p.geometry; if (!g.boundingBox) g.computeBoundingBox(); const bb = g.boundingBox.clone().applyMatrix4(p.matrix);
+        m.userData.sway = bb.min.y > kh * 0.3; }); });
+    }
     K.lods[lod] = {parts, size: new THREE.Vector3().fromArray(ex.size), min: new THREE.Vector3().fromArray(ex.min || [0, 0, 0]), max: new THREE.Vector3().fromArray(ex.max || ex.size)};
   }
   // mặt đất HANA (Moss): 1 vật liệu, pigment lặp theo toạ độ thế giới (tile = cạnh tấm plane gốc, m)

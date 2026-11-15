@@ -126,10 +126,15 @@ export function grassTiles(kits, set, mats, skip) {
   const target = tpl.h * (hs / Math.max(1, n)) * GRASS_K, bh = kit.lods[0].size.y * 0.62, s0 = Math.max(0.6, Math.min(1.8, target / bh));
   const out = [];
   for (const [k, y] of cells) {
-    const [gx, gz] = k.split(',').map(Number), x = (gx + 0.5) * C + (hash(gx, gz, 1) - 0.5) * 0.6, z = (gz + 0.5) * C + (hash(gx, gz, 2) - 0.5) * 0.6;
-    if (skip && skip(x, z)) continue;
-    const s = s0 * (0.85 + 0.3 * hash(gx, gz, 3));
-    out.push(new THREE.Matrix4().compose(V.set(x, y, z), Q.setFromEuler(E.set(0, hash(gx, gz, 4) * 6.283, 0)), S.set(s, s * (0.85 + 0.3 * hash(gx, gz, 5)), s)));
+    const [gx, gz] = k.split(',').map(Number);
+    // vị trí ngẫu nhiên trong cả ô + 1 lớp chồng lấp lệch nửa ô (~45%) → thảm liền, không lộ lưới / không lộ đất
+    for (let L = 0; L < 2; L++) {
+      if (L === 1 && hash(gx, gz, 9) > 0.45) continue;
+      const x = (gx + (L ? 1.0 : 0.5)) * C + (hash(gx, gz, 1 + L * 10) - 0.5) * C * 0.9, z = (gz + (L ? 1.0 : 0.5)) * C + (hash(gx, gz, 2 + L * 10) - 0.5) * C * 0.9;
+      if (skip && skip(x, z)) continue;
+      const s = s0 * (0.82 + 0.36 * hash(gx, gz, 3 + L * 10));
+      out.push(new THREE.Matrix4().compose(V.set(x, y, z), Q.setFromEuler(E.set(0, hash(gx, gz, 4 + L * 10) * 6.283, 0)), S.set(s, s * (0.85 + 0.3 * hash(gx, gz, 5 + L * 10)), s)));
+    }
   }
   return [{id: 'grassp', mats: out}];
 }
@@ -264,4 +269,104 @@ export function bushLayout(kits, MC, onPath) {
   line(F[0] - o, F[2], F[0] - o, F[3], 4.2, 1.9, pairOf(0), outF, 63);
   line(F[1] + o, F[2], F[1] + o, F[3], 4.2, 1.9, pairOf(2), outF, 64);
   return {groups: [...out].map(([id, mats]) => ({id, mats})), spots};
+}
+
+// ---------------- cỏ xa: "tấm cỏ" chéo nhau, tô bằng ĐÚNG vật liệu cỏ HANA ----------------
+// Mặt nạ (alpha + độ cao cọng + rand từng cọng) bake lúc tải từ chính tấm Grass_plane (nhìn ngang) → tấm chéo 3 mặt cùng cỡ tấm cỏ thật,
+// shader cỏ dùng tip/rand của mặt nạ thay cho dữ liệu cọng → cùng màu, cùng shade, cùng gió, cùng bóng, cùng ánh sáng môi trường mọi giờ / thời tiết.
+export function bakeGrassCard(renderer, kit) {
+  const part = kitParts(kit, 0)[0]; if (!part || !renderer) return null;
+  const g = part.geometry; if (!g.boundingBox) g.computeBoundingBox();
+  const b = g.boundingBox, W = Math.max(b.max.x - b.min.x, b.max.z - b.min.z), H = b.max.y - Math.min(0, b.min.y);
+  const rt = new THREE.WebGLRenderTarget(512, 192, {generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true});
+  const mat = new THREE.ShaderMaterial({side: THREE.DoubleSide,
+    vertexShader: 'attribute vec4 _leaf;varying vec2 vL;void main(){vL=vec2(_leaf.w,_leaf.x);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader: 'varying vec2 vL;void main(){gl_FragColor=vec4(vL.x,vL.y,0.0,1.0);}'});
+  const scene = new THREE.Scene(), m = new THREE.Mesh(g, mat); m.position.set(-(b.min.x + b.max.x) / 2, 0, 0); scene.add(m);
+  const cam = new THREE.OrthographicCamera(-W / 2, W / 2, H, 0, -20, 20); cam.position.set(0, 0, 10); cam.lookAt(0, 0, 0);
+  const prevT = renderer.getRenderTarget(), prevC = renderer.getClearColor(new THREE.Color()), prevA = renderer.getClearAlpha();
+  renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(scene, cam);
+  renderer.setRenderTarget(prevT); renderer.setClearColor(prevC, prevA);
+  mat.dispose();
+  // 3 tấm chéo 60°, gốc từng cột = chân tấm (gió / né đá dẫn lối theo cột)
+  const P = [], N = [], U = [], R = [], VO = [], LF = [], I = [];
+  for (let k = 0; k < 3; k++) {
+    const a = k * Math.PI / 3, ca = Math.cos(a), sa = Math.sin(a), o = P.length / 3;
+    for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 1]]) {
+      const x = (u - 0.5) * W * ca, z = (u - 0.5) * W * sa;
+      P.push(x, v * H, z); N.push(0, 1, 0); U.push(u, v); R.push(x, 0, z); VO.push(0, 127, 0, 0); LF.push(128, 0, 128, Math.round(v * 255));
+    }
+    I.push(o, o + 1, o + 2, o, o + 2, o + 3);
+  }
+  const cg = new THREE.BufferGeometry();
+  cg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); cg.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+  cg.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); cg.setAttribute('_root', new THREE.Float32BufferAttribute(R, 3));
+  cg.setAttribute('_voln', new THREE.BufferAttribute(new Int8Array(VO), 4, true)); cg.setAttribute('_leaf', new THREE.BufferAttribute(new Uint8Array(LF), 4, true));
+  cg.setIndex(I); cg.computeBoundingBox(); cg.computeBoundingSphere();
+  return {geometry: cg, texture: rt.texture, W, H};
+}
+
+// lưới tấm cỏ xa: trong hàng rào = đúng các ô có cỏ thật (cùng lưới grassTiles), ngoài hàng rào = phủ kín tới `ext` m
+export function grassCardSpots(grassMats, MC, ext, skip) {
+  const out = [...grassMats], C = 1.45, F = MC.fence;
+  let as = 0; grassMats.forEach(m => { as += Math.hypot(m.elements[0], m.elements[1], m.elements[2]); }); as = grassMats.length ? as / grassMats.length : 1;
+  if (F) for (let gz = Math.floor((F[2] - ext) / C); gz <= Math.ceil((F[3] + ext) / C); gz++) for (let gx = Math.floor((F[0] - ext) / C); gx <= Math.ceil((F[1] + ext) / C); gx++) {
+    const x = (gx + 0.5) * C + (hash(gx, gz, 1) - 0.5) * C * 0.95, z = (gz + 0.5) * C + (hash(gx, gz, 2) - 0.5) * C * 0.95;
+    if (x > F[0] - 0.4 && x < F[1] + 0.4 && z > F[2] - 0.4 && z < F[3] + 0.4) continue;    // trong rào: đã có lưới cỏ thật
+    if (skip && skip(x, z)) continue;
+    const s = as * (0.82 + 0.4 * hash(gx, gz, 3));
+    out.push(new THREE.Matrix4().compose(V.set(x, MC.floorY || 0, z), Q.setFromEuler(E.set(0, hash(gx, gz, 4) * 6.283, 0)), S.set(s, s * (0.85 + 0.3 * hash(gx, gz, 5)), s)));
+  }
+  return out;
+}
+
+// ---------------- bồn hoa / chậu ngoài nhà (khối hoa vuông của bồn cửa sổ, ban công, hiên) → hàng chậu HANA pot1–4 ----------------
+// Lưới hoa/lá (M_L2_Leaf*, M_L2_Bloom_*) trong các khối nhà PLANTER → gom thành từng bồn → ẩn, đặt chậu HANA dọc bồn, gốc chậu = mặt đất trong bồn.
+const PLANTER = /^(L2_Upgrade_\w+_Front|L2_\w+_Terrace|L4_Master_Balcony|L4_Cafe_Front|L3_BBQ_Table)$/;
+const PLANT_MAT = /^M_L2_(Leaf|Leaf_Dark|Bloom_\w+)$/;
+export function replacePlanterPots(root, kits, group) {
+  const ids = ['pot1', 'pot2', 'pot3', 'pot4'].filter(id => kits[id]); if (!ids.length) return 0;
+  root.updateMatrixWorld(true);
+  const pts = [], hide = [];
+  root.traverse(o => {
+    if (!o.isMesh || !o.visible || ![].concat(o.material).some(m => m && PLANT_MAT.test(m.name || ''))) return;
+    let ok = false; for (let q = o; q && q !== root; q = q.parent) if (PLANTER.test(q.name || '')) { ok = true; break; }
+    if (!ok) return;
+    const pos = o.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) { V.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); pts.push(V.x, V.y, V.z); }
+    hide.push(o);
+  });
+  if (!pts.length) return 0;
+  // gom bồn: ô lưới 0.3 m, nối các ô kề nhau (cùng độ cao ±0.4 m)
+  const G = 0.3, cells = new Map();
+  for (let i = 0; i < pts.length; i += 3) { const k = Math.floor(pts[i] / G) + ',' + Math.floor(pts[i + 1] / 0.4) + ',' + Math.floor(pts[i + 2] / G); (cells.get(k) || cells.set(k, []).get(k)).push(i); }
+  const seen = new Set(), boxes = [];
+  for (const k0 of cells.keys()) {
+    if (seen.has(k0)) continue; seen.add(k0);
+    const st = [k0], b = {x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9, z0: 1e9, z1: -1e9};
+    while (st.length) { const k = st.pop(); for (const i of cells.get(k)) { b.x0 = Math.min(b.x0, pts[i]); b.x1 = Math.max(b.x1, pts[i]); b.y0 = Math.min(b.y0, pts[i + 1]); b.y1 = Math.max(b.y1, pts[i + 1]); b.z0 = Math.min(b.z0, pts[i + 2]); b.z1 = Math.max(b.z1, pts[i + 2]); }
+      const [a, c, d] = k.split(',').map(Number);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) { const kk = (a + dx) + ',' + (c + dy) + ',' + (d + dz); if (cells.has(kk) && !seen.has(kk)) { seen.add(kk); st.push(kk); } } }
+    boxes.push(b);
+  }
+  hide.forEach(o => { o.visible = false; });
+  // đặt chậu dọc trục dài của mỗi bồn
+  const per = new Map();
+  boxes.forEach((b, bi) => {
+    const lx = b.x1 - b.x0, lz = b.z1 - b.z0, L = Math.max(lx, lz), D = Math.max(0.2, Math.min(lx, lz)), alongX = lx >= lz;
+    const n = Math.max(1, Math.round(L / 0.55)), sp = L / n;
+    for (let i = 0; i < n; i++) {
+      const id = ids[(bi + i) % ids.length], k = kits[id], kh = k.lods[0].size.y, kw = Math.max(k.lods[0].size.x, k.lods[0].size.z);
+      const s = Math.min(Math.max(0.42, Math.min(0.62, (b.y1 - b.y0) * 2.2)) / kh, (Math.min(sp * 0.92, D * 1.7)) / kw);
+      const t = -L / 2 + sp * (i + 0.5), cx = (b.x0 + b.x1) / 2 + (alongX ? t : 0), cz = (b.z0 + b.z1) / 2 + (alongX ? 0 : t);
+      const m = new THREE.Matrix4().compose(V.set(cx, b.y0 - 0.02, cz), Q.setFromEuler(E.set(0, hash(cx, cz, 2) * 6.283, 0)), S.set(s, s, s));
+      (per.get(id) || per.set(id, []).get(id)).push(m);
+    }
+  });
+  let nPot = 0;
+  for (const [id, mats] of per) for (const p of kitParts(kits[id], 0)) {
+    const im = new THREE.InstancedMesh(p.geometry, p.material, mats.length); mats.forEach((m, i) => im.setMatrixAt(i, m));
+    im.instanceMatrix.needsUpdate = true; im.castShadow = im.receiveShadow = true; im.name = 'HANA_POTS_' + id; im.computeBoundingSphere(); group.add(im); nPot = Math.max(nPot, 0) + (p === kitParts(kits[id], 0)[0] ? mats.length : 0);
+  }
+  return nPot;
 }
