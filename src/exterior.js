@@ -371,8 +371,8 @@ export function setupExterior(c) {
     }
     else groups = toKits(HK, cls, set, mats, cls === 'grass' || cls === 'flower' ? (x, z) => onPath(x, z, 0.12) : (cls === 'bush' ? (x, z) => onPath(x, z, 0.5) : null));
     if (!groups) return;
-    for (const {id, mats: km} of groups) {
-      const kset = KS(id);
+    for (const {id, mats: km, sparse} of groups) {
+      const kset = sparse ? (kitSets[id + '#sparse'] ||= KS(id).filter(p => p.lod === 1).map(p => ({...p, lod: null, lodMax: undefined}))) : KS(id);
       if (cls === 'grass') grassPatchMats.push(...km);
       templates[cls].push({set: kset, mats: km, hana: id});
       if (cls === 'tree') {

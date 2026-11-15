@@ -124,7 +124,7 @@ export function grassTiles(kits, set, mats, skip, area) {
   for (const mm of mats) { hs += Math.hypot(mm.elements[4], mm.elements[5], mm.elements[6]); ys += mm.elements[13]; n++; }
   // chiều cao cỏ mới = cỏ cũ (trung bình) × GRASS_K; tấm HANA đo theo cọng (scale cọng trung vị)
   const target = tpl.h * (hs / Math.max(1, n)) * GRASS_K, bh = kit.lods[0].size.y * 0.62, s0 = Math.max(0.6, Math.min(1.8, target / bh)), y = n ? ys / n : 0;
-  const out = [];
+  const out = [], out2 = [];
   // phủ KÍN cả vùng (area = [x0,x1,z0,z1]): 2 lớp đầy đủ lệch nửa ô, vị trí ngẫu nhiên trong ô → thảm liền; skip = chỗ không lộ đất
   const [ax0, ax1, az0, az1] = area;
   for (let gz = Math.floor(az0 / C); gz <= Math.ceil(az1 / C); gz++) for (let gx = Math.floor(ax0 / C); gx <= Math.ceil(ax1 / C); gx++)
@@ -132,9 +132,10 @@ export function grassTiles(kits, set, mats, skip, area) {
       const x = (gx + (L ? 1.0 : 0.5)) * C + (hash(gx, gz, 1 + L * 10) - 0.5) * C * 0.9, z = (gz + (L ? 1.0 : 0.5)) * C + (hash(gx, gz, 2 + L * 10) - 0.5) * C * 0.9;
       if (x < ax0 || x > ax1 || z < az0 || z > az1 || (skip && skip(x, z))) continue;
       const s = s0 * (0.82 + 0.36 * hash(gx, gz, 3 + L * 10));
-      out.push(new THREE.Matrix4().compose(V.set(x, y, z), Q.setFromEuler(E.set(0, hash(gx, gz, 4 + L * 10) * 6.283, 0)), S.set(s, s * (0.85 + 0.3 * hash(gx, gz, 5 + L * 10)), s)));
+      (L ? out2 : out).push(new THREE.Matrix4().compose(V.set(x, y, z), Q.setFromEuler(E.set(0, hash(gx, gz, 4 + L * 10) * 6.283, 0)), S.set(s, s * (0.85 + 0.3 * hash(gx, gz, 5 + L * 10)), s)));
     }
-  return [{id: 'grassp', mats: out}];
+  // lớp 2 (lấp kẽ hở giữa các tấm) dùng hình LOD1 (40% cọng): thảm vẫn kín như 2 lớp đầy, ít hơn ~30% tam giác cỏ
+  return [{id: 'grassp', mats: out}, {id: 'grassp', mats: out2, sparse: true}];
 }
 
 // ---------------- cây / bụi / cỏ / hoa: bản thể cũ → kit HANA ----------------
