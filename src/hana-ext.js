@@ -117,25 +117,23 @@ export function pathStones(env, kits, noPlant) {
 
 // ---------------- cỏ: phủ kín bằng tấm cỏ HANA ----------------
 // chỗ nào trước đây có cỏ (bản thể cỏ cũ) → lưới ô 1.7 m, mỗi ô 1 tấm cỏ 2×2 m (lệch, xoay, cao thấp ngẫu nhiên) → thảm cỏ dày liền
-export function grassTiles(kits, set, mats, skip) {
+export function grassTiles(kits, set, mats, skip, area) {
   const kit = kits.grassp; if (!kit) return null;
-  const tpl = tplSize(set), C = 1.9, cells = new Map();
-  let hs = 0, n = 0;
-  for (const mm of mats) { V.setFromMatrixPosition(mm); const k = Math.floor(V.x / C) + ',' + Math.floor(V.z / C); if (!cells.has(k)) cells.set(k, V.y); hs += Math.hypot(mm.elements[4], mm.elements[5], mm.elements[6]); n++; }
-  // chiều cao cỏ mới = cỏ cũ (trung bình) × 0.8; tấm HANA đo theo cọng (scale cọng trung vị)
-  const target = tpl.h * (hs / Math.max(1, n)) * GRASS_K, bh = kit.lods[0].size.y * 0.62, s0 = Math.max(0.6, Math.min(1.8, target / bh));
+  const tpl = tplSize(set), C = 1.9;
+  let hs = 0, n = 0, ys = 0;
+  for (const mm of mats) { hs += Math.hypot(mm.elements[4], mm.elements[5], mm.elements[6]); ys += mm.elements[13]; n++; }
+  // chiều cao cỏ mới = cỏ cũ (trung bình) × GRASS_K; tấm HANA đo theo cọng (scale cọng trung vị)
+  const target = tpl.h * (hs / Math.max(1, n)) * GRASS_K, bh = kit.lods[0].size.y * 0.62, s0 = Math.max(0.6, Math.min(1.8, target / bh)), y = n ? ys / n : 0;
   const out = [];
-  for (const [k, y] of cells) {
-    const [gx, gz] = k.split(',').map(Number);
-    // vị trí ngẫu nhiên trong cả ô + 1 lớp chồng lấp lệch nửa ô (~45%) → thảm liền, không lộ lưới / không lộ đất
+  // phủ KÍN cả vùng (area = [x0,x1,z0,z1]): 2 lớp đầy đủ lệch nửa ô, vị trí ngẫu nhiên trong ô → thảm liền; skip = chỗ không lộ đất
+  const [ax0, ax1, az0, az1] = area;
+  for (let gz = Math.floor(az0 / C); gz <= Math.ceil(az1 / C); gz++) for (let gx = Math.floor(ax0 / C); gx <= Math.ceil(ax1 / C); gx++)
     for (let L = 0; L < 2; L++) {
-      if (L === 1 && hash(gx, gz, 9) > 0.45) continue;
       const x = (gx + (L ? 1.0 : 0.5)) * C + (hash(gx, gz, 1 + L * 10) - 0.5) * C * 0.9, z = (gz + (L ? 1.0 : 0.5)) * C + (hash(gx, gz, 2 + L * 10) - 0.5) * C * 0.9;
-      if (skip && skip(x, z)) continue;
+      if (x < ax0 || x > ax1 || z < az0 || z > az1 || (skip && skip(x, z))) continue;
       const s = s0 * (0.82 + 0.36 * hash(gx, gz, 3 + L * 10));
       out.push(new THREE.Matrix4().compose(V.set(x, y, z), Q.setFromEuler(E.set(0, hash(gx, gz, 4 + L * 10) * 6.283, 0)), S.set(s, s * (0.85 + 0.3 * hash(gx, gz, 5 + L * 10)), s)));
     }
-  }
   return [{id: 'grassp', mats: out}];
 }
 
@@ -322,21 +320,38 @@ export function grassCardSpots(grassMats, MC, ext, skip) {
 
 // ---------------- bồn hoa / chậu ngoài nhà (khối hoa vuông của bồn cửa sổ, ban công, hiên) → hàng chậu HANA pot1–4 ----------------
 // Lưới hoa/lá (M_L2_Leaf*, M_L2_Bloom_*) trong các khối nhà PLANTER → gom thành từng bồn → ẩn, đặt chậu HANA dọc bồn, gốc chậu = mặt đất trong bồn.
-const PLANTER = /^(L2_Upgrade_\w+_Front|L2_\w+_Terrace|L4_Master_Balcony|L4_Cafe_Front|L3_BBQ_Table)$/;
+// mọi lưới cây placeholder (khối hoa/lá vuông) — trừ những thứ không phải chậu: giàn/cổng hoa, dây leo, hàng rào cây, vườn cây ăn quả, tre, sen, bờ hồ, bể cá, quả địa cầu
+const NOT_POT = /Hedge|Arch|Vines|Orchard|Bamboo|Lilies|Shore|Island|Aquarium|Earth|Onsen|Picnic/;
+const BED = /Bed/;      // luống hoa sát đất → trồng hoa HANA kín luống (không đặt chậu)
 const PLANT_MAT = /^M_L2_(Leaf|Leaf_Dark|Bloom_\w+)$/;
 export function replacePlanterPots(root, kits, group) {
   const ids = ['pot1', 'pot2', 'pot3', 'pot4'].filter(id => kits[id]); if (!ids.length) return 0;
   root.updateMatrixWorld(true);
-  const pts = [], hide = [];
+  const pts = [], hide = [], beds = [];
   root.traverse(o => {
     if (!o.isMesh || !o.visible || ![].concat(o.material).some(m => m && PLANT_MAT.test(m.name || ''))) return;
-    let ok = false; for (let q = o; q && q !== root; q = q.parent) if (PLANTER.test(q.name || '')) { ok = true; break; }
+    let ok = true, bed = false; for (let q = o; q && q !== root; q = q.parent) { if (NOT_POT.test(q.name || '')) { ok = false; break; } if (BED.test(q.name || '')) bed = true; }
     if (!ok) return;
+    if (bed) { beds.push(o); return; }
     const pos = o.geometry.attributes.position;
     for (let i = 0; i < pos.count; i++) { V.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); pts.push(V.x, V.y, V.z); }
     hide.push(o);
   });
-  if (!pts.length) return 0;
+  // luống hoa: hoa HANA (3 loại) trồng theo lưới 0.32 m lệch ngẫu nhiên, phủ kín hộp bao của cây trong luống
+  const fl = ['flowerc', 'flower1', 'flower2'].filter(id => kits[id]), perF = new Map();
+  if (fl.length) beds.forEach(o => {
+    const b = new THREE.Box3().setFromObject(o); o.visible = false;
+    for (let x = b.min.x + 0.16; x < b.max.x; x += 0.32) for (let z = b.min.z + 0.16; z < b.max.z; z += 0.32) {
+      const jx = x + (hash(x, z, 1) - 0.5) * 0.22, jz = z + (hash(x, z, 2) - 0.5) * 0.22, id = fl[Math.floor(hash(x, z, 3) * fl.length) % fl.length], kh = kits[id].lods[0].size.y;
+      const sc = (0.4 + 0.25 * hash(x, z, 4)) / kh;
+      (perF.get(id) || perF.set(id, []).get(id)).push(new THREE.Matrix4().compose(V.set(jx, b.min.y - 0.02, jz), Q.setFromEuler(E.set(0, hash(x, z, 5) * 6.283, 0)), S.set(sc, sc, sc)));
+    }
+  });
+  for (const [id, mats] of perF) for (const p of kitParts(kits[id], 0)) {
+    const im = new THREE.InstancedMesh(p.geometry, p.material, mats.length); mats.forEach((m, i) => im.setMatrixAt(i, m));
+    im.instanceMatrix.needsUpdate = true; im.castShadow = false; im.receiveShadow = true; im.name = 'HANA_BED_' + id; im.computeBoundingSphere(); group.add(im);
+  }
+  if (!pts.length) return perF.size;
   // gom bồn: ô lưới 0.3 m, nối các ô kề nhau (cùng độ cao ±0.4 m)
   const G = 0.3, cells = new Map();
   for (let i = 0; i < pts.length; i += 3) { const k = Math.floor(pts[i] / G) + ',' + Math.floor(pts[i + 1] / 0.4) + ',' + Math.floor(pts[i + 2] / G); (cells.get(k) || cells.set(k, []).get(k)).push(i); }
@@ -353,12 +368,12 @@ export function replacePlanterPots(root, kits, group) {
   // đặt chậu dọc trục dài của mỗi bồn
   const per = new Map();
   boxes.forEach((b, bi) => {
-    const lx = b.x1 - b.x0, lz = b.z1 - b.z0, L = Math.max(lx, lz), D = Math.max(0.2, Math.min(lx, lz)), alongX = lx >= lz;
-    const n = Math.max(1, Math.round(L / 0.55)), sp = L / n;
-    for (let i = 0; i < n; i++) {
-      const id = ids[(bi + i) % ids.length], k = kits[id], kh = k.lods[0].size.y, kw = Math.max(k.lods[0].size.x, k.lods[0].size.z);
-      const s = Math.min(Math.max(0.42, Math.min(0.62, (b.y1 - b.y0) * 2.2)) / kh, (Math.min(sp * 0.92, D * 1.7)) / kw);
-      const t = -L / 2 + sp * (i + 0.5), cx = (b.x0 + b.x1) / 2 + (alongX ? t : 0), cz = (b.z0 + b.z1) / 2 + (alongX ? 0 : t);
+    // lưới chậu phủ cả bồn (bồn dài → 1 hàng, bồn rộng / luống trên bàn nhà kính → nhiều hàng), mỗi chậu ~0.55 m
+    const lx = b.x1 - b.x0, lz = b.z1 - b.z0, nx = Math.max(1, Math.round(lx / 0.55)), nz = Math.max(1, Math.round(lz / 0.55)), sx = lx / nx, sz = lz / nz;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+      const id = ids[(bi + i + j * 3) % ids.length], k = kits[id], kh = k.lods[0].size.y, kw = Math.max(k.lods[0].size.x, k.lods[0].size.z);
+      const s = Math.min(Math.max(0.42, Math.min(0.62, (b.y1 - b.y0) * 2.2)) / kh, (Math.min(Math.max(sx, 0.3), Math.max(sz, 0.3)) * 0.95) / kw);
+      const cx = b.x0 + sx * (i + 0.5), cz = b.z0 + sz * (j + 0.5);
       const m = new THREE.Matrix4().compose(V.set(cx, b.y0 - 0.02, cz), Q.setFromEuler(E.set(0, hash(cx, cz, 2) * 6.283, 0)), S.set(s, s, s));
       (per.get(id) || per.set(id, []).get(id)).push(m);
     }
@@ -369,4 +384,38 @@ export function replacePlanterPots(root, kits, group) {
     im.instanceMatrix.needsUpdate = true; im.castShadow = im.receiveShadow = true; im.name = 'HANA_POTS_' + id; im.computeBoundingSphere(); group.add(im); nPot = Math.max(nPot, 0) + (p === kitParts(kits[id], 0)[0] ? mats.length : 0);
   }
   return nPot;
+}
+
+// ---------------- chỗ nào lộ mặt đất? (bản đồ độ cao chụp từ trên xuống) ----------------
+// Chụp env bằng camera trực giao từ trên: mỗi px = độ cao vật cao nhất. Cỏ chỉ mọc nơi không có vật gì cao hơn mặt đất (luống, sàn gỗ, hồ, nhà, đường đất…)
+// → cỏ phủ kín mọi khoảng đất trống (kể cả lane giữa luống, mép lối đi), không phụ thuộc chỗ cỏ cũ từng mọc.
+export function groundFree(renderer, env, x0, x1, z0, z1, floorY, px = 0.25) {
+  const W = Math.min(2048, Math.ceil((x1 - x0) / px)), H = Math.min(2048, Math.ceil((z1 - z0) / px));
+  const rt = new THREE.WebGLRenderTarget(W, H, {type: THREE.FloatType, depthBuffer: true});
+  const mat = new THREE.ShaderMaterial({side: THREE.DoubleSide, vertexShader: `varying float vY;void main(){vec4 w=modelMatrix*vec4(position,1.0);
+      #ifdef USE_INSTANCING
+       w=modelMatrix*instanceMatrix*vec4(position,1.0);
+      #endif
+      vY=w.y;gl_Position=projectionMatrix*viewMatrix*w;}`, fragmentShader: 'varying float vY;void main(){gl_FragColor=vec4(vY,1.0,0.0,1.0);}'});
+  const skip = o => { const ms = [].concat(o.material); return ms.some(m => m && (m.userData.hana || m.userData.ground || /^(M_PathStone|Plant_01|Poly|ROCK$|M_L4_Sand)/.test(m.name || ''))) || /Hill_Ground|^Plane\d*$|Ground/i.test(o.name || ''); };
+  const hidden = []; env.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && o.visible && skip(o)) { o.visible = false; hidden.push(o); } });
+  const tmp = new THREE.Scene(); tmp.overrideMaterial = mat; const par = env.parent, idx = par ? par.children.indexOf(env) : -1; tmp.add(env);
+  const cam = new THREE.OrthographicCamera(x0, x1, -z0, -z1, 0.1, 400); cam.position.set(0, floorY + 200, 0); cam.up.set(0, 0, -1); cam.lookAt(0, floorY, 0);
+  // camera nhìn thẳng xuống, up = -z → trục dọc ảnh = -z; left/right = x
+  const prevT = renderer.getRenderTarget(), pc = renderer.getClearColor(new THREE.Color()), pa = renderer.getClearAlpha();
+  renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(tmp, cam);
+  const buf = new Float32Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf);
+  renderer.setRenderTarget(prevT); renderer.setClearColor(pc, pa);
+  if (par) { par.add(env); if (idx >= 0) { par.children.splice(par.children.indexOf(env), 1); par.children.splice(idx, 0, env); } }
+  hidden.forEach(o => { o.visible = true; }); rt.dispose(); mat.dispose();
+  const occ = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) occ[i] = buf[i * 4 + 1] > 0.5 && buf[i * 4] > floorY + 0.08 ? 1 : 0;
+  // ô ảnh: hàng 0 = z1 (đáy ảnh, vì trục dọc = -z) → (x, z) → (i, j)
+  return (x, z, m = 0) => {
+    if (x < x0 || x > x1 || z < z0 || z > z1) return true;
+    const r = Math.ceil(m / px);
+    const ci = Math.floor((x - x0) / px), cj = Math.floor((z1 - z) / px);
+    for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) { const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= W || j >= H) continue; if (occ[j * W + i]) return false; }
+    return true;
+  };
 }

@@ -15,7 +15,7 @@ import {MAP_CONFIGS} from './map-configs.js';
 import {TU,applyToon,patchLeafMask,hexV,TP,DEPTH_LEAF} from './toon.js';
 import {Perf} from './perf.js';
 import {FU,vertFol2,FRAG_PARS,FRAG_COLOR,OCC_GLSL,makeDepthMat,bindTU} from './foliage.js';
-import {replaceIndoorPots} from './hana-ext.js';
+import {replaceIndoorPots,replacePlanterPots} from './hana-ext.js';
 import {HU,HANA_PMASK,HANA_VERT_PARS,HANA_VERT,HANA_SOLID_VERT_PARS,HANA_SOLID_VERT,HANA_CUT,HANA_FRAG_PARS,HANA_COLOR} from './hana.js';
 import {setupExterior,LEVELS} from './exterior.js';
 import {makeStylizer} from './stylize.js';
@@ -1424,6 +1424,8 @@ ${HANA_COLOR}
     for(let i=0;i<P.count;i++){v.fromBufferAttribute(P,i).applyMatrix4(o.matrixWorld);uv[i*2]=((v.x-gp.x)/650+1)/2;uv[i*2+1]=(-(v.z-gp.z)/650+1)/2}
     o.geometry.setAttribute('uv',new THREE.BufferAttribute(uv,2));o.material=ground.material;o.receiveShadow=ground.receiveShadow}))}
 
+  // chậu trong phòng (HANA): phải chạy TRƯỚC khi gộp mesh tĩnh (cây placeholder bị gộp mất)
+  if(HKIT&&!OUTD){try{const n=replaceIndoorPots(env,HKIT.kits,'pot5');if(n)console.log('[hana] chậu trong phòng → chậu sứ HANA: '+n);const m=replacePlanterPots(env,HKIT.kits,env);if(m)console.log('[hana] cây placeholder trong phòng → chậu HANA: '+m)}catch(e){console.warn('[hana] pots',e)}}
   // ===== TỐI ƯU: gộp mesh tĩnh theo material (batching), tắt matrix auto, ngoại cảnh: bỏ bóng + cull theo khoảng cách =====
   const OPT={far:[],inst:[]};
   const maxAniso=renderer.capabilities.getMaxAnisotropy();
@@ -1506,7 +1508,6 @@ ${HANA_COLOR}
     // texture: anisotropy cao để cảnh ngoài cửa sổ không bị sạn/nhấp nháy
     const tex=new Set();env.traverse(o=>{if(!o.isMesh)return;(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{if(!m)return;['map','normalMap','emissiveMap','roughnessMap','metalnessMap','aoMap'].forEach(k=>{if(m[k])tex.add(m[k])})})});
     tex.forEach(t=>{t.anisotropy=maxAniso;t.generateMipmaps=true;t.minFilter=THREE.LinearMipmapLinearFilter;t.needsUpdate=true});
-    if(HKIT&&!OUTD){try{const n=replaceIndoorPots(env,HKIT.kits,'pot5');if(n)console.log('[hana] chậu trong phòng → chậu sứ HANA: '+n)}catch(e){console.warn('[hana] pots',e)}}
     console.log('[sty] map: '+api.stylize(env));
     // chống z-fighting: tấm mỏng nằm áp lên mặt khác (thảm, tranh, bảng ghim, khung, tấm lót…) → vật liệu riêng có polygonOffset
     // (kéo về phía camera trong bộ đệm sâu, không dời hình). Tấm chồng lên tấm khác (thảm trong trên thảm ngoài) được đẩy mạnh thêm 1 bậc.

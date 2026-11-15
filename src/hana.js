@@ -169,7 +169,11 @@ vec3 hanaShade( vec3 N, vec3 V, vec3 L, float sh, float sunK, float ambK, float 
   c = mix( c, uHHighC, clamp( convex * lit, 0.0, 1.0 ) );
   float facing = 1.0 - abs( dot( N, V ) ), lo = 1.0 - uHRimW;
   float rim = hSm( lo, lo + uHRimS * uHRimW, facing ) * mix( 1.0, hSm( -0.2, 0.8, dot( -V, L ) ), uHRimAw );
+#ifdef HANA_GRASS
+  return c;   // cỏ: tắt rim
+#else
   return c + uHRimC * rim * uHRimI;
+#endif
 }
 `;
 

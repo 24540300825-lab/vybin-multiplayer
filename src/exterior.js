@@ -9,7 +9,7 @@ import {makeFoliageDecals} from './decals.js';
 import {makeMeadow} from './meadow.js';
 import {hanaDepthMat, kitParts} from './hana.js';
 const kitParts0 = k => kitParts(k, 0)[0];
-import {HANA_CLS, kitSet, toKits, rockClumps, pathStones, grassTiles, bushLayout, bakeGrassCard, grassCardSpots, replacePlanterPots} from './hana-ext.js';
+import {HANA_CLS, kitSet, toKits, rockClumps, pathStones, grassTiles, bushLayout, bakeGrassCard, grassCardSpots, replacePlanterPots, groundFree} from './hana-ext.js';
 import {WIND_FN, FU} from './foliage.js';
 import {TU} from './toon.js';
 
@@ -273,7 +273,10 @@ export function setupExterior(c) {
   const PS = HK ? pathStones(env, HK) : null;
   const inNoPlant = (x, z, m = 0) => MC.noPlant && MC.noPlant.some(b => x > b[0] - m && x < b[1] + m && z > b[2] - m && z < b[3] + m);
   const onPath = (x, z, m) => !!(PS && PS.near(x, z, m));
-  let bushDone = false; const grassPatchMats = [];
+  // chỗ lộ mặt đất (không luống / sàn / hồ / nhà / đường đất…) — cỏ mọc kín mọi chỗ trống, không cần vị trí cỏ cũ
+  let FREE = null;
+  if (HK && c.renderer && MC.fence) { try { const Fe = MC.fence, B = INDOOR ? 14 : 24; FREE = groundFree(c.renderer, env, Fe[0] - B, Fe[1] + B, Fe[2] - B, Fe[3] + B, MC.floorY || 0); } catch (e) { console.warn('[hana] groundFree', e); } }
+  let bushDone = false, grassDone = false; const grassPatchMats = [];
   const treeH = set => { let h = 0; set.forEach(m => { const g = m.geometry; if (!g.boundingBox) g.computeBoundingBox(); h = Math.max(h, g.boundingBox.max.y); }); return Math.max(2, h); };
   // bán kính tán (ngang) của mẫu cây/bụi theo hộp bao thật của mọi phần (thân + tán) — dùng để bỏ cây/bụi có tán chạm vào tường nhà (lộ vào phòng, nhìn nhạt/xuyên tường)
   const canopyR = set => { let r = 0; set.forEach(m => { const g = m.geometry; if (!g.boundingBox) g.computeBoundingBox(); const bb = g.boundingBox; r = Math.max(r, Math.abs(bb.min.x), bb.max.x, Math.abs(bb.min.z), bb.max.z); }); return r; };
@@ -344,7 +347,11 @@ export function setupExterior(c) {
     } else if (cls === 'bush') {       // bụi: xếp hàng dọc hàng rào + chân tường nhà (bỏ vị trí rải ngẫu nhiên cũ)
       if (bushDone) return; bushDone = true;
       const bl = bushLayout(HK, MC, (x, z, m) => onPath(x, z, m)); if (!bl) return; groups = bl.groups; console.log('exterior: HANA bụi xếp hàng ' + bl.spots.length);
-    } else if (cls === 'grass') groups = grassTiles(HK, set, mats, (x, z) => inNoPlant(x, z, 0.3));
+    } else if (cls === 'grass') {      // cỏ: phủ kín mọi chỗ lộ đất trong hàng rào (ngoài rào làm riêng ở phần rải); cọng nằm trên đá dẫn lối tự ẩn (mặt nạ)
+      if (grassDone) return; grassDone = true;
+      const Fe = MC.fence;
+      groups = grassTiles(HK, set, mats, (x, z) => (FREE ? !FREE(x, z, 0.15) : inNoPlant(x, z, 0.3)), [Fe[0] + 0.3, Fe[1] - 0.3, Fe[2] + 0.3, Fe[3] - 0.3]);
+    }
     else groups = toKits(HK, cls, set, mats, cls === 'grass' || cls === 'flower' ? (x, z) => onPath(x, z, 0.12) : (cls === 'bush' ? (x, z) => onPath(x, z, 0.5) : null));
     if (!groups) return;
     for (const {id, mats: km} of groups) {
@@ -388,7 +395,7 @@ export function setupExterior(c) {
         cardMat = base.clone(); cardMat.name = 'HANA_GrassCard';
         cardMat.userData = {...base.userData, hana: {...base.userData.hana, card: true, sil: false, U}};
         toonMat(cardMat);
-        const spots = grassCardSpots(grassPatchMats, MC, INDOOR ? 60 : 95, (x, z) => inNoPlant(x, z, 0.4) || onPath(x, z, 0.4));
+        const spots = grassCardSpots(grassPatchMats, MC, INDOOR ? 60 : 95, (x, z) => (FREE ? !FREE(x, z, 0.2) : inNoPlant(x, z, 0.4)) || onPath(x, z, 0.35));
         const CL = CLASS.gcard, buckets = new Map();
         spots.forEach(mm => { V3.setFromMatrixPosition(mm); const k = Math.floor(V3.x / CL.cell) + ',' + Math.floor(V3.z / CL.cell); (buckets.get(k) || buckets.set(k, []).get(k)).push(mm); });
         const cset = [{geometry: card.geometry, material: cardMat, hana: true, leaf: 'grass', name: 'HANA_card'}];
@@ -471,7 +478,7 @@ export function setupExterior(c) {
       for (let L = 0; L < 2; L++) {
         if (L === 1 && hh(gx, gz, 9) > 0.45) continue;
         const x = (gx + (L ? 1 : 0.5)) * C + (hh(gx, gz, 1 + L * 10) - 0.5) * C * 0.9, z = (gz + (L ? 1 : 0.5)) * C + (hh(gx, gz, 2 + L * 10) - 0.5) * C * 0.9;
-        if (inside(x, z, -0.3) || distFence(x, z) > band || inNoPlant(x, z, 0.3) || onPath(x, z, 0.12)) continue;
+        if (inside(x, z, -0.3) || distFence(x, z) > band || (FREE ? !FREE(x, z, 0.15) : (inNoPlant(x, z, 0.3) || onPath(x, z, 0.12)))) continue;
         const sc = as * (0.82 + 0.36 * hh(gx, gz, 3 + L * 10));
         outM.push(new THREE.Matrix4().compose(new THREE.Vector3(x, MC.floorY || 0, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, hh(gx, gz, 4 + L * 10) * 6.283, 0)), new THREE.Vector3(sc, sc * (0.85 + 0.3 * hh(gx, gz, 5 + L * 10)), sc)));
       }
