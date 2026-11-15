@@ -418,7 +418,8 @@ export function groundFree(renderer, env, x0, x1, z0, z1, floorY, px = 0.25) {
   hidden.forEach(o => { o.visible = true; }); rt.dispose(); mat.dispose();
   const occ = new Uint8Array(W * H);
   for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const k = j * W + i, u = j * W + (W - 1 - i);
-    occ[k] = buf[k * 4 + 1] > 0.5 && buf[k * 4] > floorY + 0.08 && bufU[u * 4 + 1] > 0.5 && bufU[u * 4] < floorY + 1.2 ? 1 : 0; }
+    occ[k] = buf[k * 4 + 1] > 0.5 && buf[k * 4] > floorY - 0.6 &&     // mọi bề mặt không phải đất (nước hồ, hồ bơi, sân tennis, đường ray, lối đất…) dù nằm sát mặt đất
+       bufU[u * 4 + 1] > 0.5 && bufU[u * 4] < floorY + 1.2 ? 1 : 0; }
   // ô ảnh: hàng 0 = z1 (đáy ảnh, vì trục dọc = -z) → (x, z) → (i, j)
   return (x, z, m = 0) => {
     if (x < x0 || x > x1 || z < z0 || z > z1) return true;
