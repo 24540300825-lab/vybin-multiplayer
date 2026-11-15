@@ -4,7 +4,10 @@ const [,, SRC, TJ] = process.argv, OUT = path.join(__dirname, '../../assets/deca
 (async () => {
   const b = await chromium.launch({args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist']});
   const meta = {};
-  const jobs = [['tree1', 512, 640], ['tree2', 512, 640], ['bush2', 512, 320], ['bush3', 512, 320], ['bush4', 512, 320], ['berry', 512, 320], ['grass', 1024, 256]];
+  const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
+  const jobs0 = [['tree1', 512, 640], ['tree2', 512, 640], ['bush2', 512, 320], ['bush3', 512, 320], ['bush4', 512, 320], ['berry', 512, 320], ['grass', 1024, 256], ['grass1', 512, 256]];
+  const jobs = ONLY ? jobs0.filter(j => ONLY.includes(j[0])) : jobs0;
+  const old = (() => { try { return JSON.parse(fs.readFileSync(path.join(OUT, 'h_meta.json'))); } catch (e) { return {}; } })(); Object.assign(meta, old);
   for (const [what, w, h] of jobs) {
     const p = await b.newPage({viewport: {width: w, height: h}});
     await p.route('**/*', r => { const u = r.request().url(); const m = u.match(/three@0\.160\.0\/(.*)$/); if (m) return r.fulfill({path: path.join(TJ, m[1]), contentType: 'application/javascript'});

@@ -11,7 +11,7 @@ const GROUPS = {
   tree1: [/^Tree_Leaf_1_HANA_Foliage$/, /^Tree_Branch_1_HANA$/], tree2: [/^Tree_Leaf_2_HANA_Foliage$/, /^Tree_Branch_2_HANA$/],
   bush2: [/^Bush_2_HANA_Foliage$/], bush3: [/^Bush_3_HANA_Foliage$/], bush4: [/^Bush_4_HANA_Foliage$/],
   berry: [/^Bush_bush-blackberry-eurasian-generic-mature-b_1_HANA_Foliage$/, /^bush-blackberry-eurasian-generic-mature-b\.001_HANA$/],
-  grass: [/^Grass_plane_HANA_Foliage$/],
+  grass: [/^Grass_plane_HANA_Foliage$/], grass1: [/^Grass_plane_HANA_Foliage$/],
 };
 const renderer = setupHanaRenderer(new THREE.WebGLRenderer({antialias: true, alpha: true, preserveDrawingBuffer: true}));
 renderer.setSize(W, H); renderer.setClearColor(0x000000, 0); document.body.appendChild(renderer.domElement);
@@ -32,7 +32,7 @@ const box = new THREE.Box3(); hana.root.traverse(o => { if ((o.isMesh || o.isIns
 function visible(o) { for (let q = o; q; q = q.parent) if (!q.visible) return false; return true; }
 const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
 // camera trực giao nhìn ngang (hơi từ trên xuống cho cỏ), mặt trời từ phía trước-trên như key light của bạn
-const tilt = what === 'grass' ? 0.42 : 0.12;
+const tilt = what === 'grass' ? 0.42 : what === 'grass1' ? 0.3 : 0.12;
 const pw = (what === 'grass' ? s.x : Math.max(s.x, s.z)) * (what.startsWith('tree') ? 1.08 : 1.2), ph = (s.y + (what === 'grass' ? Math.max(s.x, s.z) * Math.sin(tilt) * 0.5 : 0)) * 1.06;
 const aspect = W / H; let hw = pw / 2, hh = ph / 2; if (hw / hh > aspect) hh = hw / aspect; else hw = hh * aspect;
 const cam = new THREE.OrthographicCamera(-hw, hw, hh, -hh, 0.01, 200);

@@ -11,7 +11,7 @@ export const DEC_VER = 2;
 const META = {"grass":{"w":8.932,"h":2.076,"bh":1.977},"pine":{"w":4.16,"h":9.424,"bh":9.239},"round1":{"w":5.165,"h":8.369,"bh":8.205},"round2":{"w":5.734,"h":8.293,"bh":8.131},"round3":{"w":3.942,"h":9.797,"bh":9.605},"round4":{"w":2.532,"h":9.003,"bh":8.827},"round5":{"w":3.519,"h":10.237,"bh":10.036}};   // assets/decal/meta.json (tools/bake/pack.py)
 
 // decal HANA (tools/hana_bake: bake bằng hana-three.js = màu Blender) — assets/decal/h_*.png + h_meta.json (base = tỉ lệ đáy cây trên ảnh)
-const META_H = {"tree1": {"w": 2.629, "h": 3.287, "bh": 3.101, "base": 0.0317}, "tree2": {"w": 2.284, "h": 2.855, "bh": 2.694, "base": 0.0317}, "bush2": {"w": 2.224, "h": 1.39, "bh": 0.722, "base": 0.2423}, "bush3": {"w": 2.831, "h": 1.77, "bh": 0.747, "base": 0.2904}, "bush4": {"w": 2.155, "h": 1.347, "bh": 0.864, "base": 0.1815}, "berry": {"w": 2.269, "h": 1.418, "bh": 1.2, "base": 0.08}, "grass": {"w": 12.238, "h": 3.06, "bh": 0.898, "base": 0.366}};
+const META_H = {"tree1": {"w": 2.629, "h": 3.287, "bh": 3.101, "base": 0.0317}, "tree2": {"w": 2.284, "h": 2.855, "bh": 2.694, "base": 0.0317}, "bush2": {"w": 2.224, "h": 1.39, "bh": 0.722, "base": 0.2423}, "bush3": {"w": 2.831, "h": 1.77, "bh": 0.747, "base": 0.2904}, "bush4": {"w": 2.155, "h": 1.347, "bh": 0.864, "base": 0.1815}, "berry": {"w": 2.269, "h": 1.418, "bh": 1.2, "base": 0.08}, "grass": {"w": 12.238, "h": 3.06, "bh": 0.898, "base": 0.366}, "grass1": {"w": 3.099, "h": 1.549, "bh": 0.898, "base": 0.2232}};
 
 // gọi trong onBeforeCompile của toonMat (game.js) khi m.userData.vyDec có
 export function patchDecal(sh, m) {
@@ -93,7 +93,8 @@ export function makeFoliageDecals({scene, toonMat, trees = [], grass = [], bushe
     bushes.forEach(t => { const k = 'h_' + (t.kit || 'bush2'), M = META_H[k.slice(2)]; if (!M) return;
       HB[k].push({x: t.x, y: t.y, z: t.z, s: Math.max(0.2, t.h / M.bh), hue: 0, val: (rnd() - 0.5) * 0.05}); });
     Object.keys(HB).forEach(k => build(k, HB[k], k.includes('tree') ? 'tree' : 'bush'));
-    build('h_grass', grass.map(p => ({...p, s: p.s * 8.932 / META_H.grass.w * 1.6})), 'grass');
+    // cỏ xa: mỗi tấm = 1 khóm Grass_plane (bake từ cỏ HANA), cao ~0.45 m như cỏ 3D, rải dày → không còn dải phẳng dài
+    build('h_grass1', grass.map(p => ({...p, s: (0.42 + rnd() * 0.16) / META_H.grass1.bh})), 'grass');
   } else {
   trees.forEach(t => { const k = t.kind || kindAt(t); const M = META[k];
     by[k].push({x: t.x, y: t.y, z: t.z, s: Math.max(0.3, t.h / M.bh) * (0.95 + rnd() * 0.1), hue: (rnd() - 0.5) * 0.03, val: (rnd() - 0.5) * 0.08}); });

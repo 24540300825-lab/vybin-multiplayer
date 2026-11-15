@@ -451,7 +451,16 @@ export function setupExterior(c) {
       }
     }
   }
-  if (HK) decGrass.length = 0;     // HANA: xa không dùng dải cỏ decal (nhìn như tấm phẳng) — để lộ nền Moss nét cọ, cỏ 3D LOD1 thưa dần ở rìa
+  if (HK) {      // HANA: decal cỏ = từng khóm nhỏ (1 tấm Grass_plane), dày hơn dải cũ
+    decGrass.length = 0; const y = MC.floorY || 0, np = MC.noPlant || [], ext = INDOOR ? 70 : 95;
+    for (let z = R0[2] - ext; z < R0[3] + ext; z += 1.25) for (let x = R0[0] - ext; x < R0[1] + ext; x += 1.25) {
+      const inn = x > R0[0] && x < R0[1] && z > R0[2] && z < R0[3], st = inn ? 1.25 : 1.6;
+      if (!inn && rnd() > (1.25 * 1.25) / (st * st)) continue;
+      const jx = x + rnd() * 1.25, jz = z + rnd() * 1.25;
+      if (np.some(b => jx > b[0] - 1.2 && jx < b[1] + 1.2 && jz > b[2] - 1.2 && jz < b[3] + 1.2) || onPath(jx, jz, 0.9)) continue;
+      decGrass.push({x: jx, y: y - 0.03, z: jz, s: 1, hue: 0, val: (rnd() - 0.5) * 0.06});
+    }
+  }
   const DEC = makeFoliageDecals({scene, toonMat, trees: treeSpots, grass: decGrass, bushes: bushSpots, indoor: INDOOR, hana: !!HK});
 
   // ---- 4b) lớp CÂY NGƯỜI CHƠI RẢI (src/build/furniture.js): đi CHUNG đường ống với cây vườn — styleMat (gió, tâm tán, bụi, cúi khi đi qua,
