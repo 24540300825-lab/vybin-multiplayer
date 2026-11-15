@@ -225,7 +225,7 @@ ${HANA_COLOR}
          outgoingLight=min(outgoingLight,vec3(0.78))+(1.0-exp(-max(outgoingLight-0.78,0.0)/0.18))*0.18;
          #endif
          }
-        #include <opaque_fragment>`);if(HN&&(HN.sil||HN.card))sh.fragmentShader=sh.fragmentShader.replace('#include <clipping_planes_fragment>',HANA_CUT+'#include <clipping_planes_fragment>');if(STY&&!HN)STY.patch(sh,m);if(m.userData.vyDec)patchDecal(sh,m)};
+        #include <opaque_fragment>`);if(HN&&(HN.sil||HN.card))sh.fragmentShader=sh.fragmentShader.replace('#include <clipping_planes_fragment>',HANA_CUT+'#include <clipping_planes_fragment>');if(HN&&(HN.ground||HN.card))sh.fragmentShader=sh.fragmentShader.replace('#include <fog_fragment>','#include <fog_fragment>\n#ifdef USE_FOG\n{float hmd=distance(vWP.xz,cameraPosition.xz);gl_FragColor.rgb=mix(gl_FragColor.rgb,fogColor,smoothstep(uHMist.x,uHMist.y,hmd)*uHMist.z);}\n#endif');if(STY&&!HN)STY.patch(sh,m);if(m.userData.vyDec)patchDecal(sh,m)};
       m.customProgramCacheKey=()=>'vytoon11'+(m.userData.hana?'H'+m.userData.hana.kind+(m.userData.hana.sil?'s':'')+(m.userData.hana.dmap?'d':'')+(m.userData.hana.dattr?'a':'')+(m.userData.hana.ground?'g':'')+(m.userData.hana.card?'c':''):'')+(isGlow(m)?'Y':'')+(aoOn(m)?'A':'')+(STY?STY.key(m):'')+(m.userData.vyDec?'D'+m.userData.vyDec:'')+(m.userData.occW?'W':(m.userData.occF?'X':''))+(m.userData.fol2?'F':'')+(m.userData.stemR?'R':'')+(m.userData.tsway?'T':'')+(m.userData.grass?'G':'')+(m.userData.cloudV?'c':'')+(m.userData.squash||m.userData.grass?'q':'')+(m.userData.occ?'o':'')+(m.userData.leafMask?'L':'')+((/Wind/i.test(m.name||'')||m.userData.sway||/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||''))?'s':'')+(((/PolyFoliage|Leaves|Plant_|Fern/i.test(m.name||'')||m.userData.leaf)&&!m.userData.noLeaf)?'f':'')+((m.userData.ground||/Stylized Grass/i.test(m.name||''))?'g':'');m.needsUpdate=true;}
 
   // mái ngói cánh Vy/Bin: GLB ngoại cảnh chỉ có mái cánh phòng khách (Roof_Living) → nhân bản sang 2 cánh kia
@@ -1986,7 +1986,9 @@ ${HANA_COLOR}
     skyU.sunDir.value.copy(S.v);skyU.moonDir.value.copy(M.v);skyStep(t,S.v,M.v,isDay,dt);
     // sương
     scene.fog.color.copy(des(k.fog));
-    if(WL.fA>0.001){const fl=scene.fog.color.r*.299+scene.fog.color.g*.587+scene.fog.color.b*.114,tl=WL.fT.r*.299+WL.fT.g*.587+WL.fT.b*.114;_wlC.copy(WL.fT).multiplyScalar(fl/Math.max(tl,1e-3));scene.fog.color.lerp(_wlC,WL.fA)}   // ám màu sương theo thời tiết, giữ độ sáng theo giờscene.fog.near=WC.fn*(OUTD?0.8:1);scene.fog.far=WC.ff*(OUTD?0.55:1);
+    if(WL.fA>0.001){const fl=scene.fog.color.r*.299+scene.fog.color.g*.587+scene.fog.color.b*.114,tl=WL.fT.r*.299+WL.fT.g*.587+WL.fT.b*.114;_wlC.copy(WL.fT).multiplyScalar(fl/Math.max(tl,1e-3));scene.fog.color.lerp(_wlC,WL.fA)}
+    HU.uHMist.value.z=0.5*Math.min(1,Math.max(0,(300-WC.ff)/225));   // sương xa của nền + cỏ xa HANA theo thời tiết (= sương riêng của decal cây: trời quang 0 → sương mù 0.5) → cây và thảm cỏ xa cùng chìm vào sương
+    // ám màu sương theo thời tiết, giữ độ sáng theo giờscene.fog.near=WC.fn*(OUTD?0.8:1);scene.fog.far=WC.ff*(OUTD?0.55:1);
     // grade
     GU.uExpo.value=TP.expo*(1-(1-WC.dim)*0.3);GU.uCon.value=TP.con*(OUTD?0.97:1);GU.uSat.value=TP.sat*(1-WC.des*0.35)*(OUTD?0.9:1);GU.uCon.value*=WL.gC;GU.uTemp.value=TP.temp+k.gt+WL.gT;GU.uVig.value=TP.vig+WL.gV;GU.uLift.value.copy(WL.gL).multiplyScalar(0.5+0.5*k.day);GU.uGrain.value=WL.gG;GU.uTintAmt.value=TP.tintAmt;GU.uFlash.value=flash*0.6;
     const hs=h=>{const v=hexV(h);return new THREE.Vector3(v.x,v.y,v.z)};GU.uTintSh.value.copy(hexV(TP.tintSh));GU.uTintHi.value.copy(hexV(TP.tintHi));

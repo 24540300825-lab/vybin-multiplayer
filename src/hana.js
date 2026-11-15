@@ -15,6 +15,7 @@ export const HU = {
   uHLift: {value: 1.0},     // nhân độ sáng tổng của cây cỏ HANA
   uHSolidLift: {value: 1.0},
   uHGBot: {value: new THREE.Vector2(0.5, 0.62)},
+  uHMist: {value: new THREE.Vector3(40, 170, 0)},   // sương xa của nền + tấm cỏ xa (khớp decal cây: uM0, uM1; z = độ mạnh theo thời tiết, game.js)
   uHTop: {value: 0},   // 1 = map trong phòng (camera trên cao nhìn xuống vườn): cỏ bớt tương phản, tấm cỏ xa ngả ra sau theo hướng nhìn → cỏ tệp vào nền. Ngoài vườn = 0 (giữ nguyên)   // cỏ: vùng tối ở gốc — x = độ tối (trừ vào tone), y = cao tới đâu (0 gốc → 1 ngọn)
   uHFolShadow: {value: new THREE.Color(0.002, 0.277, 0.022)},   // màu vùng tối của lá (từ file HANA) — decal xa về đúng màu này khi khuất nắng / ban đêm
   uHDbg: {value: 0},
@@ -96,7 +97,7 @@ export const HANA_CUT = `
 `;
 
 export const HANA_FRAG_PARS = `
-uniform vec3 uHRefL,uHRefS,uHFolShadow;uniform vec2 uHGBot;uniform float uHTop;
+uniform vec3 uHRefL,uHRefS,uHFolShadow;uniform vec2 uHGBot;uniform float uHTop;uniform vec3 uHMist;
 #ifdef HANA_DEC
 uniform float uHDecBase;
 #endif
