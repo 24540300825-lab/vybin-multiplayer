@@ -215,3 +215,53 @@ export function replaceIndoorPots(root, kits, id = 'pot5') {
   }
   return k;
 }
+
+// ---------------- bụi: xếp có chủ ý (không rải ngẫu nhiên) ----------------
+// 1 hàng dọc theo mặt trong hàng rào (cách rào ~1 m, nhịp ~2.7 m, chừa cổng/lối đi/công trình), 1 hàng chân tường nhà (3 cánh nhà),
+// 1 hàng thưa ngoài hàng rào. Mỗi cạnh lặp nhịp 2 loại bụi xen kẽ → gọn, có trật tự như vườn được chăm.
+export function bushLayout(kits, MC, onPath) {
+  const ids = KITS.bush.filter(id => kits[id]); if (!ids.length || !MC.fence) return null;
+  const F = MC.fence, np = MC.noPlant || [], house = np.slice(0, 3), out = new Map(), spots = [];
+  const blocked = (x, z, m) => np.some(b => x > b[0] - m && x < b[1] + m && z > b[2] - m && z < b[3] + m) || onPath(x, z, 0.9);
+  const put = (id, x, z, s, yaw) => { const m = new THREE.Matrix4().compose(V.set(x, MC.floorY || 0, z), Q.setFromEuler(E.set(0, yaw, 0)), S.set(s, s * (0.9 + 0.2 * hash(x, z, 3)), s));
+    (out.get(id) || out.set(id, []).get(id)).push(m); spots.push({x, z, id, s}); };
+  const size = id => { const k = kits[id].lods[0].size; return Math.max(k.x, k.z); };
+  // đi dọc 1 đoạn thẳng, đặt bụi theo nhịp; pair = cặp loại bụi xen kẽ của cạnh này
+  const line = (x0, z0, x1, z1, step, target, pair, check, sideSeed) => {
+    const L = Math.hypot(x1 - x0, z1 - z0), n = Math.floor(L / step), dx = (x1 - x0) / L, dz = (z1 - z0) / L, off = (L - n * step) / 2;
+    for (let i = 0; i <= n; i++) {
+      const t = off + i * step, x = x0 + dx * t, z = z0 + dz * t;
+      if (!check(x, z)) continue;
+      const id = pair[i % 2], s = target / size(id) * (0.92 + 0.16 * hash(x, z, sideSeed));
+      put(id, x, z, s, Math.atan2(dx, dz) + (hash(x, z, 5) - 0.5) * 0.6);
+    }
+  };
+  const pairOf = k => [ids[k % ids.length], ids[(k + 1) % ids.length]];
+  // hàng trong hàng rào
+  const d = 1.15, gx = F[4];
+  const inFence = (x, z) => !blocked(x, z, 1.0) && !(Math.abs(x - gx) < 3.2 && z > F[3] - 4);
+  line(F[0] + d, F[2] + d, F[1] - d, F[2] + d, 2.7, 1.7, pairOf(0), inFence, 11);   // rào sau
+  line(F[0] + d, F[3] - d, F[1] - d, F[3] - d, 2.7, 1.7, pairOf(2), inFence, 12);   // rào trước (chừa cổng)
+  line(F[0] + d, F[2] + d + 2.7, F[0] + d, F[3] - d - 2.7, 2.7, 1.7, pairOf(1), inFence, 13);   // rào trái
+  line(F[1] - d, F[2] + d + 2.7, F[1] - d, F[3] - d - 2.7, 2.7, 1.7, pairOf(3), inFence, 14);   // rào phải
+  // hàng chân tường nhà (bụi nhỏ hơn, sát tường ~0.9 m, không chắn lối vào / cửa)
+  // bậc thềm cửa chính (trục cửa = trục cổng F[4]) → không trồng bụi lên thềm
+  const fz = Math.max(...house.map(b => b[3])), onPorch = (x, z) => Math.abs(x - F[4]) < 2.7 && z > fz - 0.5 && z < fz + 3.2;
+  const g = 0.95, nearWall = (x, z) => !onPath(x, z, 1.1) && !onPorch(x, z) && x > F[0] + 2 && x < F[1] - 2 && z > F[2] + 2 && z < F[3] - 2
+    && !np.slice(3).some(b => x > b[0] - 0.8 && x < b[1] + 0.8 && z > b[2] - 0.8 && z < b[3] + 0.8)
+    && !house.some(b => x > b[0] - 0.3 && x < b[1] + 0.3 && z > b[2] - 0.3 && z < b[3] + 0.3);
+  house.forEach((b, k) => {
+    const pr = pairOf(k + 1);
+    line(b[0] - g, b[3] + g, b[1] + g, b[3] + g, 2.4, 1.45, pr, nearWall, 20 + k);    // mặt trước
+    line(b[0] - g, b[2] - g, b[1] + g, b[2] - g, 2.4, 1.45, pr, nearWall, 30 + k);    // mặt sau
+    line(b[0] - g, b[2] + 1.2, b[0] - g, b[3] - 1.2, 2.4, 1.45, pr, nearWall, 40 + k); // hai đầu hồi
+    line(b[1] + g, b[2] + 1.2, b[1] + g, b[3] - 1.2, 2.4, 1.45, pr, nearWall, 50 + k);
+  });
+  // hàng thưa ngoài hàng rào
+  const o = 1.6, outF = (x, z) => !onPath(x, z, 1.2) && !(Math.abs(x - gx) < 4 && z > F[3]) && hash(x, z, 60) < 0.55;
+  line(F[0] - o, F[2] - o, F[1] + o, F[2] - o, 4.2, 1.9, pairOf(1), outF, 61);
+  line(F[0] - o, F[3] + o, F[1] + o, F[3] + o, 4.2, 1.9, pairOf(3), outF, 62);
+  line(F[0] - o, F[2], F[0] - o, F[3], 4.2, 1.9, pairOf(0), outF, 63);
+  line(F[1] + o, F[2], F[1] + o, F[3], 4.2, 1.9, pairOf(2), outF, 64);
+  return {groups: [...out].map(([id, mats]) => ({id, mats})), spots};
+}

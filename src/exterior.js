@@ -8,7 +8,7 @@ import {makeDepthMat} from './foliage.js';
 import {makeFoliageDecals} from './decals.js';
 import {makeMeadow} from './meadow.js';
 import {hanaDepthMat} from './hana.js';
-import {HANA_CLS, kitSet, toKits, rockClumps, pathStones, grassTiles} from './hana-ext.js';
+import {HANA_CLS, kitSet, toKits, rockClumps, pathStones, grassTiles, bushLayout} from './hana-ext.js';
 import {WIND_FN, FU} from './foliage.js';
 import {TU} from './toon.js';
 
@@ -270,6 +270,7 @@ export function setupExterior(c) {
   const PS = HK ? pathStones(env, HK) : null;
   const inNoPlant = (x, z, m = 0) => MC.noPlant && MC.noPlant.some(b => x > b[0] - m && x < b[1] + m && z > b[2] - m && z < b[3] + m);
   const onPath = (x, z, m) => !!(PS && PS.near(x, z, m));
+  let bushDone = false;
   const treeH = set => { let h = 0; set.forEach(m => { const g = m.geometry; if (!g.boundingBox) g.computeBoundingBox(); h = Math.max(h, g.boundingBox.max.y); }); return Math.max(2, h); };
   // bán kính tán (ngang) của mẫu cây/bụi theo hộp bao thật của mọi phần (thân + tán) — dùng để bỏ cây/bụi có tán chạm vào tường nhà (lộ vào phòng, nhìn nhạt/xuyên tường)
   const canopyR = set => { let r = 0; set.forEach(m => { const g = m.geometry; if (!g.boundingBox) g.computeBoundingBox(); const bb = g.boundingBox; r = Math.max(r, Math.abs(bb.min.x), bb.max.x, Math.abs(bb.min.z), bb.max.z); }); return r; };
@@ -337,6 +338,9 @@ export function setupExterior(c) {
       const rc = rockClumps(HK, set, mats, (x, z, m) => onPath(x, z, (m || 0) + 0.25) || inNoPlant(x, z)); if (!rc) return;
       groups = rc.groups;
       rc.anchors.forEach(a => { if (a.r >= 0.3 && a.h >= 0.3) colliders.circles.push({x: a.x, z: a.z, r: a.r * 0.6, h: a.h}); });   // hòn chính đủ to: vật cản (thấp thì nhảy qua được)
+    } else if (cls === 'bush') {       // bụi: xếp hàng dọc hàng rào + chân tường nhà (bỏ vị trí rải ngẫu nhiên cũ)
+      if (bushDone) return; bushDone = true;
+      const bl = bushLayout(HK, MC, (x, z, m) => onPath(x, z, m)); if (!bl) return; groups = bl.groups; console.log('exterior: HANA bụi xếp hàng ' + bl.spots.length);
     } else if (cls === 'grass') groups = grassTiles(HK, set, mats, (x, z) => inNoPlant(x, z, 0.3));
     else groups = toKits(HK, cls, set, mats, cls === 'grass' || cls === 'flower' ? (x, z) => onPath(x, z, 0.12) : (cls === 'bush' ? (x, z) => onPath(x, z, 0.5) : null));
     if (!groups) return;
@@ -431,7 +435,7 @@ export function setupExterior(c) {
   const F = (MC.farDensity || 1) * (c.ultra ? 1.6 : 1);   // ultra: rải dày hơn ngoài hàng rào để không lộ thưa
   farN.tree = scatter('tree', Math.round(1100 * F), 2.2, 150, d => rnd() < 0.95 - d / 260);
   // cỏ/hoa/bụi/đá 3D ngoài hàng rào: chỉ dải sát hàng rào (xa hơn là thảm + decal cỏ)
-  farN.bush = scatter('bush', Math.round(110 * F), 1.8, 18, () => true);
+  farN.bush = HK ? 0 : scatter('bush', Math.round(110 * F), 1.8, 18, () => true);     // HANA: bụi đã xếp hàng (cả ngoài hàng rào) trong bushLayout
   farN.rock = scatter('rock', Math.round(24 * F), 3, 30, () => true);
   farN.grass = scatter('grass', Math.round((HK ? 650 : 1700) * F), 0.9, 15, d => rnd() < 1.0 - d / 22);     // HANA: mỗi bản thể là cả tấm cỏ 2×2 m
   farN.flower = scatter('flower', Math.round(300 * F), 0.9, 14, d => rnd() < 1.0 - d / 20);

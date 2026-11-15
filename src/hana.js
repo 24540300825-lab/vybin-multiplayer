@@ -89,11 +89,15 @@ export const HANA_CUT = `
 `;
 
 export const HANA_FRAG_PARS = `
-uniform vec3 uHRefL,uHRefS,uHFolShadow;uniform float uHSun,uHAmb,uHLift,uHSolidLift,uHDbg;uniform vec4 uHG;uniform vec3 uHTSh,uHTHi,uHGLift;uniform float uHTAmt;
+uniform vec3 uHRefL,uHRefS,uHFolShadow;uniform vec2 uHGBot;
+#ifdef HANA_DEC
+uniform float uHDecBase;
+#endif
+uniform float uHSun,uHAmb,uHLift,uHSolidLift,uHDbg;uniform vec4 uHG;uniform vec3 uHTSh,uHTHi,uHGLift;uniform float uHTAmt;
 uniform vec3 uHMidC,uHShadowC,uHLightC,uHHighC,uHRimC,uHHue;uniform float uHToneOff;
 uniform float uHThr,uHSoft,uHShape,uHShStr,uHHThr,uHHSoft,uHHStr,uHTexSh,uHTexHi,uHCap,uHK,uHWrap,uHTrans,uHRimI,uHRimW,uHRimS,uHRimAw;
 #ifdef HANA_FOL
-uniform vec2 uHGBot;uniform vec3 uHAccent,uHCavity;uniform float uHVolume,uHFlat,uHInterior,uHTipL,uHHGrad,uHLeafVar,uHJit,uHPaint,uHAOSh,uHAOCol,uHLayer,uHMedVar,uHColVar;
+uniform vec3 uHAccent,uHCavity;uniform float uHVolume,uHFlat,uHInterior,uHTipL,uHHGrad,uHLeafVar,uHJit,uHPaint,uHAOSh,uHAOCol,uHLayer,uHMedVar,uHColVar;
 varying vec3 vHVol;varying vec4 vHLeaf;varying vec2 vHUv;
 #else
 varying vec3 vHData;
@@ -178,9 +182,13 @@ export const HANA_COLOR = `
   vec3 hV = geometryViewDir, hN = geometryNormal; float hlit = 1.0; vec3 hc;
   #if defined( HANA_DEC )
    // decal xa: màu bake sẵn (= Blender lúc nắng) → cùng cách đổi vùng như cây cỏ 3D: nắng yếu (chiều tối / đêm) hoặc nằm trong bóng → về màu vùng tối của lá
+   vec3 hBk = diffuseColor.rgb;
+   if ( uHDecBase >= 0.0 ) {   // decal cỏ: gốc tối lên cao như cỏ 3D (uHGBot) + hạ tone như cỏ 3D → cùng 2 tông sáng / tối
+     float gh = clamp( ( vMapUv.y - uHDecBase ) / ( 1.0 - uHDecBase ), 0.0, 1.0 );
+     hBk = mix( mix( uHFolShadow, hBk * 0.55, 0.5 ), hBk * 0.9, smoothstep( 0.05, uHGBot.y + 0.1, gh ) ); }
    { float dl = clamp( sunK, 0.0, 1.0 );      // (không dùng bóng đổ: decal ở xa, tấm nghiêng → răng cưa bóng)
-     vec3 hS = mix( uHFolShadow, diffuseColor.rgb * 0.45, 0.45 );
-     hlit = smoothstep( 0.2, 0.85, dl ); hc = mix( hS, diffuseColor.rgb, hlit ); }
+     vec3 hS = mix( uHFolShadow, hBk * 0.45, 0.45 );
+     hlit = smoothstep( 0.2, 0.85, dl ); hc = mix( hS, hBk, hlit ); }
   #elif defined( HANA_FOL )
    vec3 hNg = hN;
    hN = normalize( mix( hNg, normalize( vHVol ), uHVolume ) );

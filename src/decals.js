@@ -35,7 +35,7 @@ export function patchDecal(sh, m) {
        float hs=fract(52.9829189*fract(dot(floor(gl_FragCoord.xy),vec2(0.06711056,0.00583715))));
        if(fz<=hs*0.98+0.01)discard;}
       ${tree ? '' : 'if(uFenK>0.5&&vWP.x>uFen.x&&vWP.x<uFen.y&&vWP.z>uFen.z&&vWP.z<uFen.w)discard;'}   // ULTRA: trong hàng rào đã có thảm cỏ thật (meadow.js)
-      ${H ? 'diffuseColor.rgb*=_da.rgb;' : tree ? `vec3 _lf=mix(uLeafA,uLeafB,smoothstep(0.18,0.95,_da.r))*vec3(0.93,1.0,1.09)*mix(0.82,1.06,_da.r);   // ngả teal như cỏ cây 3D; giữ sáng tối trong tán
+      ${H ? 'diffuseColor.rgb*=_da.rgb;' + (tree ? '' : '_da.a*=smoothstep(uHDecBase-0.02,uHDecBase+0.2,_uv.y);   // chân khóm cỏ tan dần vào nền (không lộ mép đáy tấm)') : tree ? `vec3 _lf=mix(uLeafA,uLeafB,smoothstep(0.18,0.95,_da.r))*vec3(0.93,1.0,1.09)*mix(0.82,1.06,_da.r);   // ngả teal như cỏ cây 3D; giữ sáng tối trong tán
       diffuseColor.rgb*=mix(_da.rgb,_lf,_mk);` : `// CỎ: màu lấy THẲNG từ texture thảm ngay dưới (đúng công thức cỏ 3D gần) → luôn tệp màu với thảm ở mọi góc nhìn; chỉ giữ chút sáng tối của cụm
       vec3 _gt=texture2D(uGMap,vec2(55.0+vWP.x*uGK,55.0-vWP.z*uGK)).rgb*uGTint;float _gl=dot(_gt,vec3(0.299,0.587,0.114));
       vec3 _gc=mix(_gt,mix(uGrassA,uGrassB,smoothstep(0.08,0.6,_gl))*uGTint,0.75);
@@ -68,7 +68,7 @@ export function makeFoliageDecals({scene, toonMat, trees = [], grass = [], bushe
     const mat = H ? new THREE.MeshStandardMaterial({map: tex(kind, true), alphaTest: 0.45, roughness: 1, metalness: 0})
       : new THREE.MeshStandardMaterial({map: tex(kind + '_a', true), normalMap: tex(kind + '_n'), alphaTest: 0.45, roughness: 1, metalness: 0});
     mat.name = 'VY_DECAL_' + kind; mat.userData.vyDec = base === 'bush' ? 'tree' : base; mat.userData.vyDecU = U[base]; mat.userData.desat = base === 'grass' ? 0.95 : 1;
-    if (H) { mat.userData.hanaDec = true; mat.userData.noSty = true; mat.userData.noAO = true; mat.userData.hana = {kind: 'decal', sil: false, dmap: false, dattr: false, U: {...HU, uHHue: {value: base === 'grass' ? HUE_SYNC.grass.clone() : new THREE.Vector3(0, 1, 1)}}}; }
+    if (H) { mat.userData.hanaDec = true; mat.userData.noSty = true; mat.userData.noAO = true; mat.userData.hana = {kind: 'decal', sil: false, dmap: false, dattr: false, U: {...HU, uHHue: {value: base === 'grass' ? HUE_SYNC.grass.clone() : new THREE.Vector3(0, 1, 1)}, uHDecBase: {value: base === 'grass' ? (M.base || 0) : -1}}}; }
     toonMat(mat);
     const im = new THREE.InstancedMesh(g, mat, list.length), m4 = new THREE.Matrix4(), c = new THREE.Color();
     list.forEach((p, i) => { m4.makeScale(p.s, p.s, p.s).setPosition(p.x, p.y, p.z); im.setMatrixAt(i, m4); c.setHSL(0, 0, 1).offsetHSL(p.hue || 0, 0, p.val || 0); im.setColorAt(i, c); });
