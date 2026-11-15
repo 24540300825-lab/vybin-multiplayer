@@ -1,6 +1,7 @@
 // Cấu hình "hình học/gameplay" riêng cho từng map — DỮ LIỆU THUẦN, không có logic.
 // Thêm map mới: thêm 1 khối vào đây (cùng id với MAP_LIST trong maps.js). Ý nghĩa các trường: xem docs/EXTENDING.md.
 import {houseLevel} from './house.js';
+import {rooftopSeason} from './season/calendar.js';
 export const MAP_CONFIGS = {
   // ===== 3 phòng trong nhà (đi vào từ vườn). Toạ độ phòng luôn x 0..10, z -8..0 (mặt cắt mở về phía camera +z) =====
   // ext: dùng lại map ngoài vườn quanh nhà — dx/dz dời ngoại cảnh cho khớp (phòng Vy/Bin nằm lệch ±10m so với phòng khách),
@@ -179,3 +180,36 @@ const EXTERIOR_L4 = {
     {node:'Path_L4_Station_Lake',label:'Ga Bờ hồ',id:'st_lake'},{node:'Path_L4_Station_Park',label:'Ga Khu vui chơi',id:'st_park'}],
 };
 if (houseLevel() >= 4) Object.assign(MAP_CONFIGS.exterior, EXTERIOR_L4);
+
+// ===== MÙA GIÁNG SINH (src/season/calendar.js → rooftop, chỉ nhà L2): sân thượng thành "tầng Nhà Giáng sinh" =====
+// Nhà gỗ ở giữa (to nhất) + ban công trước + 2 bãi trống hai bên (trái: photobooth, phải: cưỡi tuần lộc — làm sau, hiện ghim "Sắp có").
+// Vỏ ngoài + sàn thấy từ mọi map L2 = assets/season-christmas-house.glb (gốc 'exterior@L2-2'); Vườn kính + lounge sân thượng ẩn trong mùa.
+// 2 map: xmasdeck = sân thượng / ban công (sàn = y 0 · toạ độ = thế giới x+9.6, z−2.0) · xmasin = trong nhà, cắt mặt trước + mái (x+0.7, z+2.7).
+// Cầu thang xoắn của Phòng Game lên thẳng góc sau-trái trong nhà (cùng toạ độ thế giới 0.65, 7.32); cửa chính ra ban công.
+export const XMAS_MAPS = {
+  xmasdeck:{name:'Sân thượng Giáng sinh',room:[0.25,28.95,-12.4,0.0,4.0,true],triCol:true,flat:true,wallMats:[],treadNames:[],mezz:[],
+    walk0:[0.4,28.8,-12.25,-0.12],l1:[0,0,0,0],cl1:[0,0,0,0],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
+    ext:{dx:9.6,dy:-13.06,dz:-2.0,hideSeason:/XM_/},
+    // hiên + 2 bậc thềm (mesh Walk_XM_Porch): đi lên được, cao độ theo từng bậc
+    raise:[[12.9,16.3,-2.66,-2.33,0.15],[12.9,16.3,-2.96,-2.66,0.30],[12.76,16.44,-4.42,-2.96,0.45]],
+    doors:[{at:[14.6,1.6,-4.25],to:'xmasin',label:'Vào Nhà Giáng sinh'}],
+    spots:[{at:[4.43,1.1,-8.0],label:'Góc photobooth Giáng sinh',id:'xmas_photobooth'},{at:[24.78,1.1,-8.0],label:'Cưỡi tuần lộc',id:'xmas_reindeer'}],
+    spawnFrom:{xmasin:[14.6,-3.75,0,0],default:[14.6,-1.4,Math.PI,0]}},
+  xmasin:{name:'Nhà Giáng sinh',room:[0,11.4,-7.4,0.35,3.3],triCol:true,flat:true,wallMats:[],treadNames:[],mezz:[],hide:/^COL_/,
+    glass:{front:{x0:0.1,x1:11.3,z:0.33,y0:0,y1:3.3},top:{x0:0.1,x1:11.3,z0:-7.35,z1:0.33,y:3.3}},
+    walk0:[0.25,11.15,-7.15,0.22],l1:[0,0,0,0],cl1:[0,0,0,0],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
+    ext:{dx:0.7,dy:-13.51,dz:2.7,hideSeason:/^(XM_House|XM_Door|Walk_XM)/},
+    doors:[{at:[2.25,1.25,-4.62],to:'game',label:'Xuống Phòng Game'},{at:[5.7,1.25,0.05],to:'xmasdeck',label:'Ra ban công'}],
+    spots:[{node:'XM_In_Tree',label:'Trang trí cây thông',id:'xmas_tree'},{node:'XM_In_GiftBench',label:'Gói quà',id:'xmas_gifts'},
+      {node:'XM_In_Hearth',label:'Sưởi ấm bên lò sưởi',id:'xmas_fire'},{node:'XM_In_Easel',label:'Vẽ tranh',id:'xmas_paint'},
+      {node:'XM_In_CardDresser',label:'Viết thiệp',id:'xmas_cards'}],
+    spawnFrom:{game:[2.35,-4.62,Math.PI/2,0],xmasdeck:[5.7,-0.75,Math.PI,0],default:[5.7,-0.75,Math.PI,0]}},
+};
+if (rooftopSeason(houseLevel())) {
+  Object.assign(MAP_CONFIGS, XMAS_MAPS);
+  // cầu thang xoắn Phòng Game lên thẳng trong Nhà Giáng sinh (thay Vườn kính); Phòng Game / Xưởng / Phòng kỷ niệm ẩn phần tầng Giáng sinh che phòng mình
+  MAP_CONFIGS.game = {...MAP_CONFIGS.game, doors: MAP_CONFIGS.game.doors.map(d => d.to === 'greenhouse' ? {...d, to: 'xmasin', label: 'Lên Nhà Giáng sinh'} : d),
+    spawnFrom: {...MAP_CONFIGS.game.spawnFrom, xmasin: MAP_CONFIGS.game.spawnFrom.greenhouse}, ext: {...MAP_CONFIGS.game.ext, hideSeason: /XM_/}};
+  MAP_CONFIGS.workshop = {...MAP_CONFIGS.workshop, ext: {...MAP_CONFIGS.workshop.ext, hideSeason: /XM_/}};
+  MAP_CONFIGS.memory = {...MAP_CONFIGS.memory, ext: {...MAP_CONFIGS.memory.ext, hideSeason: /^XM_(PadR|Deck_Support)/}};
+}

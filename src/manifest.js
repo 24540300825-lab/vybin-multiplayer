@@ -119,5 +119,20 @@ export const FILES = {
   "file": "map-workshop.glb",
   "v": "e4c8d7c7",
   "size": 788700
+ },
+ "map-xmasdeck": {
+  "file": "map-xmasdeck.glb",
+  "v": "933f1c3f",
+  "size": 2211840
+ },
+ "map-xmasin": {
+  "file": "map-xmasin.glb",
+  "v": "ea87c6a2",
+  "size": 1730896
+ },
+ "season-christmas-house": {
+  "file": "season-christmas-house.glb",
+  "v": "e6e61036",
+  "size": 2207932
  }
 };

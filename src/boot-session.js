@@ -2,7 +2,7 @@
 // Dùng chung cho trang vỏ (shell.js — chạy 1 lần, giữ phiên suốt khi đổi map) và chế độ không vỏ (?noshell).
 // Trả về {sess, slot, mapId} hoặc null nếu đang dừng ở một màn chờ (đăng nhập / phòng đầy / lỗi).
 import {CONFIG} from './config.js';
-import {DEFAULT_MAP, isMap, mapOpen} from './maps.js';
+import {DEFAULT_MAP, isMap, mapOpen, mapReplacedBy} from './maps.js';
 
 const $ = id => document.getElementById(id);
 const mapFromUrl = () => (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap');
@@ -75,6 +75,7 @@ export async function connectStep({gate, hide, LB}) {
     if (!forced) saveChar(slot);
     mapId = mapFromUrl();
   }
+  if (isMap(mapId) && mapReplacedBy(mapId)) mapId = mapReplacedBy(mapId);   // mùa lễ: Vườn kính → Nhà Giáng sinh
   if (!mapOpen(mapId)) mapId = DEFAULT_MAP;
   return {sess, slot, mapId};
 }

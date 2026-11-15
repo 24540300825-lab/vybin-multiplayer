@@ -3,9 +3,13 @@
 //   assets/season-<id>.glb            đồ trang trí (xem docs/SEASONS.md: node gốc đặt tên theo map, vd 'exterior', 'living@L2')
 //   assets/frame-<id>-<tỉ lệ>.png      khung ảnh photobooth / chế độ chụp ảnh: tỉ lệ = 9x16 | 1x1 | full
 //   assets/costume-<vy|bin>-<id>.glb   trang phục (tủ đồ hiện những bộ thuộc mùa đang bật — khai báo ở COSTUMES)
+//   assets/season-<id>-<phần>.glb      đồ trang trí thêm (vd. season-christmas-house.glb = tầng Nhà Giáng sinh) — nạp cùng season-<id>.glb
 // Bản test: ?season=christmas (hoặc newyear / tet / off) trên URL, hoặc nút 🎄 trên thanh công cụ → ép mùa để thử.
 export const SEASONS = {
-  christmas: {name: 'Giáng sinh', icon: '🎄', weather: 'snow', ranges: [['12-01', '12-26']]},
+  christmas: {name: 'Giáng sinh', icon: '🎄', weather: 'snow', ranges: [['12-01', '12-26']],
+    // TẦNG NHÀ GIÁNG SINH trên sân thượng (chỉ nhà L2): thay Vườn kính + lounge sân thượng bằng nhà gỗ + ban công + 2 bãi trống.
+    // Hết mùa: các node này hiện lại, tầng Giáng sinh (season-christmas-house.glb, gốc 'exterior@L2-2') biến mất — map gốc không bị sửa.
+    rooftop: {level: 2, hide: /^(L2_Greenhouse|L2_Roof_Lounge|L2_Roof_Rail|L2_Roof_StairCap)/, replaces: {greenhouse: 'xmasin'}}},
   newyear: {name: 'Năm mới', icon: '🎆', ranges: [['12-27', '01-02']]},
   // Tết theo âm lịch → ghi theo từng năm: từ 23 tháng Chạp (ông Công ông Táo) tới mùng 7.
   tet: {name: 'Tết Nguyên Đán', icon: '🧧', dates: [['2027-01-30', '2027-02-12'], ['2028-01-19', '2028-02-01']]},
@@ -51,4 +55,10 @@ export function activeSeason(t = Date.now()) {
 }
 export function forceSeason(id) {      // null = theo lịch
   try { if (id) localStorage.setItem(KEY, id); else localStorage.removeItem(KEY); } catch (e) {}
+}
+
+// Tầng mùa lễ trên sân thượng đang bật ở cấp nhà này? → {season, level, hide, replaces} hoặc null
+export function rooftopSeason(level, t = Date.now()) {
+  const id = activeSeason(t), s = id && SEASONS[id];
+  return s && s.rooftop && s.rooftop.level === level ? {season: id, ...s.rooftop} : null;
 }

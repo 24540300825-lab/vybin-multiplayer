@@ -1,5 +1,7 @@
 import {$} from './shared.js';
 import {houseLevel} from './house.js';
+import {MAP_LIST, mapReplacedBy} from './maps.js';
+import {activeSeason} from './season/calendar.js';
 import {SFX} from './sfx.js';
 import {Lofi as Lofi0} from './lofi.js';
 import {createYTMusic} from './music-yt.js';
@@ -33,9 +35,12 @@ import {Fx} from './ui/fx.js';
     if(!confirm('Đổi nhân vật? Trang sẽ tải lại và hiện màn chọn Bin / Vy.'))return;try{localStorage.removeItem('vyChar')}catch(e){}const W=window.top||window,u=new URL(W.location.href);u.searchParams.delete('as');u.searchParams.delete('g');W.location.href=u.toString()}}
   {const MAPID=window.MAPID,MI={living:['home','Phòng khách','Phòng khách 2 tầng, cửa sang phòng Vy & Bin'],vy:['home','Phòng Vy','Studio của Vy (gác lửng)'],bin:['home','Phòng Bin','Studio của Bin (gác lửng)'],exterior:['building','Vườn ngoài nhà','Sân vườn quanh nhà, cổng & hàng rào'],
      game:['home','Phòng Game','Tầng 2 · arcade, bi lắc, cờ, sofa xem TV'],workshop:['home','Xưởng thủ công','Tầng 2 · chế tạo, vẽ tranh + hiên ăn ngoài trời'],memory:['home','Phòng kỷ niệm','Tầng 2 · tường ảnh, hộp thư, quỹ chung'],greenhouse:['home','Vườn kính','Sân thượng · trồng cây + góc nghe nhạc'],
-     karaoke:['home','Karaoke & phòng nhạc','Nhà vườn · sân khấu, màn hình, đàn'],spa:['home','Spa / onsen','Nhà vườn · bồn onsen, massage'],library:['home','Thư viện','Tháp · kệ sách, góc đọc, sân ngắm sao'],cinema:['home','Rạp phim','Tầng hầm · màn chiếu lớn, bắp nước'],master:['home','Phòng ngủ master','Tháp · giường đôi, ban công, bồn tắm'],pets:['home','Phòng thú cưng','Nhà vườn · ổ nằm, bát ăn, sân chơi'],cafe:['home','Café bên hồ','Nhà vườn · quầy, tủ bánh, hiên trên hồ'],bowling:['home','Hầm bowling & bể cá','Tầng hầm · 2 làn bowling, bể cá']};
-   const HL=houseLevel(),NEED={game:2,workshop:2,memory:2,greenhouse:2,karaoke:3,spa:3,library:3,cinema:3,master:4,pets:4,cafe:4,bowling:4};
-   $('mpList').innerHTML=Object.keys(MI).map(k=>{const lk=(NEED[k]||1)>HL;return `<div class="mapc${k===MAPID?' cur':''}${lk?' lock':''}" data-m="${k}"${lk?' style="opacity:.5"':''}><span class="ic">${ic(MI[k][0])}</span><div><b>${MI[k][1]}${k===MAPID?' · đang ở':''}${lk?' · 🔒 cần nhà L'+NEED[k]:''}</b><small>${MI[k][2]}</small></div></div>`}).join('');
+     karaoke:['home','Karaoke & phòng nhạc','Nhà vườn · sân khấu, màn hình, đàn'],spa:['home','Spa / onsen','Nhà vườn · bồn onsen, massage'],library:['home','Thư viện','Tháp · kệ sách, góc đọc, sân ngắm sao'],cinema:['home','Rạp phim','Tầng hầm · màn chiếu lớn, bắp nước'],master:['home','Phòng ngủ master','Tháp · giường đôi, ban công, bồn tắm'],pets:['home','Phòng thú cưng','Nhà vườn · ổ nằm, bát ăn, sân chơi'],cafe:['home','Café bên hồ','Nhà vườn · quầy, tủ bánh, hiên trên hồ'],bowling:['home','Hầm bowling & bể cá','Tầng hầm · 2 làn bowling, bể cá'],
+     xmasin:['home','Nhà Giáng sinh','Sân thượng · lò sưởi, cây thông, bàn gói quà'],xmasdeck:['building','Sân thượng Giáng sinh','Ban công · góc photobooth, bãi tuần lộc']};
+   const HL=houseLevel(),NEED={game:2,workshop:2,memory:2,greenhouse:2,karaoke:3,spa:3,library:3,cinema:3,master:4,pets:4,cafe:4,bowling:4,xmasin:2,xmasdeck:2};
+   // mùa lễ: map theo mùa chỉ hiện khi mùa bật (và đúng cấp nhà); map bị thay (Vườn kính → Nhà Giáng sinh) ẩn khỏi danh sách
+   const vis=k=>{const M=MAP_LIST[k];if(!M)return true;if(M.season&&activeSeason()!==M.season)return false;if(M.maxHouse&&HL>M.maxHouse)return false;return !mapReplacedBy(k)};
+   $('mpList').innerHTML=Object.keys(MI).filter(vis).map(k=>{const lk=(NEED[k]||1)>HL;return `<div class="mapc${k===MAPID?' cur':''}${lk?' lock':''}" data-m="${k}"${lk?' style="opacity:.5"':''}><span class="ic">${ic(MI[k][0])}</span><div><b>${MI[k][1]}${k===MAPID?' · đang ở':''}${lk?' · 🔒 cần nhà L'+NEED[k]:''}</b><small>${MI[k][2]}</small></div></div>`}).join('');
    $('iMap').onclick=()=>$('hMap').classList.add('on');$('mX').onclick=()=>$('hMap').classList.remove('on');$('hMap').onclick=e=>{if(e.target.id==='hMap')$('hMap').classList.remove('on')};
    $('mpList').onclick=e=>{const c=e.target.closest('.mapc');if(!c||c.classList.contains('cur'))return;const m=c.dataset.m;$('hMap').classList.remove('on');window.__switchMap&&window.__switchMap(m)}
    $('mpList').onmouseover=e=>{const c=e.target.closest('.mapc');if(c&&window.__prefetchMap)window.__prefetchMap(c.dataset.m)}}

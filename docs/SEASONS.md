@@ -105,3 +105,25 @@ Mùa khác thì đổi `tet` thành `christmas` hoặc `newyear`. Thiếu tỉ l
 - Tới giờ mà mới có một người: trong vòng 60 phút sau, lúc người kia vào sẽ đếm ngược rồi bắn.
 - Giờ bắn ghi ở `FIREWORKS` trong `src/season/calendar.js`. Hiện để tạm 0h ngày 01/01/2027 và 0h giao thừa (06/02/2027) — **chờ bạn chốt giờ**.
 - Bản test có nút 🎆 "Thử pháo hoa": đếm ngược rồi bắn 1 phút, cả hai cùng thấy.
+
+---
+
+## 5. Tầng Nhà Giáng sinh trên sân thượng (chỉ nhà L2)
+
+Trong mùa Giáng sinh, nhà **L2** đổi sân thượng thành một tầng mới: nhà gỗ ở giữa, ban công phía trước, **bãi trái** (dành cho photobooth) và **bãi phải** (dành cho cưỡi tuần lộc). Hai bãi hiện chỉ có sàn, lan can và ghim "Sắp có" để launch sau. Nhà L3, L4 giữ nguyên, không đổi gì.
+
+- **Bật/tắt:** cấu hình `rooftop` của mùa `christmas` trong `src/season/calendar.js`.
+  - Trong mùa: ẩn Vườn kính, lounge, lan can và nắp cầu thang của sân thượng cũ; map Vườn kính được thay bằng Nhà Giáng sinh.
+  - Hết mùa: mọi thứ trở lại như cũ. Không file map gốc nào bị sửa.
+- **File:**
+  - `assets/season-christmas-house.glb`: vỏ ngoài và sàn mà mọi map L2 đều thấy. Node gốc là `exterior@L2-2` (`@L2-2` = chỉ hiện ở nhà L2).
+  - `assets/map-xmasdeck.glb`: map ban công / sân thượng.
+  - `assets/map-xmasin.glb`: map trong nhà, cắt mặt trước và mái giống phòng khách.
+- **Lối đi:**
+  - Cầu thang xoắn của Phòng Game lên thẳng góc sau-trái trong nhà.
+  - Cửa chính đi ra ban công; hiên và 2 bậc thềm đi lên được (`MC.raise`).
+- **Dựng lại:** sửa số trong `tools/xmas/xm_*.py` → `python3 tools/xmas/build_all.py /tmp/xo` → `quantize_normals.py` + `optimize_anim.py` cho 3 file → `build_manifest.py`.
+- **Đồ của bạn cho 2 bãi trống:**
+  - Đặt trong `season-christmas.glb`, dưới node gốc `xmasdeck`.
+  - Toạ độ map ban công: x = X_thế giới + 9.6, z = −Y_thế giới − 2.0, sàn y = 0.
+  - Bãi photobooth: x 0.3..8.3, z −12.3..−4.5. Bãi tuần lộc: x 20.7..28.9, cùng khoảng z.

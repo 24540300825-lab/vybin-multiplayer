@@ -20,12 +20,24 @@ export const MAP_LIST = {
   pets:       {name: 'Phòng thú cưng', icon: '🐾', desc: 'Nhà vườn cạnh đồi hoa: ổ nằm, bát ăn, bồn tắm thú, sân chơi có rào', assets: ['map-pets', 'map-exterior'], minHouse: 4},
   cafe:       {name: 'Café bên hồ', icon: '☕', desc: 'Sau khu BBQ: quầy, tủ bánh, lò nướng, hiên gỗ nhô ra mặt hồ', assets: ['map-cafe', 'map-exterior'], minHouse: 4},
   bowling:    {name: 'Hầm bowling & bể cá', icon: '🎳', desc: 'Tầng hầm dưới cánh Vy, cửa thông Rạp phim: 2 làn bowling, bể cá lớn, quầy nước', assets: ['map-bowling'], minHouse: 4},
+  // ===== mùa Giáng sinh, nhà L2: tầng Nhà Giáng sinh thay Vườn kính trên sân thượng (src/season/calendar.js → rooftop) =====
+  xmasin:     {name: 'Nhà Giáng sinh', icon: '🎄', desc: 'Sân thượng · lò sưởi, cây thông, bàn gói quà', assets: ['map-xmasin', 'map-exterior'], minHouse: 2, maxHouse: 2, season: 'christmas'},
+  xmasdeck:   {name: 'Sân thượng Giáng sinh', icon: '❄️', desc: 'Ban công quanh Nhà Giáng sinh · góc photobooth, bãi tuần lộc', assets: ['map-xmasdeck', 'map-exterior'], minHouse: 2, maxHouse: 2, season: 'christmas'},
 };
 export const DEFAULT_MAP = 'living';
 export const isMap = id => Object.prototype.hasOwnProperty.call(MAP_LIST, id);
 // nhà đã đủ cấp để vào map này chưa (map tầng trên cần nhà L2)
 import {houseLevel} from './house.js';
-export const mapOpen = id => isMap(id) && (MAP_LIST[id].minHouse || 1) <= houseLevel();
+import {activeSeason, rooftopSeason} from './season/calendar.js';
+// map theo mùa (season) chỉ mở khi mùa đó bật; map bị tầng mùa lễ thay thế (vd. Vườn kính trong mùa Giáng sinh ở nhà L2) tạm đóng
+export const mapReplacedBy = id => { const r = rooftopSeason(houseLevel()); return (r && r.replaces && r.replaces[id]) || null; };
+export const mapOpen = id => {
+  if (!isMap(id)) return false;
+  const m = MAP_LIST[id], lv = houseLevel();
+  if ((m.minHouse || 1) > lv || (m.maxHouse && lv > m.maxHouse)) return false;
+  if (m.season && activeSeason() !== m.season) return false;
+  return !mapReplacedBy(id);
+};
 // asset thật sự cần nạp cho map (nhà ≥ L2: nạp thêm phần tầng trên)
 // nhà ≥ L2: ngoại cảnh (vườn + vỏ nhà) đổi sang map-exterior-l2 = map-exterior bản chính, chỉ thay phần nhà bằng nhà L2
 export const extAsset = () => (houseLevel() >= 4 ? 'map-exterior-l4' : houseLevel() >= 3 ? 'map-exterior-l3' : houseLevel() >= 2 ? 'map-exterior-l2' : 'map-exterior');

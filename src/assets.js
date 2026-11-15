@@ -31,6 +31,8 @@ def('map-karaoke', {owner: 'karaoke', priority: 1});
 def('map-spa', {owner: 'spa', priority: 1});
 def('map-library', {owner: 'library', priority: 1});
 def('map-cinema', {owner: 'cinema', priority: 1});
+if (FILES['map-xmasin']) def('map-xmasin', {owner: 'xmasin', priority: 1});       // mùa Giáng sinh, nhà L2: trong Nhà Giáng sinh (tầng sân thượng)
+if (FILES['map-xmasdeck']) def('map-xmasdeck', {owner: 'xmasdeck', priority: 1}); // mùa Giáng sinh, nhà L2: ban công / sân thượng quanh nhà
 def('char-vy', {owner: null, priority: 2});
 def('char-bin', {owner: null, priority: 2});
 def('flora-hana', {owner: null, priority: 2});

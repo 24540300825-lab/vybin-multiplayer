@@ -2,7 +2,7 @@
 import {APP_VERSION} from './version.js';
 import {CONFIG} from './config.js';
 import * as Assets from './assets.js';
-import {MAP_LIST, DEFAULT_MAP, isMap, mapOpen, mapAssets, extAsset, goToMap, prefetchMap} from './maps.js';
+import {MAP_LIST, DEFAULT_MAP, isMap, mapOpen, mapAssets, extAsset, goToMap, prefetchMap, mapReplacedBy} from './maps.js';
 import {FILES} from './manifest.js';
 import {SFX} from './sfx.js';
 import {MAP_CONFIGS} from './map-configs.js';
@@ -29,7 +29,7 @@ async function boot() {
   // KHỞI ĐỘNG SỚM, SONG SONG với bước chọn nhân vật / kết nối phòng: đoán map + nhân vật (hash/localStorage) rồi tải & parse ngay GLB (engine JS đã được modulepreload trong index.html).
   // Đoán đúng (gần như luôn đúng ở lần vào sau) → tới bước 2 mọi thứ đã sẵn; đoán sai chỉ tốn một ít băng thông (asset có cache bền).
   {
-    let gm = (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap'); if (!mapOpen(gm)) gm = DEFAULT_MAP;
+    let gm = (location.hash.match(/map=(\w+)/) || [])[1] || localStorage.getItem('vyMap'); if (isMap(gm) && mapReplacedBy(gm)) gm = mapReplacedBy(gm); if (!mapOpen(gm)) gm = DEFAULT_MAP;
     const gc = (CONFIG.as === 'bin' || CONFIG.as === 'vy') ? CONFIG.as : (localStorage.getItem('vyChar') || '');
     const pre = [gm]; for (const id of pre) mapAssets(id).forEach(a => Assets.load(a).catch(() => {}));
     if (gc === 'bin' || gc === 'vy') Assets.load('char-' + gc).catch(() => {});
@@ -45,7 +45,7 @@ async function boot() {
   // ?as=bin|vy ép nhân vật (dùng khi test), không lưu.
   if (SH) {
     sess = SH.sess; slot = SH.slot;
-    mapId = (location.hash.match(/map=(\w+)/) || [])[1] || SH.mapId; if (!mapOpen(mapId)) mapId = DEFAULT_MAP;
+    mapId = (location.hash.match(/map=(\w+)/) || [])[1] || SH.mapId; if (isMap(mapId) && mapReplacedBy(mapId)) mapId = mapReplacedBy(mapId); if (!mapOpen(mapId)) mapId = DEFAULT_MAP;
   } else {
     const {connectStep} = await import('./boot-session.js');
     const r = await connectStep({gate, hide, LB}); if (!r) return;
@@ -57,10 +57,13 @@ async function boot() {
   // ---------- 2) nạp song song: engine (JS) + asset map + nhân vật của mình ----------
   LB(10, 'Đang tải bản đồ & nhân vật ' + slot.toUpperCase() + '...');
   const enginePromise = import('./game.js');   // KHÔNG import sớm: hud.js/game.js đọc LOCAL_SLOT/MAPID lúc nạp module (file đã được modulepreload nên vẫn nhanh)
-  const {activeSeason} = await import('./season/calendar.js');
+  const {activeSeason, rooftopSeason} = await import('./season/calendar.js');
+  const {houseLevel} = await import('./house.js');
   const SEASON = activeSeason(), seasonAsset = SEASON && Assets.hasAsset('season-' + SEASON) ? 'season-' + SEASON : null;   // mùa lễ: đồ trang trí (nếu đã có file)
+  // phần đồ thêm season-<mùa>-<phần>.glb (vd. -house = tầng Nhà Giáng sinh trên sân thượng: chỉ nạp khi tầng đó bật ở cấp nhà hiện tại)
+  const seasonParts = SEASON ? Object.keys(FILES).filter(k => k.startsWith('season-' + SEASON + '-') && Assets.hasAsset(k) && (!/-house$/.test(k) || rooftopSeason(houseLevel()))) : [];
   window.__season = SEASON;
-  const ids = [...mapAssets(mapId), 'char-' + slot, ...(seasonAsset ? [seasonAsset] : []), ...(Assets.hasAsset('flora-hana') && !/[?&]nohana\b/.test(location.search) ? ['flora-hana', ...(Assets.hasAsset('ground-hana') ? ['ground-hana'] : [])] : [])];
+  const ids = [...mapAssets(mapId), 'char-' + slot, ...(seasonAsset ? [seasonAsset] : []), ...seasonParts, ...(Assets.hasAsset('flora-hana') && !/[?&]nohana\b/.test(location.search) ? ['flora-hana', ...(Assets.hasAsset('ground-hana') ? ['ground-hana'] : [])] : [])];
   const files = await Assets.loadGroup(ids, p => LB(10 + p * 60));
   const eng = await enginePromise;
   // cây cỏ HANA: dựng hình học lá + vật liệu một lần (src/hana.js) — lỗi thì giữ cây cỏ cũ
@@ -69,7 +72,7 @@ async function boot() {
   LB(75, 'Dựng cảnh...');
   await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
   const EXT = extAsset(), mapKey = mapId === 'exterior' ? EXT : 'map-' + mapId;
-  eng.init({env: files[mapKey], ext: mapId !== 'exterior' ? files[EXT] || null : null, houseL2: EXT !== 'map-exterior', houseLv: EXT === 'map-exterior-l4' ? 4 : EXT === 'map-exterior-l3' ? 3 : EXT === 'map-exterior-l2' ? 2 : 1, localGlb: files['char-' + slot], localSlot: slot, mapId, hana: hanaKit, season: SEASON ? {id: SEASON, glb: seasonAsset ? files[seasonAsset] : null} : null});
+  eng.init({env: files[mapKey], ext: mapId !== 'exterior' ? files[EXT] || null : null, houseL2: EXT !== 'map-exterior', houseLv: EXT === 'map-exterior-l4' ? 4 : EXT === 'map-exterior-l3' ? 3 : EXT === 'map-exterior-l2' ? 2 : 1, localGlb: files['char-' + slot], localSlot: slot, mapId, hana: hanaKit, season: SEASON ? {id: SEASON, glb: seasonAsset ? files[seasonAsset] : null, glbs: [seasonAsset, ...seasonParts].filter(Boolean).map(k => files[k]).filter(Boolean), rooftop: rooftopSeason(houseLevel())} : null});
   const api = eng.api;
   LB(88, 'Biên dịch shader...');
   let warmed = false; try { warmed = localStorage.getItem('vyWarm') === mapId; } catch (e) {}   // lần sau: trình duyệt đã cache shader → chờ ngắn hơn
@@ -80,8 +83,9 @@ async function boot() {
   // ---------- 3) chuyển map (có fade + loading; ĐỘC LẬP từng người, không kéo người kia theo) ----------
   window.__prefetchMap = prefetchMap;
   window.__switchMap = async m => {
+    if (isMap(m) && mapReplacedBy(m)) m = mapReplacedBy(m);   // mùa lễ: Vườn kính → Nhà Giáng sinh
     if (!isMap(m) || m === mapId) return;
-    if (!mapOpen(m)) { try { window.__vyToast && window.__vyToast('🏡 Cần nâng nhà lên L' + (MAP_LIST[m].minHouse || 2) + ' để mở ' + MAP_LIST[m].name); } catch (e) {} return; }
+    if (!mapOpen(m)) { const M = MAP_LIST[m], lv = houseLevel(); try { window.__vyToast && window.__vyToast(M.season && activeSeason() !== M.season ? '🎄 ' + M.name + ' chỉ mở trong mùa lễ' : M.maxHouse && lv > M.maxHouse ? '🎄 ' + M.name + ' chỉ có ở nhà L' + M.maxHouse : '🏡 Cần nâng nhà lên L' + (M.minHouse || 2) + ' để mở ' + M.name); } catch (e) {} return; }
     prefetchMap(m);
     goToMap(m);        // chỉ mình đổi map; người kia ở lại map của họ
   };

@@ -4,8 +4,10 @@ import {HOUSE_RULES, houseLevel, setHouseLevel} from '../house.js';
 
 // tải lại map đang đứng (có trang vỏ: chỉ nạp lại khung game → cuộc gọi / nhạc / chat không đứt). Map tầng trên bị khoá khi hạ cấp → về phòng khách.
 const reloadMap = (id) => {
-  const NEED = {game: 2, workshop: 2, memory: 2, greenhouse: 2, karaoke: 3, spa: 3, library: 3, cinema: 3};
+  const NEED = {game: 2, workshop: 2, memory: 2, greenhouse: 2, karaoke: 3, spa: 3, library: 3, cinema: 3, master: 4, pets: 4, cafe: 4, bowling: 4};
   if ((NEED[id] || 1) > houseLevel()) id = 'living';
+  if (/^xmas/.test(id) && houseLevel() !== 2) id = 'game';     // tầng Nhà Giáng sinh chỉ có ở nhà L2 → về Phòng Game (L3/L4 vẫn có) hoặc phòng khách
+  if (id === 'game' && houseLevel() < 2) id = 'living';
   try { sessionStorage.setItem('vyFrom', ''); localStorage.setItem('vyMap', id); } catch (e) {}
   let sh = null; try { sh = window.parent && window.parent !== window ? window.parent.VYSHELL : null; } catch (e) {}
   if (sh && sh.go) { sh.go(id); return; }
