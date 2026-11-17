@@ -5,7 +5,7 @@ Game không dùng HDR trực tiếp: mỗi map được chuyển sẵn thành �
 
 ## Ảnh
 
-`assets/sky/asv5/<giờ>_<kiểu>.jpg` — equirect 2048×576, từ đỉnh trời (90°) xuống **-12° dưới chân trời**
+`assets/sky/asv5/<giờ>_<kiểu>.jpg` — equirect 3072×864 (JPEG q90, màu 4:4:4), từ đỉnh trời (90°) xuống **-12° dưới chân trời**
 (mây ASV5 kéo dài xuống dưới chân trời nên không bị cắt cụt sau đồi/rặng cây).
 
 - `<giờ>`: `dawn`, `sunrise`, `morning`, `noon`, `afternoon`, `sunset`, `blue` (blue hour), `night`
@@ -21,12 +21,14 @@ trong shader, và `su` là vị trí ngang của vầng sáng, dùng để xoay 
 |---|---|
 | `times` | lịch giờ game → bộ trời. Giữa 2 mốc thì hoà mượt (smoothstep); 2 mốc trùng tên thì giữ nguyên ảnh |
 | `wx` | thời tiết game → kiểu ảnh (`clear`→`01`…). Đổi thời tiết = nạp bộ mới vào "khe" đang ẩn rồi hoà sang trong `wxT` giây, không nhảy ảnh |
-| `look` | `[giờ, tương phản, bão hoà, phơi sáng]` của riêng ảnh trời, nội suy theo giờ (giờ vàng: mây đậm hơn; đêm: sáng hơn cho khớp mood cũ) |
+| `look` | `[giờ, tương phản, bão hoà, phơi sáng, gk, độ rực mặt trời, màu ám trời, màu nắng]`, nội suy mượt theo giờ. Bình minh ám hồng đào, giờ vàng ám hổ phách, đêm sáng hơn cho khớp mood cũ. `gk` = mức kéo màu ảnh về dải màu theo giờ của game |
+| `rep` | số lần lặp ảnh quanh vòng trời (2 = mây nhỏ bằng nửa, dày hơn, nét hơn) |
 | `haze` | độ mờ đục về màu không khí theo thời tiết (sương, tuyết, mưa dày) |
 | `wexp`, `dim` | làm tối trời khi mưa/giông |
 
 Uniform shader:
 - `uGK`: mức kéo màu ảnh về dải màu grading theo giờ/thời tiết (giữ mood của nhánh).
+- Mặt trời điện ảnh: lõi sáng >1 (để bloom), quầng gần, dải nắng ấm sát chân trời khi mặt trời thấp. Mây phía mặt trời được rọi ấm. Độ mạnh lấy theo `look`.
 - `uVG`: nén độ cao về phía chân trời (pow), để phần mây đẹp ở giữa HDRI nằm ngay tầm mắt người chơi thay vì trên đỉnh đầu.
 
 Hướng xoay chạy liên tục cả 24h: ban ngày bám hướng mặt trời, ban đêm quay tiếp về hướng bình minh,
@@ -34,5 +36,5 @@ nên mây không giật lúc chuyển ngày/đêm.
 
 ## Thêm hoặc đổi map
 
-1. `GAM=0.75 python3 tools/sky_asv5.py <thư mục .hdr> <thư mục ra>`: cắt 90°…-12°, 2048×576, xoá đĩa mặt trời/trăng, ghi meta.json (GAM phải bằng `uVG`).
+1. `W=3072 GAM=0.62 python3 tools/sky_asv5.py <thư mục .hdr> <thư mục ra>`: cắt 90°…-12°, rộng W, xoá đĩa mặt trời/trăng, ghi meta.json (GAM phải bằng `uVG`).
 2. Chép JPG vào `assets/sky/asv5/`, thêm meta vào `SKYM`, rồi tăng `SKYCFG.ver` để trình duyệt nạp lại ảnh.
