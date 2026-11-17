@@ -38,3 +38,16 @@ nên mây không giật lúc chuyển ngày/đêm.
 
 1. `W=3072 GAM=0.62 python3 tools/sky_asv5.py <thư mục .hdr> <thư mục ra>`: cắt 90°…-12°, rộng W, xoá đĩa mặt trời/trăng, ghi meta.json (GAM phải bằng `uVG`).
 2. Chép JPG vào `assets/sky/asv5/`, thêm meta vào `SKYM`, rồi tăng `SKYCFG.ver` để trình duyệt nạp lại ảnh.
+
+## Bình minh và giờ vàng điện ảnh (grade toàn cảnh)
+
+Khối `BÌNH MINH + GIỜ VÀNG ĐIỆN ẢNH` trong `envApply` (src/game.js) bật dần theo giờ và giảm theo mây:
+bình minh 5:12 → 6:18 → 7:54, giờ vàng 16:00 → 18:09 → 19:45. Trời càng nhiều mây thì hiệu ứng càng yếu, mưa hoặc u ám thì tắt.
+
+- Nắng gắt hơn, trời và ánh sáng môi trường yếu đi → tương phản sáng/tối rõ. Vùng khuất nắng ngả hồng đào thay vì tím xám.
+- Grade: tăng tương phản, ám hổ phách, bóng tím ấm, vignette. LUT `uGold` trong Grade pass kéo lá xanh ngả vàng lục,
+  có vai sáng mềm để trời quanh mặt trời không cháy trắng.
+- Bloom mạnh hơn, ngưỡng thấp hơn trong khung giờ này.
+- Áp sau khi HANA đã lấy grade gốc (`HU.uHG`), nên cây cỏ HANA cũng nhận đúng grade này.
+
+Thông số `G` (dawn, dusk, con, sat, temp, vig, expo, tint, hi, sh, bloom, th, sun, amb, lut, ambC, ambMix) nằm ngay trong khối đó.
