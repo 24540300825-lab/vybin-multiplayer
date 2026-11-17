@@ -1215,12 +1215,12 @@ ${FRAG_COLOR}
   const skyU={cTop:{value:new THREE.Color(SKY.top)},cMid:{value:new THREE.Color(SKY.mid)},cPink:{value:new THREE.Color(SKY.pink)},cHor:{value:new THREE.Color(SKY.hor)},
     cCl:{value:new THREE.Color('#ffffff')},cClSh:{value:new THREE.Color('#e8d8e8')},cth:{value:0.58},uStar:{value:0},uSunV:{value:1},uOut:{value:OUTD?1:0},
     sunDir:{value:new THREE.Vector3(0.55,0.5,0.65).normalize()},moonDir:{value:new THREE.Vector3(-0.5,0.4,-0.3).normalize()},uT:{value:0},
-    tA:{value:null},tB:{value:null},tC:{value:null},uMix:{value:0},uW:{value:0},uRA:{value:0},uRB:{value:0},uRC:{value:0},uTexK:{value:0},uGK:{value:0.62},
+    tA:{value:null},tB:{value:null},tC:{value:null},tD:{value:null},uMix:{value:0},uW:{value:0},uRA:{value:0},uRB:{value:0},uRC:{value:0},uRD:{value:0},uTexK:{value:0},uGK:{value:0.62},uVG:{value:0.75},uVS0:{value:-3},uVLo:{value:-12},uVSpan:{value:102},uHaze:{value:0},uTC:{value:1},uTS:{value:1},uTE:{value:1},
     rH:{value:new THREE.Vector3(.5,.5,.5)},rM:{value:new THREE.Vector3(.5,.5,.5)},rZ:{value:new THREE.Vector3(.5,.5,.5)},uSkyDim:{value:1}};
   const sky=new THREE.Mesh(new THREE.SphereGeometry(1,32,16),new THREE.ShaderMaterial({uniforms:skyU,side:THREE.BackSide,depthWrite:false,depthTest:false,fog:false,toneMapped:false,
     vertexShader:'varying vec3 vD;void main(){vD=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
     fragmentShader:`varying vec3 vD;uniform vec3 cTop,cMid,cPink,cHor,cCl,cClSh,sunDir,moonDir;uniform float uT,cth,uStar,uSunV,uOut;
-    uniform sampler2D tA,tB,tC;uniform float uMix,uW,uRA,uRB,uRC,uTexK,uGK,uSkyDim;uniform vec3 rH,rM,rZ;
+    uniform sampler2D tA,tB,tC,tD;uniform float uMix,uW,uRA,uRB,uRC,uRD,uTexK,uGK,uSkyDim,uVG,uVS0,uVLo,uVSpan,uHaze,uTC,uTS,uTE;uniform vec3 rH,rM,rZ;
     float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
     float h31(vec3 p){p=fract(p*0.3183099+vec3(.1,.2,.3));p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
     float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
@@ -1229,14 +1229,18 @@ ${FRAG_COLOR}
       vec3 c=cHor;c=mix(c,cPink,smoothstep(0.02,0.06,t));c=mix(c,cMid,smoothstep(0.1,0.16,t));c=mix(c,cTop,smoothstep(0.3,0.38,t));
       if(h<0.0)c=cHor;
       float up=step(0.0,h);
-      // ẢNH BẦU TRỜI stylized (bán cầu trên, equirect): 2 ảnh theo giờ (chuyển mượt) + 1 ảnh thời tiết (mây u ám).
-      // Xoay ngang để vầng mặt trời vẽ sẵn trùng hướng mặt trời thật; rồi kéo màu một phần về dải màu grading hiện tại (giữ mood theo giờ/thời tiết)
-      if(uTexK>0.001){float hh=max(h,0.0015);float vv=asin(clamp(hh,0.0,1.0))*0.63662;float uu=atan(d.z,d.x)*0.159155+0.5;
-        vec3 ta=texture2D(tA,vec2(fract(uu+uRA),vv)).rgb,tb=texture2D(tB,vec2(fract(uu+uRB),vv)).rgb,tc=texture2D(tC,vec2(fract(uu+uRC),vv)).rgb;
-        vec3 tx=mix(mix(ta,tb,uMix),tc,uW);
+      // ẢNH BẦU TRỜI anime ASV5 (equirect, từ đỉnh xuống uVLo° dưới chân trời): 2 ảnh theo giờ × 2 bộ thời tiết (đổi thời tiết = hoà dần bộ này sang bộ kia).
+      // Độ cao được nén về phía chân trời (pow uVG): phần mây/trời đẹp ở giữa ảnh nằm ngay tầm mắt người chơi thay vì trên đỉnh đầu.
+      // Xoay ngang để vầng sáng vẽ sẵn trùng hướng mặt trời thật; rồi kéo màu một phần về dải màu grading theo giờ/thời tiết (giữ mood).
+      if(uTexK>0.001){float hh=max(h,0.0015);float ex=asin(clamp(h,-1.0,1.0))*0.63662;
+        float sdg=ex>0.0?uVS0+(90.0-uVS0)*pow(ex,uVG):uVS0+ex*90.0;float vv=clamp((sdg-uVLo)/uVSpan,0.002,0.998);float uu=atan(d.z,d.x)*0.159155+0.5;
+        vec3 ta=texture2D(tA,vec2(fract(uu+uRA),vv)).rgb,tb=texture2D(tB,vec2(fract(uu+uRB),vv)).rgb,tc=texture2D(tC,vec2(fract(uu+uRC),vv)).rgb,td=texture2D(tD,vec2(fract(uu+uRD),vv)).rgb;
+        vec3 tx=mix(mix(ta,tb,uMix),mix(tc,td,uMix),uW);
         vec3 ref=mix(mix(rH,rM,smoothstep(0.03,0.22,hh)),rZ,smoothstep(0.3,0.65,hh));
+        {float rl=dot(ref,vec3(0.2126,0.7152,0.0722)),tl=dot(tx,vec3(0.2126,0.7152,0.0722));tx=max(mix(vec3(tl),tx,uTS),0.0);tx=max(rl+(tx-rl)*uTC,0.0)*uTE;}   // độ tương phản/bão hoà riêng của ảnh theo giờ (giờ vàng: mây đậm hơn)
         vec3 rat=clamp(c/max(ref,vec3(0.02)),vec3(0.35),vec3(2.6));
         vec3 g=tx*pow(rat,vec3(uGK))*uSkyDim;
+        g=mix(g,c*uSkyDim,uHaze*(1.0-0.45*smoothstep(0.05,0.55,hh)));   // sương/tuyết/mưa dày: trời mờ đục về màu không khí, mạnh ở gần chân trời
         g=mix(g,c,smoothstep(0.0,-0.03,h));          // dưới chân trời: về màu chân trời (khớp sương / mặt đất)
         c=mix(c,g,uTexK);}
       // sao
@@ -1309,30 +1313,42 @@ ${FRAG_COLOR}
       #include <colorspace_fragment>
     }`}));
   sky.renderOrder=-1000;sky.frustumCulled=false;sky.scale.setScalar(700);scene.add(sky);scene.background=null;
-  // ===== ẢNH BẦU TRỜI theo giờ =====  (assets/sky/sky_XX.jpg: bán cầu trên 2048×512; meta: màu trung bình chân trời/giữa/đỉnh + vị trí ngang vầng mặt trời)
-  const SKYM={"03":{"h":[0.4955,0.4618,0.1879],"m":[0.2928,0.2589,0.1925],"z":[0.2902,0.1597,0.1125],"su":0.1763},"123":{"h":[0.3463,0.4113,0.4655],"m":[0.2492,0.3238,0.5314],"z":[0.5633,0.4214,0.4679],"su":0.9985},"12":{"h":[0.9388,0.2768,0.1153],"m":[0.4093,0.0732,0.1977],"z":[0.1983,0.0457,0.0968],"su":0.7979},"130":{"h":[0.4675,0.6068,0.6715],"m":[0.2695,0.3754,0.5819],"z":[0.4767,0.2421,0.2662],"su":0.106},"131":{"h":[0.4985,0.3439,0.2385],"m":[0.4028,0.4515,0.4337],"z":[0.3494,0.253,0.2971],"su":0.4136},"133":{"h":[0.5477,0.5139,0.3814],"m":[0.4084,0.421,0.4121],"z":[0.3747,0.2661,0.3266],"su":0.314},"23":{"h":[0.3211,0.3616,0.409],"m":[0.3683,0.3717,0.3879],"z":[0.3541,0.3298,0.3552],"su":null},"29":{"h":[0.3082,0.4848,0.3462],"m":[0.3211,0.333,0.3004],"z":[0.295,0.2252,0.223],"su":null},"40":{"h":[0.4917,0.4615,0.3537],"m":[0.4497,0.4374,0.3672],"z":[0.381,0.3294,0.3182],"su":0.1958},"66":{"h":[0.7473,0.4682,0.3404],"m":[0.4326,0.4377,0.4254],"z":[0.2386,0.1843,0.2343],"su":0.605},"87":{"h":[0.0948,0.1561,0.3007],"m":[0.0779,0.1406,0.3083],"z":[0.1347,0.1068,0.1803],"su":0.0708},"97":{"h":[0.7035,0.4221,0.3102],"m":[0.6985,0.4779,0.4071],"z":[0.3526,0.2353,0.3386],"su":0.0513}};
-  // lịch trong ngày (giờ game) → ảnh trời; giữa 2 mốc chuyển mượt
-  const SKYS=[[0,'87'],[4.7,'87'],[5.6,'97'],[6.5,'130'],[7.6,'40'],[9.4,'123'],[15.2,'123'],[16.3,'40'],[17.2,'29'],[17.9,'03'],[18.6,'131'],[19.25,'12'],[19.9,'66'],[20.7,'87'],[24,'87']];
+  // ===== ẢNH BẦU TRỜI ASV5 theo giờ + thời tiết =====  (assets/sky/asv5/<giờ>_<kiểu>.jpg: equirect 2048×576 từ đỉnh xuống -12°, đã xoá đĩa mặt trời/trăng vẽ sẵn;
+  // meta: màu trung bình (tuyến tính) dải chân trời/giữa/đỉnh theo đúng ánh xạ độ cao trong shader + vị trí ngang vầng sáng `su`). Nguồn: bộ HDRI ASV5 (8 thời điểm × 8 thời tiết).
+  const SKYCFG={"ver":"asv5c","times":[[0,"night"],[4.7,"night"],[5.5,"dawn"],[6.3,"sunrise"],[7.4,"morning"],[9.4,"noon"],[14.8,"noon"],[16.0,"afternoon"],[18.2,"afternoon"],[18.9,"sunset"],[19.15,"sunset"],[19.7,"blue"],[20.1,"blue"],[20.9,"night"],[24,"night"]],"wx":{"clear":"01","cloudy":"03","overcast":"04","drizzle":"06","light rain":"06","rain":"06","heavy rain":"07","storm":"07","snow":"08","blizzard":"08","fog":"05","windy":"03"},"wxT":6,"dim":0.2,"haze":{"fog":0.55,"snow":0.45,"blizzard":0.6,"heavy rain":0.3,"storm":0.25,"rain":0.15,"light rain":0.1,"drizzle":0.08,"overcast":0.12},"look":[[0,1,0.75,1.8],[4.7,1,0.75,1.8],[5.4,0.85,0.8,1.22],[6.3,1,0.9,1],[8,1.0,0.75,1.04],[15.5,1.0,0.8,1.02],[17.2,1.3,1.35,0.9],[18.2,1.35,1.4,0.85],[18.9,1.2,1.2,0.92],[19.7,1.05,1.05,0.95],[20.9,1,0.75,1.8],[24,1,0.75,1.8]],"wexp":{"storm":0.72,"heavy rain":0.82,"rain":0.92,"blizzard":0.9,"snow":1.15}};
+  const SKYM={"afternoon_01":{"h":[0.6268,0.61,0.6313],"m":[0.4852,0.5553,0.6909],"z":[0.6408,0.5957,0.5895],"su":0.5137},"afternoon_03":{"h":[0.682,0.6344,0.6107],"m":[0.582,0.5935,0.6522],"z":[0.6666,0.6108,0.5884],"su":0.334},"afternoon_04":{"h":[0.6653,0.591,0.5322],"m":[0.6582,0.6047,0.5693],"z":[0.622,0.5731,0.5529],"su":0.376},"afternoon_05":{"h":[0.6673,0.6214,0.6052],"m":[0.6538,0.6254,0.6292],"z":[0.6187,0.579,0.5837],"su":0.3652},"afternoon_06":{"h":[0.48,0.4259,0.4334],"m":[0.461,0.423,0.4547],"z":[0.469,0.4234,0.4458],"su":0.4937},"afternoon_07":{"h":[0.3402,0.329,0.4086],"m":[0.2626,0.2963,0.4377],"z":[0.2805,0.2852,0.3981],"su":0.9434},"afternoon_08":{"h":[0.6781,0.6198,0.5805],"m":[0.6854,0.631,0.5953],"z":[0.6138,0.5737,0.5714],"su":0.4321},"blue_01":{"h":[0.3064,0.2296,0.2748],"m":[0.2037,0.1826,0.2808],"z":[0.1534,0.1858,0.3066],"su":0.5723},"blue_03":{"h":[0.3099,0.2605,0.3118],"m":[0.2108,0.1963,0.2989],"z":[0.1517,0.1844,0.3047],"su":0.6377},"blue_04":{"h":[0.2803,0.2435,0.2919],"m":[0.2043,0.2146,0.3204],"z":[0.1723,0.2116,0.3372],"su":0.668},"blue_05":{"h":[0.3082,0.2553,0.3068],"m":[0.2167,0.2129,0.3209],"z":[0.1662,0.2021,0.3293],"su":0.644},"blue_06":{"h":[0.1803,0.1662,0.2117],"m":[0.1321,0.1432,0.2201],"z":[0.1069,0.131,0.2167],"su":0.7661},"blue_07":{"h":[0.1337,0.1146,0.1541],"m":[0.0826,0.0725,0.127],"z":[0.0615,0.0752,0.1377],"su":0.5693},"blue_08":{"h":[0.3003,0.2559,0.3037],"m":[0.2153,0.2221,0.3313],"z":[0.1846,0.2254,0.3596],"su":0.6909},"dawn_01":{"h":[0.3363,0.2745,0.4488],"m":[0.2696,0.2377,0.4217],"z":[0.2713,0.2734,0.4266],"su":0.1348},"dawn_03":{"h":[0.3477,0.2851,0.4568],"m":[0.2918,0.2655,0.4423],"z":[0.2435,0.247,0.3945],"su":0.0068},"dawn_04":{"h":[0.346,0.2979,0.4382],"m":[0.306,0.2925,0.4458],"z":[0.2733,0.2796,0.4198],"su":0.106},"dawn_05":{"h":[0.3594,0.3028,0.4654],"m":[0.3095,0.2868,0.4593],"z":[0.2818,0.2869,0.4367],"su":0.0234},"dawn_06":{"h":[0.2457,0.2204,0.3364],"m":[0.2113,0.2086,0.3333],"z":[0.2309,0.2356,0.359],"su":0.9028},"dawn_07":{"h":[0.1752,0.1573,0.2704],"m":[0.1286,0.1211,0.2458],"z":[0.1265,0.1325,0.2402],"su":0.0112},"dawn_08":{"h":[0.3717,0.3193,0.4668],"m":[0.3153,0.2994,0.4609],"z":[0.2814,0.2873,0.434],"su":0.0859},"morning_01":{"h":[0.5035,0.6384,0.7253],"m":[0.3836,0.5739,0.734],"z":[0.4248,0.522,0.661],"su":0.1021},"morning_03":{"h":[0.5579,0.6663,0.7252],"m":[0.5544,0.6535,0.7143],"z":[0.5769,0.6232,0.672],"su":0.127},"morning_04":{"h":[0.6376,0.6632,0.6451],"m":[0.5896,0.643,0.6592],"z":[0.6269,0.6388,0.6273],"su":0.1406},"morning_05":{"h":[0.6961,0.7221,0.699],"m":[0.4989,0.6298,0.7251],"z":[0.6266,0.6567,0.6776],"su":0.2251},"morning_06":{"h":[0.4744,0.5188,0.5358],"m":[0.4213,0.4974,0.5509],"z":[0.4636,0.5097,0.5312],"su":0.3862},"morning_07":{"h":[0.2663,0.3811,0.487],"m":[0.1822,0.3346,0.4941],"z":[0.2278,0.3373,0.468],"su":0.1533},"morning_08":{"h":[0.6911,0.7127,0.6859],"m":[0.5497,0.6408,0.6962],"z":[0.6683,0.6794,0.6639],"su":0.186},"night_01":{"h":[0.0827,0.1151,0.2168],"m":[0.0698,0.1011,0.1989],"z":[0.074,0.1036,0.1804],"su":0.7041},"night_03":{"h":[0.0998,0.1358,0.2371],"m":[0.0842,0.1188,0.2166],"z":[0.0945,0.1302,0.2164],"su":0.9375},"night_04":{"h":[0.1014,0.1366,0.2264],"m":[0.0965,0.1331,0.224],"z":[0.1049,0.1433,0.2298],"su":0.6401},"night_05":{"h":[0.1092,0.147,0.2464],"m":[0.0862,0.1213,0.2202],"z":[0.0863,0.1196,0.2024],"su":0.6724},"night_06":{"h":[0.0777,0.1061,0.1767],"m":[0.0651,0.0926,0.1615],"z":[0.0688,0.0972,0.1646],"su":0.752},"night_07":{"h":[0.0459,0.0669,0.1273],"m":[0.0279,0.0458,0.1056],"z":[0.0315,0.0492,0.0999],"su":0.8345},"night_08":{"h":[0.1163,0.1552,0.2514],"m":[0.0945,0.1312,0.2262],"z":[0.1175,0.1597,0.2535],"su":0.6323},"noon_01":{"h":[0.5335,0.6552,0.7511],"m":[0.3709,0.5533,0.7491],"z":[0.4701,0.5473,0.6811],"su":0.2163},"noon_03":{"h":[0.6428,0.7162,0.7523],"m":[0.4778,0.6133,0.7428],"z":[0.5552,0.6174,0.7069],"su":0.2466},"noon_04":{"h":[0.6636,0.698,0.6895],"m":[0.6504,0.6902,0.6943],"z":[0.6813,0.6961,0.6793],"su":0.2305},"noon_05":{"h":[0.6767,0.735,0.7519],"m":[0.4909,0.6227,0.7489],"z":[0.6529,0.691,0.7231],"su":0.1353},"noon_06":{"h":[0.4533,0.5272,0.5661],"m":[0.404,0.501,0.5725],"z":[0.4522,0.5214,0.566],"su":0.2466},"noon_07":{"h":[0.2559,0.3837,0.5019],"m":[0.1684,0.3251,0.4996],"z":[0.2097,0.3262,0.4739],"su":0.3022},"noon_08":{"h":[0.6782,0.7259,0.7328],"m":[0.5851,0.6672,0.7282],"z":[0.6618,0.6888,0.703],"su":0.2705},"sunrise_01":{"h":[0.685,0.5288,0.5232],"m":[0.6216,0.5092,0.5606],"z":[0.4858,0.4623,0.5431],"su":0.8247},"sunrise_03":{"h":[0.695,0.5388,0.5266],"m":[0.6537,0.5428,0.5647],"z":[0.6148,0.5558,0.5643],"su":0.1104},"sunrise_04":{"h":[0.7033,0.5786,0.4794],"m":[0.6666,0.5692,0.5343],"z":[0.6512,0.5787,0.5358],"su":0.0508},"sunrise_05":{"h":[0.7507,0.6057,0.5218],"m":[0.6486,0.5346,0.5694],"z":[0.6721,0.6003,0.5756],"su":0.0078},"sunrise_06":{"h":[0.5088,0.4252,0.398],"m":[0.4374,0.3779,0.42],"z":[0.4951,0.4362,0.4389],"su":0.9873},"sunrise_07":{"h":[0.3553,0.2917,0.3546],"m":[0.2807,0.2368,0.3698],"z":[0.2911,0.2653,0.3625],"su":0.9331},"sunrise_08":{"h":[0.7598,0.6256,0.5056],"m":[0.671,0.5672,0.5555],"z":[0.7277,0.6383,0.5676],"su":0.1392},"sunset_01":{"h":[0.5909,0.378,0.4388],"m":[0.4777,0.2767,0.429],"z":[0.3622,0.2619,0.4528],"su":0.6357},"sunset_03":{"h":[0.5925,0.3765,0.4375],"m":[0.4953,0.3153,0.4733],"z":[0.4125,0.3045,0.4965],"su":0.5234},"sunset_04":{"h":[0.5457,0.3726,0.4263],"m":[0.4864,0.3411,0.4932],"z":[0.4562,0.3391,0.5219],"su":0.5557},"sunset_05":{"h":[0.5871,0.3808,0.4414],"m":[0.5211,0.352,0.5117],"z":[0.4506,0.3333,0.5262],"su":0.6533},"sunset_06":{"h":[0.3606,0.2566,0.3328],"m":[0.3189,0.2348,0.3664],"z":[0.288,0.2197,0.3663],"su":0.4009},"sunset_07":{"h":[0.2816,0.192,0.2753],"m":[0.2249,0.1491,0.276],"z":[0.1978,0.1519,0.2885],"su":0.521},"sunset_08":{"h":[0.5776,0.3887,0.4413],"m":[0.5167,0.3634,0.5203],"z":[0.4631,0.342,0.5355],"su":0.5181}};
+  // lịch trong ngày (giờ game) → bộ trời; giữa 2 mốc chuyển mượt (mốc trùng tên = giữ nguyên)
+  const SKYS=SKYCFG.times;
   const skyTex=new Map(),skyLd=new THREE.TextureLoader();
-  const getSky=k=>{let t=skyTex.get(k);if(t)return t.ok?t.tex:null;t={ok:false,tex:skyLd.load('assets/sky/sky_'+k+'.jpg?v=1',()=>{t.ok=true})};
+  const getSky=k=>{if(!SKYM[k])return null;let t=skyTex.get(k);if(t)return t.ok?t.tex:null;t={ok:false,tex:skyLd.load('assets/sky/asv5/'+k+'.jpg?v='+SKYCFG.ver,()=>{t.ok=true})};
     t.tex.colorSpace=THREE.SRGBColorSpace;t.tex.wrapS=THREE.RepeatWrapping;t.tex.wrapT=THREE.ClampToEdgeWrapping;t.tex.generateMipmaps=false;t.tex.minFilter=THREE.LinearFilter;t.tex.magFilter=THREE.LinearFilter;   // không mipmap: tránh đường nối ở mép ảnh
     skyTex.set(k,t);return null};
-  const sunU=v=>Math.atan2(v.z,v.x)/(2*Math.PI)+0.5,rotOf=(k,su)=>SKYM[k].su==null?0:(SKYM[k].su-su);
-  const _ra=new THREE.Vector3(),_rb=new THREE.Vector3();
+  const sunU=v=>Math.atan2(v.z,v.x)/(2*Math.PI)+0.5,rotOf=(k,su)=>!SKYM[k]||SKYM[k].su==null?0:(SKYM[k].su-su);
+  const wxOf=w=>SKYCFG.wx[w]||SKYCFG.wx.clear;
+  // 2 "khe" thời tiết P/Q: đổi thời tiết = nạp bộ mới vào khe đang ẩn rồi hoà sang (không nhảy ảnh); w: 0 = P, 1 = Q
+  const SKV={P:null,Q:null,w:0};
+  const _ra=new THREE.Vector3(),_rb=new THREE.Vector3(),_rc=new THREE.Vector3();
   function skyStep(t,sunV,moonV,isDay,dt){
     t=((t%24)+24)%24;let i=0;while(i<SKYS.length-2&&SKYS[i+1][0]<=t)i++;
     const [t0,a]=SKYS[i],[t1,b]=SKYS[i+1];let m=t1>t0?(t-t0)/(t1-t0):0;m=m*m*(3-2*m);
-    const wK=Math.min(1,Math.max(0,(WC.cov-0.55)/0.3)),cK=isDay?'23':'66';
-    const A=getSky(a),B=getSky(b),C=wK>0.01?getSky(cK):null;
-    // ảnh kế tiếp nạp trước
-    getSky(SKYS[Math.min(SKYS.length-1,i+2)][1]);
-    const ok=A&&B&&(wK<=0.01||C);const U=skyU;
+    const S=SKV,tv=wxOf(TP.weather);if(S.P==null){S.P=S.Q=tv;S.w=0}
+    let dir;if(tv===S.P)dir=0;else if(tv===S.Q)dir=1;else if(S.w<0.5){if(S.w<=0.001){S.Q=tv;dir=1}else dir=0}else{if(S.w>=0.999){S.P=tv;dir=0}else dir=1}
+    const A=getSky(a+'_'+S.P),B=getSky(b+'_'+S.P),C=getSky(a+'_'+S.Q),D=getSky(b+'_'+S.Q);
+    {const n=SKYS[Math.min(SKYS.length-1,i+2)][1];getSky(n+'_'+S.P);if(S.Q!==S.P)getSky(n+'_'+S.Q);}   // mốc kế tiếp nạp trước
+    const okP=!!(A&&B),okQ=!!(C&&D),st=(dt||0.016)/SKYCFG.wxT;
+    if(dir===1&&okQ)S.w=Math.min(1,S.w+st);else if(dir===0&&okP)S.w=Math.max(0,S.w-st);
+    const ok=(S.w<0.999?okP:true)&&(S.w>0.001?okQ:true);const U=skyU;
     U.uTexK.value+=((ok?1:0)-U.uTexK.value)*Math.min(1,(dt||0.016)*2);if(!ok)return;
-    U.tA.value=A;U.tB.value=B;U.tC.value=C||A;U.uMix.value=m;U.uW.value=wK;
-    const su=sunU(isDay?sunV:moonV);U.uRA.value=rotOf(a,su);U.uRB.value=rotOf(b,su);U.uRC.value=rotOf(cK,su);
-    const bl=(f)=>{_ra.fromArray(SKYM[a][f]).lerp(_rb.fromArray(SKYM[b][f]),m);if(wK>0.01)_ra.lerp(_rb.fromArray(SKYM[cK][f]),wK);return _ra};
+    const w=S.w*S.w*(3-2*S.w);
+    U.tA.value=A||C;U.tB.value=B||D;U.tC.value=C||A;U.tD.value=D||B;U.uMix.value=m;U.uW.value=w;
+    const dU=((t-5.5)%24+24)%24,az=(dU<14?110-220*dU/14:-110-140*(dU-14)/10)*Math.PI/180,su=(((Math.PI/2-az)/(2*Math.PI)+0.5)%1+1)%1;   // hướng xoay liên tục cả ngày: ban ngày = hướng mặt trời, ban đêm quay tiếp về hướng bình minh → mây không giật lúc đổi ngày/đêmU.uRA.value=rotOf(a+'_'+S.P,su);U.uRB.value=rotOf(b+'_'+S.P,su);U.uRC.value=rotOf(a+'_'+S.Q,su);U.uRD.value=rotOf(b+'_'+S.Q,su);
+    const M=k=>SKYM[k]||SKYM[a+'_'+S.P]||SKYM[b+'_'+S.P];
+    const bl=f=>{_ra.fromArray(M(a+'_'+S.P)[f]).lerp(_rb.fromArray(M(b+'_'+S.P)[f]),m);if(w>0.001){_rc.fromArray(M(a+'_'+S.Q)[f]).lerp(_rb.fromArray(M(b+'_'+S.Q)[f]),m);_ra.lerp(_rc,w)}return _ra};
     U.rH.value.copy(bl('h'));U.rM.value.copy(bl('m'));U.rZ.value.copy(bl('z'));
-    U.uSkyDim.value=1-0.35*WC.rain;}
+    {const L=SKYCFG.look;let j=0;while(j<L.length-2&&L[j+1][0]<=t)j++;const [a0,c0,s0,e0=1]=L[j],[a1,c1,s1,e1=1]=L[j+1],u=a1>a0?Math.min(1,Math.max(0,(t-a0)/(a1-a0))):0;U.uTC.value=c0+(c1-c0)*u;U.uTS.value=s0+(s1-s0)*u;U.uTE.value=e0+(e1-e0)*u;}
+    U.uHaze.value+=((SKYCFG.haze[TP.weather]||0)-U.uHaze.value)*Math.min(1,(dt||0.016)*0.6);
+    SKV.we=(SKV.we==null?1:SKV.we)+(((SKYCFG.wexp||{})[TP.weather]||1)-(SKV.we==null?1:SKV.we))*Math.min(1,(dt||0.016)*0.6);
+    U.uSkyDim.value=(1-SKYCFG.dim*WC.rain)*SKV.we;}
   window.__sky={U:skyU,SKYS,getSky};
   scene.fog=new THREE.Fog(SKY.hor,70,300);
   
