@@ -1250,14 +1250,14 @@ ${FRAG_COLOR}
       c+=vec3(st)*uStar*smoothstep(0.03,0.3,h)*up;
       // mặt trời + quầng bậc thang
       float sd=dot(d,normalize(sunDir));
-      c+=vec3(1.0,0.78,0.5)*(smoothstep(0.93,0.99,sd)*0.28+uOut*(smoothstep(0.6,0.97,sd)*0.12+smoothstep(0.985,0.998,sd)*0.2))*uSunV*up;
+      c+=vec3(1.0,0.78,0.5)*(smoothstep(0.93,0.99,sd)*0.28+uOut*(smoothstep(0.6,0.97,sd)*0.12+smoothstep(0.985,0.998,sd)*0.2))*uSunV*up*(1.0-0.6*uTexK);   // ảnh ASV5 đã có vầng sáng: giảm quầng rộng cũ để mặt trời không bị nhoè trắng
       c=mix(c,vec3(1.0,0.97,0.82),smoothstep(0.9975,0.9982,sd)*uSunV*up);
       // MẶT TRỜI ĐIỆN ẢNH (ASV5): quầng rộng + quầng gần + dải sáng ấm chân trời khi nắng thấp + lõi sáng > 1 (bloom). uSunGlow/uSunTint theo giờ (SKYCFG.look)
       {float sv=uSunV*up*uSunGlow,x1=max(1.0-sd,0.0),hzb=1.0-smoothstep(0.0,0.4,h);
        float az2=pow(max(dot(normalize(d.xz+vec2(1e-4)),normalize(sunDir.xz+vec2(1e-4))),0.0),3.0);
-       c+=uSunTint*(exp(-x1*9.0)*0.09+exp(-x1*70.0)*0.16+exp(-x1*600.0)*0.38)*sv;
+       c+=uSunTint*(exp(-x1*9.0)*0.05+exp(-x1*70.0)*0.12+exp(-x1*600.0)*0.42)*sv;
        c+=uSunTint*az2*hzb*0.22*sv*(1.0-smoothstep(0.05,0.5,sunDir.y));
-       c+=vec3(1.0,0.97,0.9)*(smoothstep(0.99955,0.99972,sd)*1.8+exp(-x1*3000.0)*0.6)*uSunV*up*clamp(uSunGlow*1.5,0.5,1.0);}
+       c+=vec3(1.0,0.97,0.9)*(smoothstep(0.99955,0.99972,sd)*2.6+exp(-x1*3000.0)*0.9)*uSunV*up*clamp(uSunGlow*1.5,0.5,1.0);}
       // mặt trăng
       float md=dot(d,normalize(moonDir));
       if(uOut<0.5){c=mix(c,vec3(0.95,0.96,1.0),smoothstep(0.9988,0.9991,md)*uStar*up);
@@ -1750,9 +1750,9 @@ ${FRAG_COLOR}
     return {u,v:new THREE.Vector3(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)),el}}
 
   // post-fx
-  const GradeShader={uniforms:{tDiffuse:{value:null},uExpo:{value:1},uCon:{value:1},uSat:{value:1},uTemp:{value:0},uVig:{value:.3},uTime:{value:0},uTintAmt:{value:.3},uFlash:{value:0},uLift:{value:new THREE.Vector3()},uGrain:{value:0},uTintSh:{value:new THREE.Vector3(.4,.35,.6)},uTintHi:{value:new THREE.Vector3(1,.7,.45)}},
+  const GradeShader={uniforms:{tDiffuse:{value:null},uExpo:{value:1},uCon:{value:1},uSat:{value:1},uTemp:{value:0},uVig:{value:.3},uTime:{value:0},uTintAmt:{value:.3},uFlash:{value:0},uLift:{value:new THREE.Vector3()},uGrain:{value:0},uGold:{value:0},uTintSh:{value:new THREE.Vector3(.4,.35,.6)},uTintHi:{value:new THREE.Vector3(1,.7,.45)}},
     vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-    fragmentShader:`uniform sampler2D tDiffuse;uniform float uExpo,uCon,uSat,uTemp,uVig,uTime,uTintAmt,uFlash,uGrain;uniform vec3 uTintSh,uTintHi,uLift;varying vec2 vUv;
+    fragmentShader:`uniform sampler2D tDiffuse;uniform float uExpo,uCon,uSat,uTemp,uVig,uTime,uTintAmt,uFlash,uGrain;uniform vec3 uTintSh,uTintHi,uLift;uniform float uGold;varying vec2 vUv;
     float hs(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
     void main(){vec3 c=texture2D(tDiffuse,vUv).rgb;
       c*=uExpo*(1.0+uFlash*vec3(0.8,0.92,1.3));   // chớp: ánh xanh lạnh
@@ -1764,6 +1764,11 @@ ${FRAG_COLOR}
       float sw=1.0-smoothstep(0.02,0.4,l),hw=smoothstep(0.3,1.3,l);
       c*=mix(vec3(1.0),uTintSh*1.8,uTintAmt*sw);
       c*=mix(vec3(1.0),uTintHi*1.4,uTintAmt*hw);
+      // GIỜ VÀNG / BÌNH MINH: lá xanh ngả vàng lục, highlight hổ phách, bóng tím ấm (uGold do envApply đặt theo giờ + thời tiết)
+      if(uGold>0.001){float l2=dot(c,vec3(.2126,.7152,.0722));vec3 w=c*vec3(1.1,1.0,0.8);w.r+=max(c.g-c.r,0.0)*0.38;w.b*=1.0-max(c.g-c.b,0.0)*0.15;
+        w=mix(w,w*vec3(1.08,0.95,0.78),smoothstep(0.3,0.85,l2)*(1.0-smoothstep(0.85,1.2,l2))*0.65);w=mix(w,w*vec3(0.88,0.8,1.02),(1.0-smoothstep(0.04,0.32,l2))*0.5);
+        float l3=dot(w,vec3(.2126,.7152,.0722));if(l3>0.82)w*=(0.82+(l3-0.82)/(1.0+(l3-0.82)*1.2))/l3;   // vai sáng mềm: trời quanh mặt trời không cháy trắng, đĩa mặt trời vẫn > 1 để bloom
+        c=mix(c,w,uGold);}
       vec2 q=vUv-0.5;c*=1.0-uVig*smoothstep(0.25,0.78,length(q*vec2(1.25,1.0)));
       l=dot(c,vec3(.2126,.7152,.0722));c+=uLift*(1.0-smoothstep(0.0,0.55,l));   // nâng vùng tối theo thời tiết (mây/mưa/tuyết/sương)
       c+=(hs(gl_FragCoord.xy+fract(uTime*7.13)*517.0)-0.5)*uGrain*(1.0-0.6*l);   // hạt phim nhẹ (đổi theo khung), bớt ở vùng sáng
@@ -1879,7 +1884,7 @@ ${FRAG_COLOR}
   function thunder(){if(!RA.ctx)return;const ctx=RA.ctx,s=ctx.createBufferSource();s.buffer=RA.buf;const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=180;const g=ctx.createGain();
     const t0=ctx.currentTime+0.25+Math.random()*0.9;g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(0.9,t0+0.08);g.gain.exponentialRampToValueAtTime(0.001,t0+2.6);s.connect(lp);lp.connect(g);g.connect(ctx.destination);s.start(t0);s.stop(t0+2.8)}
 
-  let flash=0,flash2=-1,flashT=5,tgtW=WEATHER.clear;
+  let flash=0,flash2=-1,flashT=5,tgtW=WEATHER.clear;const _gdHi=new THREE.Vector3(),_gdSh=new THREE.Vector3(),_gdA=new THREE.Vector3(),_gdC=new THREE.Color();
   const sunLight=window.__L.sun,hemiL=window.__L.hemi,ambL=window.__L.amb;
   const _tc=new THREE.Vector3(5,1.5,-4);
   let sfxW=null,sfxAmbT=0;
@@ -1922,6 +1927,15 @@ ${FRAG_COLOR}
     GU.uExpo.value=TP.expo*(1-(1-WC.dim)*0.3);GU.uCon.value=TP.con*(OUTD?0.97:1);GU.uSat.value=TP.sat*(1-WC.des*0.35)*(OUTD?0.9:1);GU.uCon.value*=WL.gC;GU.uTemp.value=TP.temp+k.gt+WL.gT;GU.uVig.value=TP.vig+WL.gV;GU.uLift.value.copy(WL.gL).multiplyScalar(0.5+0.5*k.day);GU.uGrain.value=WL.gG;GU.uTintAmt.value=TP.tintAmt;GU.uFlash.value=flash*0.6;
     const hs=h=>{const v=hexV(h);return new THREE.Vector3(v.x,v.y,v.z)};GU.uTintSh.value.copy(hexV(TP.tintSh));GU.uTintHi.value.copy(hexV(TP.tintHi));
     bloomP.strength=TP.bloom*(1+0.8*(1-k.day));bloomP.threshold=TP.bloomTh;bloomP.radius=0.55;
+    // ===== BÌNH MINH + GIỜ VÀNG ĐIỆN ẢNH: nắng gắt hơn trời (tương phản sáng/tối), ám hổ phách + bóng tím lạnh, bloom rực. Áp SAU khi HANA lấy grade gốc → cây cỏ cũng nhận.
+    {const G={"dawn":0.85,"dusk":1,"con":0.18,"sat":0.08,"temp":0.06,"vig":0.1,"expo":0.03,"tint":0.4,"hi":[1,0.74,0.42],"sh":[0.42,0.34,0.56],"bloom":0.24,"th":0.9,"sun":0.4,"amb":0.25,"lut":0.7,"ambC":[1.0,0.72,0.55],"ambMix":0.55},bump=(x,a,p,b)=>x<=a||x>=b?0:x<p?Math.sin((x-a)/(p-a)*Math.PI/2)**2:Math.sin((b-x)/(b-p)*Math.PI/2)**2;
+     const g=Math.max(bump(t,5.2,6.3,7.9)*G.dawn,bump(t,16.0,18.15,19.75)*G.dusk)*Math.min(1,Math.max(0,(WC.cov-0.4)/0.2)),gs=g*(isDay?fade:0);
+     window.__gold=g;
+     GU.uGold.value=0;if(g>0.001){GU.uGold.value=G.lut*g;GU.uCon.value*=1+G.con*g;GU.uSat.value*=1+G.sat*g;GU.uTemp.value+=G.temp*g;GU.uVig.value+=G.vig*g;GU.uExpo.value*=1+G.expo*g;
+      GU.uTintAmt.value+=(G.tint-GU.uTintAmt.value)*g;GU.uTintHi.value.lerp(_gdHi.set(...G.hi),g);GU.uTintSh.value.lerp(_gdSh.set(...G.sh),g);
+      bloomP.strength+=G.bloom*g;bloomP.threshold+=(G.th-bloomP.threshold)*g;bloomP.radius+=(0.75-bloomP.radius)*g;
+      sunLight.intensity*=1+G.sun*gs;hemiL.intensity*=1-G.amb*gs;TU.uSunC.value.multiplyScalar(1+G.sun*gs);TU.uAmbS.value.multiplyScalar(1-G.amb*gs);TU.uAmbG.value.multiplyScalar(1-G.amb*gs);
+      {const A=TU.uAmbS.value,la=A.x*.2126+A.y*.7152+A.z*.0722,c=G.ambC,lc=c[0]*.2126+c[1]*.7152+c[2]*.0722;A.lerp(_gdA.set(c[0],c[1],c[2]).multiplyScalar(la/lc),G.ambMix*g);hemiL.color.lerp(_gdC.setRGB(c[0],c[1],c[2]),G.ambMix*g);}}}   // vùng khuất nắng cũng ấm (hồng đào) thay vì tím xám
     // light shafts
     const dirL=act.v,ltC=des(k.sun);beamU.uCol.value.copy(ltC);beamU.uDir.value.copy(dirL).multiplyScalar(-1);
     let any=0;for(const b of beams){const fct=Math.max(0,b.nrm.dot(dirL)-0.12);const I=TP.rays*fct*0.42*k.sunI*WC.dim*fade*(1-WC.des*0.4);b.mat.uniforms.uI.value=I;b.m.visible=I>0.01;any=Math.max(any,I)}
