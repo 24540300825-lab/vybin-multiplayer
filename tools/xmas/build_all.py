@@ -7,13 +7,14 @@ from xm_common import *
 from xm_house import build_house
 from xm_deck import build_deck
 from xm_interior import build_interior
+from xm_booth import build_booth
 from xb import write_glb, Node
 OUT = sys.argv[1] if len(sys.argv) > 1 else '/tmp/xmas_out'
 os.makedirs(OUT, exist_ok=True)
 t0 = time.time()
 H = build_house('ext'); D = build_deck()
 
-def storey_nodes(H, D, walk_name='Walk_XM_Porch'):
+def storey_nodes(H, D, walk_name='Walk_XM_Porch', with_col=False):
     house = Node('XM_House', children=[
         Node('XM_House_Shell', H['shell'].merge(H['timber']).merge(H['porch']).merge(H['porch_t'])),
         Node('XM_House_Stone', H['stone']),
@@ -25,7 +26,14 @@ def storey_nodes(H, D, walk_name='Walk_XM_Porch'):
         Node('XM_House_Decor', H['decor']),
         Node(walk_name, H['walk']),
     ])
-    deck = [Node('XM_Deck_Center', D['center']), Node('XM_PadL', D['padL']), Node('XM_PadR', D['padR']),
+    B = build_booth()
+    booth = Node('XM_PadL_Photobooth', children=[
+        Node('XM_PadL_Booth_Shell', B['shell'].merge(B['timber']).merge(B['step'])), Node('XM_PadL_Booth_Stone', B['stone']),
+        Node('XM_PadL_Booth_Roof', B['roof']), Node('XM_PadL_Booth_Snow', B['snow']), Node('XM_PadL_Booth_Sign', B['sign']),
+        Node('XM_PadL_Booth_Kiosk', B['kiosk']), Node('XM_PadL_Booth_Light', B['glow']), Node('XM_PadL_Booth_Nook', B['nook']),
+        Node('XM_PadL_Booth_Decor', B['decor']), Node('XM_PadL_Booth_Window', B['win_f'].merge(B['win_g']).merge(B['win_c']))])
+    extra = [Node('COL_Photobooth', B['col'])] if with_col else []
+    deck = [booth] + extra + [Node('XM_Deck_Center', D['center']), Node('XM_PadL', D['padL']), Node('XM_PadR', D['padR']),
             Node('XM_Deck_Snow', D['snow']), Node('XM_Deck_Support', D['support'])]
     return [house] + deck
 
@@ -34,7 +42,7 @@ root = Node('exterior@L2-2', children=storey_nodes(H, D))
 n1 = write_glb(f'{OUT}/season-christmas-house.glb', [root], MATS)
 # 2) balcony map
 H2 = build_house('ext'); D2 = build_deck()
-root = Node('XMASDECK', children=storey_nodes(H2, D2))
+root = Node('XMASDECK', children=storey_nodes(H2, D2, with_col=True))
 n2 = write_glb(f'{OUT}/map-xmasdeck.glb', [root], MATS, local=BAL_LOCAL)
 # 3) interior map
 Hi = build_house('int'); Di = build_interior()

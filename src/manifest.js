@@ -122,17 +122,17 @@ export const FILES = {
  },
  "map-xmasdeck": {
   "file": "map-xmasdeck.glb",
-  "v": "933f1c3f",
-  "size": 2211840
+  "v": "af2e3528",
+  "size": 3195100
  },
  "map-xmasin": {
   "file": "map-xmasin.glb",
-  "v": "ea87c6a2",
-  "size": 1730896
+  "v": "380836ed",
+  "size": 1728964
  },
  "season-christmas-house": {
   "file": "season-christmas-house.glb",
-  "v": "e6e61036",
-  "size": 2207932
+  "v": "989b40cf",
+  "size": 3186856
  }
 };

@@ -187,13 +187,15 @@ if (houseLevel() >= 4) Object.assign(MAP_CONFIGS.exterior, EXTERIOR_L4);
 // 2 map: xmasdeck = sân thượng / ban công (sàn = y 0 · toạ độ = thế giới x+9.6, z−2.0) · xmasin = trong nhà, cắt mặt trước + mái (x+0.7, z+2.7).
 // Cầu thang xoắn của Phòng Game lên thẳng góc sau-trái trong nhà (cùng toạ độ thế giới 0.65, 7.32); cửa chính ra ban công.
 export const XMAS_MAPS = {
-  xmasdeck:{name:'Sân thượng Giáng sinh',room:[0.25,28.95,-12.4,0.0,4.0,true],triCol:true,flat:true,wallMats:[],treadNames:[],mezz:[],
+  xmasdeck:{name:'Sân thượng Giáng sinh',room:[0.25,28.95,-12.4,0.0,4.0,true],triCol:true,flat:true,wallMats:[],treadNames:[],mezz:[],hide:/^COL_/,
     walk0:[0.4,28.8,-12.25,-0.12],l1:[0,0,0,0],cl1:[0,0,0,0],garden:false,gtex:'Plane',out:/^__none__$/,lift:0,
     ext:{dx:9.6,dy:-13.06,dz:-2.0,hideSeason:/XM_/},
     // hiên + 2 bậc thềm (mesh Walk_XM_Porch): đi lên được, cao độ theo từng bậc
     raise:[[12.9,16.3,-2.66,-2.33,0.15],[12.9,16.3,-2.96,-2.66,0.30],[12.76,16.44,-4.42,-2.96,0.45]],
     doors:[{at:[14.6,1.6,-4.25],to:'xmasin',label:'Vào Nhà Giáng sinh'}],
-    spots:[{at:[4.43,1.1,-8.0],label:'Góc photobooth Giáng sinh',id:'xmas_photobooth'},{at:[24.78,1.1,-8.0],label:'Cưỡi tuần lộc',id:'xmas_reindeer'}],
+    // VIBE LAB PHOTOBOOTH (bãi trái): ghim ở cửa vòm → đi tới trước cửa rồi mở chế độ chụp ảnh có sẵn (src/features/photo.js, id 'photobooth').
+    // Không đi vào trong booth (COL_Photobooth chặn cửa); thoát chụp ảnh (Esc) là đứng lại ngay trước cửa.
+    spots:[{at:[2.25,2.0,-6.75],label:'Vào photobooth',id:'photobooth'},{at:[24.78,1.1,-8.0],label:'Cưỡi tuần lộc',id:'xmas_reindeer'}],
     spawnFrom:{xmasin:[14.6,-3.75,0,0],default:[14.6,-1.4,Math.PI,0]}},
   xmasin:{name:'Nhà Giáng sinh',room:[0,11.4,-7.4,0.35,3.3],triCol:true,flat:true,wallMats:[],treadNames:[],mezz:[],hide:/^COL_/,
     glass:{front:{x0:0.1,x1:11.3,z:0.33,y0:0,y1:3.3},top:{x0:0.1,x1:11.3,z0:-7.35,z1:0.33,y:3.3}},

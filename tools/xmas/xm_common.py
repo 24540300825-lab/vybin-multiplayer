@@ -118,6 +118,10 @@ MATS = [
     Mat('XM_Mug_Red', '#B63B35', 0.7),
     Mat('XM_Hole_Dark', '#120E0B', 1.0),
     Mat('XM_Collider', '#FF00FF', 1.0),
+    # photobooth
+    Mat('XM_Sign_Letters', '#F7E8C6', 0.75),
+    Mat('XM_Sign_LetterSide', '#D8B47E', 0.85),
+    Mat('XM_Kiosk_Screen', '#D6EBDD', 0.4, 0.0, emis='#CFE9D8', emis_k=0.45),
 ]
 MATN = {m.name for m in MATS}
 
